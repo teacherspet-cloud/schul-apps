@@ -10,6 +10,7 @@ import type { Block } from '@shared/mehrspieler/kern'
 import { liveSenden, useLiveSicht } from '../../../shared/liveSicht'
 import { senden } from '../../onlinetest/serverApi'
 import { Bloecke, SPIEL_OHNE_MARKIEREN } from '../mehrspieler/Bloecke'
+import { kt } from '@shared/klassenspiel/texte'
 
 interface Sicht {
   code: string
@@ -80,7 +81,7 @@ function Losen({ s }: { s: Sicht }): React.JSX.Element | null {
       ) : (
         <>
           <Text fw={900} size="2rem" c={s.team.farbe}>
-            {s.team.symbol} Team {s.team.name}
+            {s.team.symbol} {s.team.name}
           </Text>
           <Text mt={4}>{s.team.mitglieder.join(', ')}</Text>
         </>
@@ -131,11 +132,11 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
           {s.phase === 'lobby' && (
             <Card withBorder radius="lg" padding="lg" ta="center" data-klasse-warten>
               <Text fw={800} size="xl">
-                Du bist dabei! 👋
+                {kt(s.sprache, 'uiDuDabei')}
               </Text>
               <Text mt="xs">{s.regel}</Text>
               <Text c="dimmed" mt="md">
-                Gleich geht es los – schau nach vorn.
+                {kt(s.sprache, 'uiGleich')}
               </Text>
             </Card>
           )}
@@ -143,7 +144,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
             <Stack>
               <Losen s={s} />
               <Text c="dimmed" ta="center">
-                Gleich geht es los.
+                {kt(s.sprache, 'uiGleichKurz')}
               </Text>
             </Stack>
           )}
@@ -151,13 +152,13 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
             <>
               {s.team && (
                 <Badge size="lg" color={s.team.farbe} variant="light" tt="none" style={{ alignSelf: 'flex-start' }}>
-                  {s.team.symbol} Team {s.team.name}
+                  {s.team.symbol} {s.team.name}
                 </Badge>
               )}
               {s.pause ? (
                 <Card withBorder radius="lg" padding="xl" ta="center">
                   <Text fw={900} size="2rem">
-                    ⏸ Pause
+                    ⏸ {kt(s.sprache, 'uiPause')}
                   </Text>
                 </Card>
               ) : (
@@ -174,17 +175,15 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                 </Text>
                 {s.ergebnis.rekord && (
                   <Text fw={800} c="yellow.7" mt="xs">
-                    🏆 Neuer Klassenrekord: {s.ergebnis.rekord}
+                    {kt(s.sprache, 'uiNeuerRekord', s.ergebnis.rekord)}
                   </Text>
                 )}
               </Paper>
               {s.ergebnis.eigen && (
                 <Card withBorder radius="lg" padding="md" data-klasse-eigen>
-                  <Text fw={700}>Deine Runde (siehst nur du)</Text>
-                  <Text>
-                    {s.ergebnis.eigen.richtig} richtig · {s.ergebnis.eigen.falsch} falsch · {s.ergebnis.eigen.punkte} Verbesserungspunkte
-                  </Text>
-                  {s.ergebnis.eigen.gewonnen && <Text c="teal">Dein Team hat gewonnen!</Text>}
+                  <Text fw={700}>{kt(s.sprache, 'uiDeineRunde')}</Text>
+                  <Text>{kt(s.sprache, 'uiEigen', s.ergebnis.eigen.richtig, s.ergebnis.eigen.falsch, s.ergebnis.eigen.punkte)}</Text>
+                  {s.ergebnis.eigen.gewonnen && <Text c="teal">{kt(s.sprache, 'uiTeamGewonnen')}</Text>}
                   {s.ergebnis.eigenText && (
                     <Text size="sm" mt={4} data-klasse-eigen-text>
                       {s.ergebnis.eigenText}
@@ -192,7 +191,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                   )}
                   {s.ergebnis.eigen.falsch > 0 && (
                     <Text size="sm" c="dimmed" mt={4}>
-                      Was falsch war, kommt beim Üben bald wieder dran.
+                      {kt(s.sprache, 'uiWiederUeben')}
                     </Text>
                   )}
                 </Card>
@@ -201,18 +200,18 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                 <Card withBorder radius="lg" padding="md">
                   <Group gap={6}>
                     <IconTrophy size={18} />
-                    <Text fw={700}>Am meisten verbessert</Text>
+                    <Text fw={700}>{kt(s.sprache, 'uiVerbessert')}</Text>
                   </Group>
                   {s.ergebnis.top3.map((x, i) => (
                     <Text key={i} fw={x.ich ? 800 : 400}>
                       {i + 1}. {x.name}
-                      {x.ich ? ' – das bist du!' : ''}
+                      {x.ich ? kt(s.sprache, 'uiDasBistDu') : ''}
                     </Text>
                   ))}
                 </Card>
               )}
               <Button variant="light" leftSection={<IconHome size={16} />} component="a" href="/s/">
-                Zur Startseite
+                {kt(s.sprache, 'uiStart')}
               </Button>
             </Stack>
           )}

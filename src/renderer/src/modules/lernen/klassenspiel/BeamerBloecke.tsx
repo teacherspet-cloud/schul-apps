@@ -5,6 +5,7 @@
  */
 import { Badge, Group, Paper, Progress, SimpleGrid, Stack, Text } from '@mantine/core'
 import type { BBlock } from '@shared/klassenspiel/kern'
+import { kt, zahl2 } from '@shared/klassenspiel/texte'
 
 const TON: Record<string, string> = { gut: 'teal', info: 'blue', warn: 'orange' }
 
@@ -46,8 +47,8 @@ function Berg({ b }: { b: Extract<BBlock, { typ: 'berg' }> }): React.JSX.Element
       </svg>
       <Group justify="space-between" mt="xs" wrap="nowrap">
         <Progress value={b.anteil * 100} size={22} radius="xl" color="teal" style={{ flex: 1 }} />
-        <Text fw={800} size="xl" w={190} ta="right">
-          Lager {b.lager}/{b.von}
+        <Text fw={800} size="xl" w={220} ta="right">
+          {b.titel ?? `${b.lager}/${b.von}`}
         </Text>
       </Group>
       {b.hinweis && (
@@ -72,8 +73,8 @@ function Boss({ b }: { b: Extract<BBlock, { typ: 'boss' }> }): React.JSX.Element
       </Text>
       <Progress value={anteil * 100} size={34} radius="xl" color={anteil > 0.66 ? 'red' : anteil > 0.33 ? 'orange' : 'yellow'} mt="sm" striped animated />
       <Text fw={800} size="xl" mt={6}>
-        {b.hp} / {b.max} Lebenspunkte · Phase {b.phase}
-        {b.ruestung ? ' · Rüstung: Schreiben trifft doppelt!' : ''}
+        {b.leben ?? `${b.hp} / ${b.max}`}
+        {b.ruestung && b.ruestungText ? ` · ${b.ruestungText}` : ''}
       </Text>
     </Paper>
   )
@@ -99,9 +100,11 @@ function Bahnen({ b }: { b: Extract<BBlock, { typ: 'bahnen' }> }): React.JSX.Ele
           <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 4, background: '#334155' }} />
           <div style={{ position: 'absolute', left: `calc(${pos}% - 22px)`, top: 8, width: 44, height: 48, borderRadius: 10, background: '#dc2626', transition: 'left .5s', border: '3px solid #fff' }} />
         </div>
-        <Text ta="center" c="dimmed" mt="sm" size="lg">
-          Ziel: {l.ziel} Schritte je Teammitglied
-        </Text>
+        {b.zielText && (
+          <Text ta="center" c="dimmed" mt="sm" size="lg">
+            {b.zielText}
+          </Text>
+        )}
       </Paper>
     )
   }
@@ -111,7 +114,7 @@ function Bahnen({ b }: { b: Extract<BBlock, { typ: 'bahnen' }> }): React.JSX.Ele
         <Paper key={t.name} radius="lg" p="md" withBorder>
           <Group justify="space-between" wrap="nowrap" mb={6}>
             <Text fw={900} size="1.8rem" c={t.farbe}>
-              {t.symbol} Team {t.name}
+              {t.symbol} {t.name}
             </Text>
             <Text fw={800} size="1.6rem">
               {t.wert} / {t.ziel}
@@ -164,7 +167,7 @@ function Karte({ b }: { b: Extract<BBlock, { typ: 'karte' }> }): React.JSX.Eleme
               {t.symbol} {t.name}
             </Text>
             <Text fw={800} size="1.6rem">
-              {t.wert} ★ je Kopf
+              {t.text ?? `${t.wert} ★`}
             </Text>
           </Paper>
         ))}
@@ -174,16 +177,17 @@ function Karte({ b }: { b: Extract<BBlock, { typ: 'karte' }> }): React.JSX.Eleme
 }
 
 /** Klasse gegen den Rekord: zwei Balken (jetzt / Rekord) */
-function Rekord({ b }: { b: Extract<BBlock, { typ: 'rekord' }> }): React.JSX.Element {
+function Rekord({ b, sprache }: { b: Extract<BBlock, { typ: 'rekord' }>; sprache: string }): React.JSX.Element {
   const max = Math.max(1, b.jetzt, b.bisher ?? 0) * 1.1
-  const zahl = (w: number): string => (w / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const zahl = (w: number): string => zahl2(sprache, w / 100)
+  const tx = b.texte
   return (
     <Paper radius="lg" p="lg" withBorder data-beamer-rekord={b.jetzt}>
       <Stack gap="lg">
         <div>
           <Group justify="space-between">
             <Text fw={900} size="2rem">
-              🏁 Jetzt
+              🏁 {tx?.jetzt ?? kt(sprache, 'rkJetzt')}
             </Text>
             <Text fw={900} size="2.6rem" c={b.bisher !== null && b.jetzt > b.bisher ? 'teal' : undefined}>
               {zahl(b.jetzt)}
@@ -194,16 +198,17 @@ function Rekord({ b }: { b: Extract<BBlock, { typ: 'rekord' }> }): React.JSX.Ele
         <div>
           <Group justify="space-between">
             <Text fw={800} size="1.6rem" c="dimmed">
-              🏆 Rekord der Klasse
+              🏆 {tx?.bisher ?? kt(sprache, 'rkBisher')}
             </Text>
             <Text fw={800} size="2rem" c="dimmed">
-              {b.bisher === null ? 'noch keiner' : zahl(b.bisher)}
+              {b.bisher === null ? tx?.keiner ?? kt(sprache, 'rkKeiner') : zahl(b.bisher)}
             </Text>
           </Group>
           <Progress value={b.bisher === null ? 0 : (b.bisher / max) * 100} size={34} radius="xl" color="yellow" />
         </div>
         <Text ta="center" size="lg" c="dimmed">
-          Punkte je Kind und Minute = Treffer × Sorgfalt · {b.richtig} richtig{b.quote !== null ? ` · ${Math.round(b.quote * 100)} % Sorgfalt` : ''}
+          {tx?.formel ?? kt(sprache, 'rkFormel')} · ✔ {b.richtig}
+          {b.quote !== null ? ` · ${tx?.sorgfalt ?? ''}` : ''}
         </Text>
       </Stack>
     </Paper>
@@ -212,11 +217,10 @@ function Rekord({ b }: { b: Extract<BBlock, { typ: 'rekord' }> }): React.JSX.Ele
 
 /** Wett-Quiz: Treffsicherheit der Klasse je Einsatz */
 function Treffsicherheit({ b }: { b: Extract<BBlock, { typ: 'treffsicherheit' }> }): React.JSX.Element {
-  const NAMEN: Record<number, string> = { 1: '1 – unsicher', 2: '2 – ziemlich sicher', 3: '3 – ganz sicher' }
   return (
     <Paper radius="lg" p="lg" withBorder data-beamer-treffsicherheit>
       <Text fw={900} size="1.8rem" mb="md">
-        Wie gut schätzt sich die Klasse ein?
+        {b.titel}
       </Text>
       <Stack gap="md">
         {b.stufen.map((x) => {
@@ -225,10 +229,10 @@ function Treffsicherheit({ b }: { b: Extract<BBlock, { typ: 'treffsicherheit' }>
             <div key={x.einsatz}>
               <Group justify="space-between">
                 <Text fw={800} size="xl">
-                  Einsatz {NAMEN[x.einsatz]}
+                  {x.name ?? x.einsatz}
                 </Text>
                 <Text fw={800} size="xl">
-                  {x.anzahl ? `${Math.round(q * 100)} % richtig (${x.anzahl}×)` : '–'}
+                  {x.text ?? (x.anzahl ? `${Math.round(q * 100)} %` : '–')}
                 </Text>
               </Group>
               <Progress value={q * 100} size={28} radius="xl" color={['gray', 'blue', 'grape'][x.einsatz - 1]} />
@@ -236,9 +240,11 @@ function Treffsicherheit({ b }: { b: Extract<BBlock, { typ: 'treffsicherheit' }>
           )
         })}
       </Stack>
-      <Text c="dimmed" mt="md" size="lg">
-        Gut eingeschätzt heißt: Je höher der Einsatz, desto öfter richtig.
-      </Text>
+      {b.erklaerung && (
+        <Text c="dimmed" mt="md" size="lg">
+          {b.erklaerung}
+        </Text>
+      )}
     </Paper>
   )
 }
@@ -248,12 +254,12 @@ function Tische({ b }: { b: Extract<BBlock, { typ: 'tische' }> }): React.JSX.Ele
   return (
     <Paper radius="lg" p="md" withBorder data-beamer-tische={b.runde}>
       <Text fw={900} size="1.6rem" mb="sm">
-        Runde {b.runde} von {b.von}
+        {b.titel ?? `${b.runde}/${b.von}`}
       </Text>
       <Group gap="sm">
         {b.tische.map((t) => (
           <Badge key={t.name} size="xl" variant={t.fertig === t.gesamt ? 'filled' : 'light'} color={t.fertig === t.gesamt ? 'teal' : 'blue'} tt="none" h="auto" py={8}>
-            {t.name} · {t.fertig}/{t.gesamt} fertig
+            {t.text ?? `${t.name} · ${t.fertig}/${t.gesamt}`}
           </Badge>
         ))}
       </Group>
@@ -267,7 +273,7 @@ export function TeamKarten({ teams, gross = true }: { teams: { name: string; far
       {teams.map((t) => (
         <Paper key={t.name} radius="lg" p="md" withBorder style={{ borderTop: `8px solid var(--mantine-color-${t.farbe}-filled)` }}>
           <Text fw={900} size={gross ? '1.8rem' : 'lg'} c={t.farbe}>
-            {t.symbol} Team {t.name}
+            {t.symbol} {t.name}
           </Text>
           <Text size={gross ? 'lg' : 'sm'} mt={4}>
             {t.mitglieder.join(', ')}
@@ -309,7 +315,7 @@ export function Podest({ plaetze, titel }: { plaetze: { name: string; wert: stri
   )
 }
 
-export function BeamerBloecke({ bloecke }: { bloecke: BBlock[] }): React.JSX.Element {
+export function BeamerBloecke({ bloecke, sprache = 'de' }: { bloecke: BBlock[]; sprache?: string }): React.JSX.Element {
   return (
     <Stack gap="md" data-beamer-bloecke>
       {bloecke.map((b, i) => {
@@ -358,7 +364,7 @@ export function BeamerBloecke({ bloecke }: { bloecke: BBlock[] }): React.JSX.Ele
           case 'karte':
             return <Karte key={i} b={b} />
           case 'rekord':
-            return <Rekord key={i} b={b} />
+            return <Rekord key={i} b={b} sprache={sprache} />
           case 'treffsicherheit':
             return <Treffsicherheit key={i} b={b} />
           case 'tische':

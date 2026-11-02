@@ -279,7 +279,7 @@ describe('Klassenspiele – Stufe B', () => {
     geraetSicht(z, r, 'p0', 2)
     antworten(z, r, 'p0', '###', 3)
     expect(z.konto.p0).toBe(1)
-    expect(r.eigenText!(z, 'p0')).toContain('Einsatz 3: 1 von 1')
+    expect(r.eigenText!(z, 'p0')).toContain('Bet 3: 1 of 1')
     // Ohne Einsatz keine Antwort
     expect(antworten(z, r, 'p0', 'x', 4)).toBeNull()
   })
@@ -291,5 +291,38 @@ describe('Klassenspiele – Stufe B', () => {
     const e = r.ergebnis(z)
     expect(e.sieg).toBe(false)
     expect(e.klassenwert).toBeGreaterThan(0)
+  })
+})
+
+describe('Klassenspiele – Texte in der Zielsprache', () => {
+  it('jeder Text in de, en, fr, es, it, la – Platzhalter überall gleich, Listen gleich lang', async () => {
+    const { KT } = await import('../src/shared/klassenspiel/texte')
+    for (const [k, f] of Object.entries(KT)) {
+      const platz = (s: string): string => (s.match(/\{\d\}/g) ?? []).sort().join()
+      const teile = (s: string): number => s.split('|').length
+      for (const sp of ['de', 'en', 'fr', 'es', 'it', 'la'] as const) {
+        expect(f[sp], `${k}/${sp}`).toBeTruthy()
+        expect(platz(f[sp]), `${k}/${sp} Platzhalter`).toBe(platz(f.de))
+        expect(teile(f[sp]), `${k}/${sp} Liste`).toBe(teile(f.de))
+      }
+    }
+  })
+  it('Rückfall Englisch für Sprachen ohne Fassung', async () => {
+    const { kt } = await import('../src/shared/klassenspiel/texte')
+    expect(kt('ru', 'uiPause')).toBe('Pause')
+    expect(kt('fr', 'uiCode')).toContain('code')
+  })
+  it('Französischer Kurs: Teamnamen, Meldungen und Ergebnis auf Französisch', () => {
+    const z = spiel('rennen', 6, { teams: 2 })
+    z.sprache = 'fr'
+    teamsLosen(z)
+    KLASSEN_REGELN.rennen!.start(z, 0)
+    expect(['Rouge', 'Bleue', 'Verte', 'Jaune', 'Violette', 'Orange']).toContain(z.teams[0].name)
+    simuliere(z, 'rennen', 40, () => 3)
+    const e = KLASSEN_REGELN.rennen!.ergebnis(z)
+    expect(e.text).toMatch(/Équipe|Égalité/)
+    const beamer = JSON.stringify(KLASSEN_REGELN.rennen!.beamer(z, 0))
+    expect(beamer).toContain('Équipe')
+    expect(beamer).not.toContain('Team ')
   })
 })

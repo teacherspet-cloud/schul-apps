@@ -8,7 +8,8 @@
  * eigenen Niveau. FAUSTREGEL: Ziel-P je Sternzahl 0,9 / 0,75 / 0,55; Sternverteilung 50 / 33 / 17 %.
  */
 import { mischen, zufall } from '../../mehrspieler/kern'
-import { meldung, teamGroesse, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { meldung, teamGroesse, teamText, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { kt } from '../texte'
 
 export const SPALTEN = 8
 export const ZEILEN = 6
@@ -92,7 +93,7 @@ export const gebiet: KlassenRegeln<Gebiet> = {
     const vorher = z.felder[i].team
     z.felder[i].team = t
     z.neu = [...z.neu, i].slice(-6)
-    if (vorher !== null && vorher !== t) meldung(z, `${z.teams[t].symbol} Team ${z.teams[t].name} erobert ein Feld von Team ${z.teams[vorher].name}!`, 'warn')
+    if (vorher !== null && vorher !== t) meldung(z, kt(z.sprache, 'geErobert', teamText(z, t), teamText(z, vorher)), 'warn')
   },
   beamer(z) {
     const neu = new Set(z.neu)
@@ -101,7 +102,7 @@ export const gebiet: KlassenRegeln<Gebiet> = {
         typ: 'karte',
         spalten: SPALTEN,
         felder: z.felder.map((f, i) => ({ sterne: f.sterne, team: f.team, ...(neu.has(i) ? { neu: true } : {}) })),
-        teams: z.teams.map((t, i) => ({ name: t.name, farbe: t.farbe, symbol: t.symbol, wert: gebietWert(z, i) }))
+        teams: z.teams.map((t, i) => ({ name: kt(z.sprache, 'team', t.name), farbe: t.farbe, symbol: t.symbol, wert: gebietWert(z, i), text: kt(z.sprache, 'geJeKopf', gebietWert(z, i)) }))
       }
     ]
     return aus
@@ -110,18 +111,18 @@ export const gebiet: KlassenRegeln<Gebiet> = {
     const t = z.personen[wer]?.team ?? -1
     const kopf =
       t >= 0
-        ? [{ typ: 'text' as const, text: `${z.teams[t].symbol} Team ${z.teams[t].name}: ${gebietWert(z, t)} Sterne je Kopf · ${z.felder.filter((f) => f.team === t).length} Felder` }]
+        ? [{ typ: 'text' as const, text: kt(z.sprache, 'geStand', teamText(z, t), gebietWert(z, t), z.felder.filter((f) => f.team === t).length) }]
         : []
-    if (z.wahl[wer]) return [...kopf, { typ: 'text', text: `Du spielst um ${'★'.repeat(z.wahl[wer]!)}`, ton: 'leise' }]
+    if (z.wahl[wer]) return [...kopf, { typ: 'text', text: kt(z.sprache, 'geDuSpielst', '★'.repeat(z.wahl[wer]!)), ton: 'leise' }]
     return [
       ...kopf,
-      { typ: 'text', text: 'Um wie viele Sterne spielst du?', gross: true },
+      { typ: 'text', text: kt(z.sprache, 'geFrage'), gross: true },
       {
         typ: 'knoepfe',
         knoepfe: [
-          { text: '★ sicher', aktion: 'sterne', wert: '1', farbe: 'gray' },
-          { text: '★★ mittel', aktion: 'sterne', wert: '2', farbe: 'blue' },
-          { text: '★★★ schwer – darf erobern', aktion: 'sterne', wert: '3', farbe: 'grape' }
+          { text: kt(z.sprache, 'ge1'), aktion: 'sterne', wert: '1', farbe: 'gray' },
+          { text: kt(z.sprache, 'ge2'), aktion: 'sterne', wert: '2', farbe: 'blue' },
+          { text: kt(z.sprache, 'ge3'), aktion: 'sterne', wert: '3', farbe: 'grape' }
         ]
       }
     ]
@@ -130,14 +131,14 @@ export const gebiet: KlassenRegeln<Gebiet> = {
     const werte = z.teams.map((_, i) => gebietWert(z, i))
     const max = Math.max(...werte)
     const sieger = werte.map((w, i) => (w === max ? i : -1)).filter((i) => i >= 0)
-    const text = sieger.length === 1 ? `${z.teams[sieger[0]].symbol} Team ${z.teams[sieger[0]].name} gewinnt mit ${max} Sternen je Kopf!` : `Unentschieden: ${sieger.map((i) => z.teams[i].name).join(' und ')}!`
+    const text = sieger.length === 1 ? kt(z.sprache, 'geGewinnt', teamText(z, sieger[0]), max) : kt(z.sprache, 'unentschieden', sieger.map((i) => teamText(z, i)).join(' & '))
     const gesamt = z.felder.filter((f) => f.team !== null).reduce((s, f) => s + f.sterne, 0)
     return {
       text,
       teams: z.teams.map((t, i) => ({ nr: i, name: t.name, farbe: t.farbe, symbol: t.symbol, wert: werte[i] })),
       siegerTeams: sieger,
       klassenwert: gesamt,
-      klassenwertText: `${gesamt} Sterne erobert`
+      klassenwertText: kt(z.sprache, 'geRekord', gesamt)
     }
   }
 }

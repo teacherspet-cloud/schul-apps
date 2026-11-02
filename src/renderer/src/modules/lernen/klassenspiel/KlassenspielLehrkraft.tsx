@@ -42,6 +42,7 @@ import { holen, senden } from '../../onlinetest/serverApi'
 import { qrDataUrl } from '../../arbeitsblatt/render/qr'
 import { auswahlZahlen, bandSchluessel, testAuswahlGliedern, unitSchluessel, type TestEintragDaten } from '../kurs/testPlanGliederung'
 import { BeamerBloecke, Podest, TeamKarten } from './BeamerBloecke'
+import { kt } from '@shared/klassenspiel/texte'
 
 interface Angebot {
   titel: string
@@ -67,8 +68,10 @@ export interface BeamerSicht {
   titel: string
   spiel: KlassenspielId
   spielName: string
+  spielNameDe?: string
   art: 'koop' | 'team' | 'einzeln'
   regel: string
+  sprache?: string
   einst: KlassenEinstellungen
   jetzt: number
   bis: number
@@ -495,7 +498,8 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
               <Title order={3}>{s?.spielName ?? 'Klassenspiel'}</Title>
               <Text size="sm" c="dimmed">
                 {s?.titel} · Code <b>{code}</b>
-                {s && s.einst.schwierigkeit === 'level' && s.phase === 'spiel' ? ` · Level ${s.level}` : ''}
+                {s?.spielNameDe && s.spielNameDe !== s.spielName ? ` · ${s.spielNameDe}` : ''}
+                {s && s.einst.schwierigkeit === 'level' && s.phase === 'spiel' ? ` · ${kt(s.sprache, 'uiLevelNr', s.level)}` : ''}
               </Text>
             </div>
           </Group>
@@ -572,7 +576,7 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                 <Paper withBorder radius="lg" p="lg" ta="center">
                   <img src={qr} alt={`QR-Code: ${link}`} style={{ width: 'min(32vh, 300px)', height: 'auto', display: 'block', margin: '0 auto' }} data-klassenspiel-qr />
                   <Text size="lg" mt="xs">
-                    Code eingeben oder scannen
+                    {kt(s.sprache, 'uiCode')}
                   </Text>
                   <Text fw={900} style={{ fontSize: 'min(9vh, 84px)', letterSpacing: 10, lineHeight: 1.1 }} data-klassenspiel-code>
                     {code}
@@ -584,21 +588,21 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                   </Text>
                   <Text size="xl">{s.regel}</Text>
                   <Group gap="xs">
-                    <Badge size="lg" variant="light">
-                      {s.inhalt.vok ? `${s.inhalt.vok} Vokabeln` : ''}
+                    <Badge size="lg" variant="light" tt="none">
+                      {s.inhalt.vok ? kt(s.sprache, 'uiVokabeln', s.inhalt.vok) : ''}
                       {s.inhalt.vok && s.inhalt.gram ? ' · ' : ''}
-                      {s.inhalt.gram ? `${s.inhalt.gram} Grammatikaufgaben` : ''}
+                      {s.inhalt.gram ? kt(s.sprache, 'uiGrammatik', s.inhalt.gram) : ''}
                     </Badge>
-                    <Badge size="lg" variant="light" color="grape">
-                      {s.einst.schwierigkeit === 'adaptiv' ? 'Adaptiv – jede:r auf eigenem Niveau' : s.einst.schwierigkeit === 'level' ? 'Level steigen' : `Feste Stufe: ${s.einst.feste}`}
+                    <Badge size="lg" variant="light" color="grape" tt="none">
+                      {s.einst.schwierigkeit === 'adaptiv' ? kt(s.sprache, 'uiAdaptiv') : s.einst.schwierigkeit === 'level' ? kt(s.sprache, 'uiLevel') : kt(s.sprache, 'uiFest')}
                     </Badge>
-                    <Badge size="lg" variant="light" color="gray">
-                      {s.einst.dauer} Minuten
+                    <Badge size="lg" variant="light" color="gray" tt="none">
+                      {kt(s.sprache, 'uiMinuten', s.einst.dauer)}
                     </Badge>
                   </Group>
                   <Text fw={800} size="xl" mt="sm" data-klassenspiel-dabei={s.personen.length}>
-                    Dabei: {s.personen.length} von {s.kurs}
-                    {online < s.personen.length ? ` (${online} verbunden)` : ''}
+                    {kt(s.sprache, 'uiDabei', s.personen.length, s.kurs)}
+                    {online < s.personen.length ? ` ${kt(s.sprache, 'uiVerbunden', online)}` : ''}
                   </Text>
                   {s.phase === 'lobby' && (
                     <Group gap={6}>
@@ -623,31 +627,31 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                   </Text>
                   {s.ergebnis.rekord?.neu && (
                     <Text fw={800} size="xl" c="yellow.7" mt="xs" data-klassenspiel-rekord>
-                      🏆 Neuer Klassenrekord: {s.ergebnis.rekord.text}
+                      {kt(s.sprache, 'uiNeuerRekord', s.ergebnis.rekord.text)}
                     </Text>
                   )}
                   {s.ergebnis.rekord && !s.ergebnis.rekord.neu && (
                     <Text c="dimmed" mt="xs">
-                      Klassenrekord: {s.ergebnis.rekord.text}
+                      {kt(s.sprache, 'uiRekord', s.ergebnis.rekord.text)}
                     </Text>
                   )}
                   {s.ergebnis.top3.length > 0 && (
                     <Center mt="lg">
-                      <Podest titel="Am meisten verbessert" plaetze={s.ergebnis.top3.map((x) => ({ name: x.name, wert: `${x.punkte} Punkte` }))} />
+                      <Podest titel={kt(s.sprache, 'uiVerbessert')} plaetze={s.ergebnis.top3.map((x) => ({ name: x.name, wert: kt(s.sprache, 'uiPunkte', x.punkte) }))} />
                     </Center>
                   )}
                 </Paper>
               )}
               {s.pause && s.phase === 'spiel' && (
                 <Text fw={900} size="3rem" ta="center" c="orange">
-                  ⏸ Pause
+                  ⏸ {kt(s.sprache, 'uiPause')}
                 </Text>
               )}
-              <BeamerBloecke bloecke={s.bloecke} />
+              <BeamerBloecke bloecke={s.bloecke} sprache={s.sprache} />
               {s.teams.length > 0 && s.phase === 'spiel' && !['rennen', 'gebiet'].includes(s.spiel) && <TeamKarten teams={s.teams} gross={false} />}
               {s.phase === 'spiel' && (
                 <Text c="dimmed" ta="center">
-                  {online} von {s.personen.length} verbunden · Wer später kommt: Code {code}
+                  {kt(s.sprache, 'uiVerbundenVon', online, s.personen.length, code)}
                 </Text>
               )}
             </Stack>

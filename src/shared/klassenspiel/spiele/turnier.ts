@@ -12,7 +12,8 @@
  */
 import { mischen } from '../../mehrspieler/kern'
 import { umsetzen } from '../teams'
-import { aufgabeBauen, meldung, naechsteAufgabe, teamGroesse, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { aufgabeBauen, meldung, naechsteAufgabe, teamGroesse, teamText, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { kt } from '../texte'
 import type { Stufe } from '../adaptiv'
 
 export const FRAGEN_JE_RUNDE = 5
@@ -54,7 +55,7 @@ function rundeStarten(z: Turnier, jetzt: number): void {
       const a = naechsteAufgabe(z, vertreter, jetzt, null, { meiden: fragen.map((f) => f.item) })
       if (a) fragen.push({ item: a.item, stufe: a.stufe })
     }
-    return { name: `Tisch ${namen[i % namen.length]}`, fragen, stand: Object.fromEntries(t.map((id) => [id, { idx: 0, richtig: 0 }])) }
+    return { name: kt(z.sprache, 'tuTisch', namen[i % namen.length]), fragen, stand: Object.fromEntries(t.map((id) => [id, { idx: 0, richtig: 0 }])) }
   })
   z.rundeBis = Math.min(z.bis, jetzt + rundeMs(z))
   for (const p of Object.values(z.personen)) p.aufgabe = null
@@ -81,7 +82,7 @@ function rundeBeenden(z: Turnier, jetzt: number): void {
       k = m + 1
     }
   })
-  meldung(z, `Runde ${z.runde} vorbei – es wird neu gesetzt.`, 'info')
+  meldung(z, kt(z.sprache, 'tuRundeVorbei', z.runde), 'info')
   z.tische = umsetzen(z.tische, rang)
   if (z.runde >= z.runden) {
     z.ende = true
@@ -151,9 +152,16 @@ export const turnier: KlassenRegeln<Turnier> = {
     const team = z.personen[wer]?.team ?? -1
     const mit = (z.tische[i] ?? []).filter((id) => id !== wer).map((id) => z.personen[id]?.name ?? '')
     return [
-      { typ: 'text', text: `Runde ${z.runde}/${z.runden} · ${tisch?.name ?? ''}${mit.length ? ` mit ${mit.join(', ')}` : ''}${team >= 0 ? ` · für ${z.teams[team].symbol} Team ${z.teams[team].name}` : ''}` },
-      ...(tisch && st && st.idx >= tisch.fragen.length ? [{ typ: 'text' as const, text: `Fertig: ${st.richtig} von ${tisch.fragen.length} richtig. Warte auf die anderen am Tisch …`, gross: true }] : []),
-      ...(tisch && st && st.idx < tisch.fragen.length ? [{ typ: 'fortschritt' as const, titel: `Frage ${st.idx + 1} von ${tisch.fragen.length}`, wert: st.idx, max: tisch.fragen.length, ton: 'info' as const }] : [])
+      {
+        typ: 'text',
+        text: [kt(z.sprache, 'tuKopf', z.runde, z.runden, tisch?.name ?? ''), mit.length ? kt(z.sprache, 'tuMit', mit.join(', ')) : '', team >= 0 ? `· ${kt(z.sprache, 'tuFuer', teamText(z, team))}` : '']
+          .filter(Boolean)
+          .join(' ')
+      },
+      ...(tisch && st && st.idx >= tisch.fragen.length ? [{ typ: 'text' as const, text: kt(z.sprache, 'tuFertig', st.richtig, tisch.fragen.length), gross: true }] : []),
+      ...(tisch && st && st.idx < tisch.fragen.length
+        ? [{ typ: 'fortschritt' as const, titel: kt(z.sprache, 'tuFrage', st.idx + 1, tisch.fragen.length), wert: st.idx, max: tisch.fragen.length, ton: 'info' as const }]
+        : [])
     ]
   },
   beamer(z) {
@@ -161,15 +169,20 @@ export const turnier: KlassenRegeln<Turnier> = {
       {
         typ: 'bahnen',
         seil: false,
-        teams: z.teams.map((t, i) => ({ name: t.name, farbe: t.farbe, symbol: t.symbol, wert: teamStand(z, i), ziel: z.runden * 6, n: teamGroesse(z, i) }))
+        zielText: '',
+        teams: z.teams.map((t, i) => ({ name: kt(z.sprache, 'team', t.name), farbe: t.farbe, symbol: t.symbol, wert: teamStand(z, i), ziel: z.runden * 6, n: teamGroesse(z, i) }))
       },
       {
         typ: 'tische',
         runde: z.runde,
         von: z.runden,
+        titel: kt(z.sprache, 'tuRunde', z.runde, z.runden),
         // Nach Namen sortiert – nie nach Stärke
         tische: z.tischRunde
-          .map((t, i) => ({ name: t.name, fertig: z.tische[i].filter((id) => (t.stand[id]?.idx ?? 0) >= t.fragen.length).length, gesamt: z.tische[i].length }))
+          .map((t, i) => {
+            const fertig = z.tische[i].filter((id) => (t.stand[id]?.idx ?? 0) >= t.fragen.length).length
+            return { name: t.name, fertig, gesamt: z.tische[i].length, text: kt(z.sprache, 'tuTischFertig', t.name, fertig, z.tische[i].length) }
+          })
           .sort((a, b) => a.name.localeCompare(b.name))
       }
     ]
@@ -182,14 +195,14 @@ export const turnier: KlassenRegeln<Turnier> = {
     const werte = z.teams.map((_, i) => teamStand(z, i))
     const max = Math.max(...werte)
     const sieger = werte.map((w, i) => (w === max ? i : -1)).filter((i) => i >= 0)
-    const text = sieger.length === 1 ? `${z.teams[sieger[0]].symbol} Team ${z.teams[sieger[0]].name} gewinnt das Turnier!` : `Unentschieden: ${sieger.map((i) => z.teams[i].name).join(' und ')}!`
+    const text = sieger.length === 1 ? kt(z.sprache, 'tuGewinnt', teamText(z, sieger[0])) : kt(z.sprache, 'unentschieden', sieger.map((i) => teamText(z, i)).join(' & '))
     const r = Object.values(z.personen).reduce((s, p) => s + p.richtig, 0)
     return {
       text,
       teams: z.teams.map((t, i) => ({ nr: i, name: t.name, farbe: t.farbe, symbol: t.symbol, wert: werte[i] })),
       siegerTeams: sieger,
       klassenwert: r,
-      klassenwertText: `${r} richtige Antworten`
+      klassenwertText: kt(z.sprache, 'tuRichtige', r)
     }
   }
 }

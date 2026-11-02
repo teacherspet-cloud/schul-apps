@@ -13,6 +13,7 @@ import { spielText } from '../spielSprache'
 import { eloSchritt, schwierigkeitVon, startTheta, stufenFuer, wahrscheinlichkeit, BAND_FEST, ZIEL_P, type Stufe } from './adaptiv'
 import { kleineTeams, teamFuerNeue, teamsBilden, tischeBilden, type Team } from './teams'
 import { klassenspielInfo, type KlassenEinstellungen, type KlassenspielId } from './typen'
+import { farbName, kt } from './texte'
 
 // ---------------------------------------------------------------- Inhalt
 
@@ -84,22 +85,22 @@ export interface BBlockTeam {
 /** Bausteine des Beamers – nie Fragen, Lösungen oder Einzelergebnisse mit Namen (außer Top 3 am Ende) */
 export type BBlock =
   | { typ: 'kopf'; titel: string; untertitel?: string; level?: { nr: number; von: number } }
-  | { typ: 'berg'; lager: number; von: number; anteil: number; quote: number | null; zielQuote: number; namen: string[]; hinweis?: string }
-  | { typ: 'boss'; name: string; symbol: string; hp: number; max: number; phase: number; ruestung: boolean; treffer: number; angriffe: number }
-  | { typ: 'bahnen'; teams: (BBlockTeam & { wert: number; ziel: number; n: number })[]; seil: boolean }
+  | { typ: 'berg'; lager: number; von: number; anteil: number; quote: number | null; zielQuote: number; namen: string[]; titel?: string; hinweis?: string }
+  | { typ: 'boss'; name: string; symbol: string; hp: number; max: number; phase: number; ruestung: boolean; treffer: number; angriffe: number; leben?: string; ruestungText?: string }
+  | { typ: 'bahnen'; teams: (BBlockTeam & { wert: number; ziel: number; n: number })[]; seil: boolean; zielText?: string }
   | { typ: 'teams'; teams: (BBlockTeam & { mitglieder: string[] })[] }
   | { typ: 'ticker'; eintraege: { text: string; ton: 'gut' | 'info' | 'warn' }[] }
   | { typ: 'zahlen'; eintraege: { titel: string; wert: string }[] }
   | { typ: 'podest'; titel: string; plaetze: { name: string; wert: string }[] }
   | { typ: 'text'; text: string; gross?: boolean; ton?: 'gut' | 'info' | 'warn' }
   /** Gebietseroberung: Felder (Sterne 1–3, Team oder frei) und Stand je Team (je Mitglied) */
-  | { typ: 'karte'; spalten: number; felder: { sterne: number; team: number | null; neu?: boolean }[]; teams: (BBlockTeam & { wert: number })[] }
+  | { typ: 'karte'; spalten: number; felder: { sterne: number; team: number | null; neu?: boolean }[]; teams: (BBlockTeam & { wert: number; text?: string })[] }
   /** Klasse gegen Rekord: jetzt gegen bisher */
-  | { typ: 'rekord'; jetzt: number; bisher: number | null; richtig: number; quote: number | null }
+  | { typ: 'rekord'; jetzt: number; bisher: number | null; richtig: number; quote: number | null; texte?: { jetzt: string; bisher: string; keiner: string; formel: string; sorgfalt: string } }
   /** Wett-Quiz: Treffsicherheit der Klasse je Einsatz (ohne Namen) */
-  | { typ: 'treffsicherheit'; stufen: { einsatz: number; anzahl: number; richtig: number }[] }
+  | { typ: 'treffsicherheit'; stufen: { einsatz: number; anzahl: number; richtig: number; name?: string; text?: string }[]; titel?: string; erklaerung?: string }
   /** Turnier: Runde und Fortschritt der Tische (ohne Namen – die Tische sind nach Stärke gebildet) */
-  | { typ: 'tische'; runde: number; von: number; tische: { name: string; fertig: number; gesamt: number }[] }
+  | { typ: 'tische'; runde: number; von: number; tische: { name: string; fertig: number; gesamt: number; text?: string }[]; titel?: string }
 
 export interface KBasis {
   spiel: KlassenspielId
@@ -259,6 +260,8 @@ export function teamsLosen(z: KBasis): void {
       ? teamsBilden(leute, Math.max(2, Math.min(6, Math.round(leute.length / 4))), z)
       : teamsBilden(leute, z.einst.teams, z)
   for (const p of Object.values(z.personen)) p.team = -1
+  // Teamnamen in der Zielsprache (Farbe; bei mehr als sechs Teams mit Nummer)
+  for (const t of z.teams) t.name = `${farbName(z.sprache, t.farbe)}${/\s\d+$/.exec(t.name)?.[0] ?? ''}`
   z.teams.forEach((t, i) => t.mitglieder.forEach((id) => z.personen[id] && (z.personen[id].team = i)))
   if (info.teams === 'tische') z.tische = tischeBilden(leute, z)
 }
@@ -266,6 +269,9 @@ export function teamsLosen(z: KBasis): void {
 export const meldung = (z: KBasis, text: string, ton: 'gut' | 'info' | 'warn' = 'info'): void => {
   z.ticker = [...z.ticker, { nr: ++z.nr, text, ton }].slice(-6)
 }
+
+/** „🦊 Team Rot" in der Zielsprache */
+export const teamText = (z: KBasis, nr: number): string => (z.teams[nr] ? `${z.teams[nr].symbol} ${kt(z.sprache, 'team', z.teams[nr].name)}` : '')
 
 export const aktivePersonen = (z: KBasis): KPerson[] => Object.values(z.personen)
 export const teamGroesse = (z: KBasis, nr: number): number => Math.max(1, z.teams[nr]?.mitglieder.filter((id) => z.personen[id]).length ?? 1)

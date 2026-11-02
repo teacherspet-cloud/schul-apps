@@ -7,6 +7,7 @@
  * FAUSTREGEL: die Formel selbst; Anzeige mit zwei Nachkommastellen.
  */
 import { klassenQuote, levelNachZeit, meldung, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { kt, zahl2 } from '../texte'
 
 export interface RekordSpiel extends KBasis {
   ueberholt: boolean
@@ -21,7 +22,7 @@ export function rekordWert(z: KBasis, jetzt: number): number {
   const minuten = Math.max(1, (Math.min(jetzt, z.bis) - z.start) / 60_000)
   return Math.round(((r / leute.length / minuten) * (r / n)) * 100)
 }
-export const rekordText = (w: number): string => `${(w / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Punkte je Kind und Minute`
+export const rekordText = (sprache: string, w: number): string => kt(sprache, 'rkEinheit', zahl2(sprache, w / 100))
 
 const ende = (z: KBasis): number => z.verlauf[z.verlauf.length - 1]?.zeit ?? z.bis
 
@@ -35,7 +36,7 @@ export const rekord: KlassenRegeln<RekordSpiel> = {
     // Erst nach einer Minute vergleichen (vorher schwankt der Wert stark)
     if (!z.ueberholt && z.rekordBisher && jetzt - z.start > 60_000 && rekordWert(z, jetzt) > z.rekordBisher.wert) {
       z.ueberholt = true
-      meldung(z, 'Ihr liegt über eurem Rekord – haltet durch!', 'gut')
+      meldung(z, kt(z.sprache, 'rkUeber'), 'gut')
     }
   },
   tick(z, jetzt) {
@@ -52,7 +53,14 @@ export const rekord: KlassenRegeln<RekordSpiel> = {
         jetzt: rekordWert(z, jetzt),
         bisher: z.rekordBisher?.wert ?? null,
         richtig: Object.values(z.personen).reduce((s, p) => s + p.richtig, 0),
-        quote: klassenQuote(z, 60, 5)
+        quote: klassenQuote(z, 60, 5),
+        texte: {
+          jetzt: kt(z.sprache, 'rkJetzt'),
+          bisher: kt(z.sprache, 'rkBisher'),
+          keiner: kt(z.sprache, 'rkKeiner'),
+          formel: kt(z.sprache, 'rkFormel'),
+          sorgfalt: kt(z.sprache, 'rkSorgfalt', Math.round((klassenQuote(z, 60, 5) ?? 0) * 100))
+        }
       }
     ]
     return aus
@@ -60,13 +68,14 @@ export const rekord: KlassenRegeln<RekordSpiel> = {
   geraet(z, _wer, jetzt) {
     const w = rekordWert(z, jetzt)
     const b = z.rekordBisher?.wert ?? null
-    return [{ typ: 'fortschritt', titel: `🏁 Klasse: ${(w / 100).toFixed(2)}${b !== null ? ` · Rekord: ${(b / 100).toFixed(2)}` : ''}`, wert: w, max: Math.max(1, b ?? w, w), ton: b !== null && w > b ? 'gut' : 'info' }]
+    return [{ typ: 'fortschritt', titel: `🏁 ${kt(z.sprache, 'rkKlasse', zahl2(z.sprache, w / 100))}${b !== null ? ` · ${kt(z.sprache, 'rkRekord', zahl2(z.sprache, b / 100))}` : ''}`, wert: w, max: Math.max(1, b ?? w, w), ton: b !== null && w > b ? 'gut' : 'info' }]
   },
   ergebnis(z) {
     const w = rekordWert(z, ende(z))
     const b = z.rekordBisher?.wert ?? null
     const sieg = w > 0 && (b === null || w > b)
-    const text = b === null ? `Erster Rekord: ${rekordText(w)}.` : sieg ? `Neuer Rekord! ${rekordText(w)} (vorher ${(b / 100).toFixed(2)}).` : `${rekordText(w)} – der Rekord (${(b / 100).toFixed(2)}) hält noch.`
-    return { text, sieg, klassenwert: w, klassenwertText: rekordText(w) }
+    const sp = z.sprache
+    const text = b === null ? kt(sp, 'rkErster', rekordText(sp, w)) : sieg ? kt(sp, 'rkNeu', rekordText(sp, w), zahl2(sp, b / 100)) : kt(sp, 'rkHaelt', rekordText(sp, w), zahl2(sp, b / 100))
+    return { text, sieg, klassenwert: w, klassenwertText: rekordText(sp, w) }
   }
 }

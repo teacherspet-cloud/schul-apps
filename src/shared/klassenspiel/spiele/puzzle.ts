@@ -10,7 +10,8 @@
  */
 import { antwortRichtig, mischen, type Block } from '../../mehrspieler/kern'
 import { schwierigkeitVon } from '../adaptiv'
-import { meldung, naechsteAufgabe, teamGroesse, verbuchen, type BBlock, type KAufgabe, type KBasis, type KlassenRegeln } from '../kern'
+import { kt } from '../texte'
+import { meldung, naechsteAufgabe, teamGroesse, teamText, verbuchen, type BBlock, type KAufgabe, type KBasis, type KlassenRegeln } from '../kern'
 
 export const PUZZLE_ZIEL = 12
 const NEU_NACH_MS = 30_000
@@ -70,15 +71,16 @@ export const puzzle: KlassenRegeln<Puzzle> = {
     verbuchen(z, puzzle, wer, { ...f.aufgabe, b: schwierigkeitVon(z.band[wer]?.[f.aufgabe.item], f.aufgabe.stufe) }, richtig, jetzt)
     if (z.personen[wer]) z.personen[wer].rueck = null
     z.schritte[t] = richtig ? z.schritte[t] + 1 : Math.max(0, z.schritte[t] - 2)
-    z.rueck[t] = { nr: ++z.verlaufNr, richtig, text: richtig ? `${z.personen[wer]?.name ?? ''}: richtig!` : `${z.personen[wer]?.name ?? ''}: falsch – richtig war „${f.aufgabe.frage.loesung}“. Zwei Schritte zurück.` }
+    const name = z.personen[wer]?.name ?? ''
+    z.rueck[t] = { nr: ++z.verlaufNr, richtig, text: richtig ? kt(z.sprache, 'puRichtig', name) : kt(z.sprache, 'puFalsch', name, f.aufgabe.frage.loesung) }
     if (z.schritte[t] >= PUZZLE_ZIEL) {
       z.fertig[t] = jetzt
       z.frage[t] = null
-      meldung(z, `${z.teams[t].symbol} Team ${z.teams[t].name} ist im Ziel!`, 'gut')
+      meldung(z, kt(z.sprache, 'imZiel', teamText(z, t)), 'gut')
       if (z.fertig.every((x) => x !== null)) {
         z.sieg = true
         z.ende = true
-        meldung(z, 'Alle Teams im Ziel! 🎉', 'gut')
+        meldung(z, kt(z.sprache, 'puAlle'), 'gut')
       }
     } else z.frage[t] = teamFrage(z, t, jetzt)
     return { richtig }
@@ -100,13 +102,13 @@ export const puzzle: KlassenRegeln<Puzzle> = {
   },
   geraetFrage(z, wer) {
     const t = teamVon(z, wer)
-    if (t < 0) return [{ typ: 'text', text: 'Gleich bekommst du ein Team.', ton: 'info' }]
+    if (t < 0) return [{ typ: 'text', text: kt(z.sprache, 'puKeinTeam'), ton: 'info' }]
     const aus: Block[] = []
     const r = z.rueck[t]
     if (r) aus.push({ typ: 'text', text: r.text, ton: r.richtig ? 'gut' : 'schlecht' })
-    if (z.fertig[t] !== null) return [...aus, { typ: 'text', text: '🏁 Euer Team ist im Ziel! Helft den anderen mit Daumendrücken.', gross: true }]
+    if (z.fertig[t] !== null) return [...aus, { typ: 'text', text: kt(z.sprache, 'puImZiel'), gross: true }]
     const f = z.frage[t]
-    if (!f) return [...aus, { typ: 'text', text: 'Einen Moment …', ton: 'leise' }]
+    if (!f) return [...aus, { typ: 'text', text: kt(z.sprache, 'puMoment'), ton: 'leise' }]
     const eigene = f.karten[wer] ?? []
     aus.push({
       typ: 'frage',
@@ -115,7 +117,7 @@ export const puzzle: KlassenRegeln<Puzzle> = {
       optionen: eigene,
       aktion: 'antwort'
     })
-    aus.push({ typ: 'text', text: 'Nur ein Gerät in eurem Team hat die richtige Karte – redet miteinander!', ton: 'leise' })
+    aus.push({ typ: 'text', text: kt(z.sprache, 'puReden'), ton: 'leise' })
     return aus
   },
   beamer(z) {
@@ -124,24 +126,22 @@ export const puzzle: KlassenRegeln<Puzzle> = {
       {
         typ: 'bahnen',
         seil: false,
-        teams: z.teams.map((t, i) => ({ name: t.name, farbe: t.farbe, symbol: t.symbol, wert: z.schritte[i] ?? 0, ziel: PUZZLE_ZIEL, n: teamGroesse(z, i) }))
+        teams: z.teams.map((t, i) => ({ name: kt(z.sprache, 'team', t.name), farbe: t.farbe, symbol: t.symbol, wert: z.schritte[i] ?? 0, ziel: PUZZLE_ZIEL, n: teamGroesse(z, i) }))
       },
-      { typ: 'zahlen', eintraege: [{ titel: 'Teams im Ziel', wert: `${imZiel} / ${z.teams.length}` }] }
+      { typ: 'zahlen', eintraege: [{ titel: kt(z.sprache, 'puTeamsImZiel'), wert: `${imZiel} / ${z.teams.length}` }] }
     ]
     return aus
   },
   geraet(z, wer) {
     const t = teamVon(z, wer)
     if (t < 0) return []
-    return [{ typ: 'fortschritt', titel: `${z.teams[t].symbol} Team ${z.teams[t].name}: ${z.schritte[t] ?? 0} / ${PUZZLE_ZIEL}`, wert: z.schritte[t] ?? 0, max: PUZZLE_ZIEL, ton: 'info' }]
+    return [{ typ: 'fortschritt', titel: `${teamText(z, t)}: ${z.schritte[t] ?? 0} / ${PUZZLE_ZIEL}`, wert: z.schritte[t] ?? 0, max: PUZZLE_ZIEL, ton: 'info' }]
   },
   ergebnis(z) {
     const imZiel = z.fertig.map((f, i) => ({ f, i })).filter((x) => x.f !== null).sort((a, b) => a.f! - b.f!)
     const max = Math.max(...z.schritte)
     const sieger = imZiel.length ? [imZiel[0].i] : z.schritte.map((s, i) => (s === max ? i : -1)).filter((i) => i >= 0)
-    const text = z.sieg
-      ? `Alle Teams im Ziel! Zuerst: ${z.teams[sieger[0]].symbol} Team ${z.teams[sieger[0]].name}.`
-      : `${imZiel.length} von ${z.teams.length} Teams im Ziel.`
+    const text = z.sieg ? kt(z.sprache, 'puAlleErgebnis', teamText(z, sieger[0])) : kt(z.sprache, 'puErgebnis', imZiel.length, z.teams.length)
     const gesamt = z.schritte.reduce((s, x) => s + x, 0)
     return {
       text,
@@ -149,7 +149,7 @@ export const puzzle: KlassenRegeln<Puzzle> = {
       teams: z.teams.map((t, i) => ({ nr: i, name: t.name, farbe: t.farbe, symbol: t.symbol, wert: z.schritte[i] ?? 0 })),
       siegerTeams: sieger,
       klassenwert: gesamt,
-      klassenwertText: `${gesamt} Schritte aller Teams`
+      klassenwertText: kt(z.sprache, 'puRekord', gesamt)
     }
   }
 }

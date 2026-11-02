@@ -146,6 +146,10 @@ try {
   const code = (await p.locator('[data-klassenspiel-code]').innerText()).trim()
   pruefe(/^\d{6}$/.test(code), `Code am Beamer: ${code}`)
   pruefe(await da(p.locator('[data-klassenspiel-qr]')), 'QR-Code am Beamer')
+  // Zielsprache (Englischkurs): Beamer und Gerät auf Englisch, Steuerung der Lehrkraft Deutsch
+  pruefe(await da(p.getByText('Enter or scan the code')), 'Beamer in der Zielsprache („Enter or scan the code")')
+  pruefe(await da(p.getByText('Tug of War & Race').first()), 'Spielname am Beamer auf Englisch')
+  pruefe(await da(p.locator('[data-klassenspiel-start-knopf]')), 'Steuerung bleibt Deutsch („Start", „Teams losen")')
 
   // ---------- Lernende: Banner, Beitritt, fremde Klasse
   const mp = await Mia.newPage()
@@ -153,6 +157,7 @@ try {
   pruefe(await da(mp.getByText('Mitspielen').first(), 20000), 'Banner „Mitspielen" auf der Startseite der Lernenden')
   await mp.getByText('Mitspielen').first().click()
   pruefe(await da(mp.locator('[data-klasse-warten]')), 'Mia im Warteraum')
+  pruefe(await da(mp.getByText("You're in!")), "Gerät in der Zielsprache („You're in!“)")
   const bp = await Ben.newPage()
   await bp.goto(`${A}/s/ks/${code}`)
   await da(bp.locator('[data-klasse-warten]'))
@@ -262,7 +267,7 @@ try {
     const e = await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'ende' })
     if (spiel === 'wette') {
       const m = (await api(Mia).get(`/s/api/klassenspiel/zustand?code=${n.code}`)).sicht
-      pruefe(/Einsatz \d/.test(m?.ergebnis?.eigenText ?? ''), `Wett-Quiz: private Rückmeldung „${(m?.ergebnis?.eigenText ?? '').slice(0, 70)}"`)
+      pruefe(/Bet \d/.test(m?.ergebnis?.eigenText ?? ''), `Wett-Quiz: private Rückmeldung „${(m?.ergebnis?.eigenText ?? '').slice(0, 70)}"`)
     }
     pruefe(Boolean(e.sicht?.ergebnis?.text), `${spiel}: Ergebnis „${e.sicht?.ergebnis?.text}"${e.sicht?.ergebnis?.rekord?.neu ? ' · neuer Klassenrekord' : ''}`)
     await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'schliessen' })

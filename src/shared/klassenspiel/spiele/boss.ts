@@ -11,13 +11,9 @@
  * Boss nach etwa 70 % der Zeit.
  */
 import { klassenwertVon, meldung, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { kt, ktListe } from '../texte'
 
-const BOSSE = [
-  { name: 'Grammatik-Drache', symbol: '🐉' },
-  { name: 'Vokabel-Krake', symbol: '🐙' },
-  { name: 'Fehlerteufel', symbol: '👹' },
-  { name: 'Wort-Golem', symbol: '🗿' }
-]
+const SYMBOLE = ['🐉', '🐙', '👹', '🗿']
 
 export interface Boss extends KBasis {
   boss: { name: string; symbol: string }
@@ -35,7 +31,8 @@ export const phaseVon = (z: Boss): number => (z.hp > z.max * 0.66 ? 1 : z.hp > z
 export const boss: KlassenRegeln<Boss> = {
   id: 'boss',
   start(z) {
-    const b = BOSSE[Math.floor((z.saat % 1000) / 250) % BOSSE.length]
+    const i = Math.floor((z.saat % 1000) / 250) % SYMBOLE.length
+    const b = { name: ktListe(z.sprache, 'bossNamen', i), symbol: SYMBOLE[i] }
     const max = lebenFuer(z)
     return Object.assign(z, { boss: b, hp: max, max, treffer: 0, angriffe: [], abgewehrt: 0, level: 1 })
   },
@@ -59,29 +56,41 @@ export const boss: KlassenRegeln<Boss> = {
     if (i >= 0) {
       z.angriffe.splice(i, 1)
       z.abgewehrt++
-      if (z.abgewehrt % 5 === 0) meldung(z, `${z.abgewehrt} Angriffe abgewehrt!`, 'gut')
+      if (z.abgewehrt % 5 === 0) meldung(z, kt(z.sprache, 'boAbgewehrt', z.abgewehrt), 'gut')
     }
     const nachher = phaseVon(z)
     if (nachher !== vorher && z.hp > 0) {
-      meldung(z, `${z.boss.name} legt Rüstung an – schreiben trifft jetzt stärker!`, 'warn')
+      meldung(z, kt(z.sprache, 'boRuestung', z.boss.name), 'warn')
       z.level = Math.min(6, nachher * 2)
     }
     if (z.hp <= 0) {
       z.sieg = true
       z.ende = true
-      meldung(z, `${z.boss.name} ist besiegt! 🎉`, 'gut')
+      meldung(z, kt(z.sprache, 'boBesiegt', z.boss.name), 'gut')
     }
   },
   beamer(z) {
     const r = Object.values(z.personen).reduce((s, p) => s + p.richtig, 0)
     const aus: BBlock[] = [
-      { typ: 'boss', name: z.boss.name, symbol: z.boss.symbol, hp: Math.ceil(z.hp), max: z.max, phase: phaseVon(z), ruestung: phaseVon(z) > 1, treffer: z.treffer, angriffe: z.angriffe.length },
+      {
+        typ: 'boss',
+        name: z.boss.name,
+        symbol: z.boss.symbol,
+        hp: Math.ceil(z.hp),
+        max: z.max,
+        phase: phaseVon(z),
+        ruestung: phaseVon(z) > 1,
+        treffer: z.treffer,
+        angriffe: z.angriffe.length,
+        leben: kt(z.sprache, 'boLeben', Math.ceil(z.hp), z.max, phaseVon(z)),
+        ruestungText: kt(z.sprache, 'boRuestungHinweis')
+      },
       {
         typ: 'zahlen',
         eintraege: [
-          { titel: 'Treffer', wert: String(r) },
-          { titel: 'Offene Angriffe', wert: String(z.angriffe.length) },
-          { titel: 'Abgewehrt', wert: String(z.abgewehrt) }
+          { titel: kt(z.sprache, 'boTreffer'), wert: String(r) },
+          { titel: kt(z.sprache, 'boAngriffe'), wert: String(z.angriffe.length) },
+          { titel: kt(z.sprache, 'boAbgewehrtT'), wert: String(z.abgewehrt) }
         ]
       }
     ]
@@ -94,14 +103,14 @@ export const boss: KlassenRegeln<Boss> = {
   },
   ergebnis(z) {
     const anteil = Math.round(((z.max - z.hp) / z.max) * 100)
-    const text = z.sieg ? `${z.boss.name} ist besiegt!` : `${z.boss.name} ist entkommen – ${anteil} % Schaden.`
+    const text = z.sieg ? kt(z.sprache, 'boBesiegt', z.boss.name) : kt(z.sprache, 'boEntkommen', z.boss.name, anteil)
     // Rekord bei Sieg: je mehr Zeit übrig, desto besser
     const restzeit = Math.max(0, z.bis - (z.verlauf[z.verlauf.length - 1]?.zeit ?? z.bis))
     return {
       text,
       sieg: z.sieg,
       klassenwert: z.sieg ? 100_000 + Math.round(restzeit / 1000) : anteil * 100 + Math.min(99, klassenwertVon(z)),
-      klassenwertText: z.sieg ? 'Boss besiegt' : `${anteil} % Schaden`
+      klassenwertText: z.sieg ? kt(z.sprache, 'boRekordSieg') : kt(z.sprache, 'boRekordSchaden', anteil)
     }
   }
 }

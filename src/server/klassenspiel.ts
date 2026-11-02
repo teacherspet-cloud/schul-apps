@@ -68,6 +68,7 @@ import {
 } from '../shared/klassenspiel/kern'
 import { KLASSEN_REGELN, spielbar } from '../shared/klassenspiel/regeln'
 import { einstellungenBereinigt, istKlassenCode, klassenspielInfo, KLASSENSPIELE, type KlassenEinstellungen } from '../shared/klassenspiel/typen'
+import { kt } from '../shared/klassenspiel/texte'
 import type { Block } from '../shared/mehrspieler/kern'
 
 type VokZeile = NonNullable<ReturnType<typeof vokZeile>>
@@ -393,9 +394,10 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     phase: r.phase,
     titel: r.titel,
     spiel: r.einst.spiel,
-    spielName: info.name,
+    // In der Zielsprache des Kurses (02.11.2026)
+    spielName: kt(r.sprache, `n_${r.einst.spiel}` as const),
     art: info.art,
-    regel: info.regel,
+    regel: kt(r.sprache, `r_${r.einst.spiel}` as const),
     sprache: r.sprache,
     jahrgang: r.jahrgang,
     dabei: Boolean(p),
@@ -406,7 +408,7 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     jetzt,
     pause: z.pause !== null,
     ...(r.phase === 'teams' && r.losenSeit ? { losenSeit: r.losenSeit } : {}),
-    team: team ? { name: team.name, farbe: team.farbe, symbol: team.symbol, mitglieder: team.mitglieder.map((id) => r.namen.get(id) ?? '') } : null,
+    team: team ? { name: kt(r.sprache, 'team', team.name), farbe: team.farbe, symbol: team.symbol, mitglieder: team.mitglieder.map((id) => r.namen.get(id) ?? '') } : null,
     ...(bloecke ? { bloecke } : {}),
     ...(r.phase === 'ende' && r.ergebnis
       ? {
@@ -443,9 +445,12 @@ function lehrSicht(r: Raum, jetzt: number) {
     phase: r.phase,
     titel: r.titel,
     spiel: r.einst.spiel,
-    spielName: info.name,
+    // Am Beamer in der Zielsprache (Steuerung und Auswertung der Lehrkraft bleiben Deutsch)
+    spielName: kt(r.sprache, `n_${r.einst.spiel}` as const),
+    spielNameDe: info.name,
     art: info.art,
-    regel: info.regel,
+    regel: kt(r.sprache, `r_${r.einst.spiel}` as const),
+    sprache: r.sprache,
     einst: r.einst,
     jetzt,
     bis: z.bis,
@@ -454,7 +459,7 @@ function lehrSicht(r: Raum, jetzt: number) {
     inhalt: { vok: z.inhalt.vok.items.length, gram: z.inhalt.gram.items.length, schwaechen: z.inhalt.vorrang.length },
     personen: Object.values(z.personen).map((p) => ({ id: p.id, name: r.namen.get(p.id) ?? p.name, online: online.has(p.id), team: p.team, n: p.n })),
     kurs: lernendeVon(vokZeile(r.kurs)!).length,
-    teams: z.teams.map((t) => ({ name: t.name, farbe: t.farbe, symbol: t.symbol, mitglieder: t.mitglieder.map((id) => r.namen.get(id) ?? '') })),
+    teams: z.teams.map((t) => ({ name: kt(r.sprache, 'team', t.name), farbe: t.farbe, symbol: t.symbol, mitglieder: t.mitglieder.map((id) => r.namen.get(id) ?? '') })),
     losenSeit: r.losenSeit,
     bloecke,
     ...(r.phase === 'ende' && r.ergebnis

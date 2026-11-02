@@ -8,7 +8,8 @@
  *
  * FAUSTREGEL: Ziel = 2,5 Schritte je Mitglied und Minute × 0,8.
  */
-import { levelNachZeit, meldung, teamGroesse, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { levelNachZeit, meldung, teamGroesse, teamText, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { kt } from '../texte'
 
 export interface Rennen extends KBasis {
   /** Schritte je Team (Summe, nicht normiert) */
@@ -40,11 +41,11 @@ export const rennen: KlassenRegeln<Rennen> = {
     const vorn = fuehrend(z)
     if (vorn.length === 1 && vorn[0] !== z.fuehrung) {
       z.fuehrung = vorn[0]
-      if (z.verlauf.length > 6) meldung(z, `${z.teams[vorn[0]].symbol} Team ${z.teams[vorn[0]].name} führt!`, 'info')
+      if (z.verlauf.length > 6) meldung(z, kt(z.sprache, 'fuehrt', teamText(z, vorn[0])), 'info')
     }
     if (stand(z, t) >= z.ziel) {
       z.ende = true
-      meldung(z, `${z.teams[t].symbol} Team ${z.teams[t].name} ist im Ziel!`, 'gut')
+      meldung(z, kt(z.sprache, 'imZiel', teamText(z, t)), 'gut')
     }
   },
   tick(z, jetzt) {
@@ -60,7 +61,8 @@ export const rennen: KlassenRegeln<Rennen> = {
       {
         typ: 'bahnen',
         seil: zwei,
-        teams: z.teams.map((t, i) => ({ name: t.name, farbe: t.farbe, symbol: t.symbol, wert: Math.round(stand(z, i) * 10) / 10, ziel: z.ziel, n: teamGroesse(z, i) }))
+        zielText: kt(z.sprache, 'reZiel', z.ziel),
+        teams: z.teams.map((t, i) => ({ name: kt(z.sprache, 'team', t.name), farbe: t.farbe, symbol: t.symbol, wert: Math.round(stand(z, i) * 10) / 10, ziel: z.ziel, n: teamGroesse(z, i) }))
       }
     ]
     return aus
@@ -74,14 +76,13 @@ export const rennen: KlassenRegeln<Rennen> = {
       const andere = stand(z, 1 - t)
       return [{ typ: 'seil', wert: Math.max(-z.ziel, Math.min(z.ziel, ich - andere)), ziel: z.ziel, links: `${team.symbol} ${team.name}`, rechts: `${z.teams[1 - t].symbol} ${z.teams[1 - t].name}` }]
     }
-    return [{ typ: 'fortschritt', titel: `${team.symbol} Team ${team.name}`, wert: Math.min(z.ziel, stand(z, t)), max: z.ziel, ton: 'info' }]
+    return [{ typ: 'fortschritt', titel: teamText(z, t), wert: Math.min(z.ziel, stand(z, t)), max: z.ziel, ton: 'info' }]
   },
   ergebnis(z) {
     const vorn = fuehrend(z)
     const teams = z.teams.map((t, i) => ({ nr: i, name: t.name, farbe: t.farbe, symbol: t.symbol, wert: Math.round(stand(z, i) * 10) / 10 }))
-    const text =
-      vorn.length === 1 ? `${z.teams[vorn[0]].symbol} Team ${z.teams[vorn[0]].name} gewinnt!` : `Unentschieden zwischen ${vorn.map((i) => z.teams[i].name).join(' und ')}!`
+    const text = vorn.length === 1 ? kt(z.sprache, 'gewinnt', teamText(z, vorn[0])) : kt(z.sprache, 'unentschieden', vorn.map((i) => teamText(z, i)).join(' & '))
     const gesamt = z.schritte.reduce((s, x) => s + x, 0)
-    return { text, teams, siegerTeams: vorn, klassenwert: gesamt, klassenwertText: `${gesamt} Schritte gesamt` }
+    return { text, teams, siegerTeams: vorn, klassenwert: gesamt, klassenwertText: kt(z.sprache, 'reSchritte', gesamt) }
   }
 }

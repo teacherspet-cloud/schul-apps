@@ -7,6 +7,7 @@
  * FAUSTREGEL: Grenzen für die Tipps (3er-Einsätze unter 60 % = zu sicher; 1er-Einsätze über 85 % = trau dir mehr zu).
  */
 import { klassenwertVon, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
+import { kt } from '../texte'
 
 export interface Wette extends KBasis {
   einsatz: Record<string, number | null>
@@ -60,13 +61,22 @@ export const wette: KlassenRegeln<Wette> = {
     const n = k.reduce((s, x) => s + x.anzahl, 0)
     const schnitt = n ? k.reduce((s, x) => s + x.einsatz * x.anzahl, 0) / n : 0
     const aus: BBlock[] = [
-      { typ: 'treffsicherheit', stufen: k },
+      {
+        typ: 'treffsicherheit',
+        titel: kt(z.sprache, 'weTitel'),
+        erklaerung: kt(z.sprache, 'weErklaerung'),
+        stufen: k.map((x) => ({
+          ...x,
+          name: kt(z.sprache, (['we1', 'we2', 'we3'] as const)[x.einsatz - 1]),
+          text: x.anzahl ? kt(z.sprache, 'weRichtigProzent', Math.round((x.richtig / x.anzahl) * 100), x.anzahl) : '–'
+        }))
+      },
       {
         typ: 'zahlen',
         eintraege: [
-          { titel: 'Antworten', wert: String(n) },
-          { titel: 'Ø Einsatz', wert: n ? schnitt.toFixed(1) : '–' },
-          { titel: 'Dabei', wert: String(Object.keys(z.personen).length) }
+          { titel: kt(z.sprache, 'weAntworten'), wert: String(n) },
+          { titel: kt(z.sprache, 'weSchnitt'), wert: n ? schnitt.toFixed(1) : '–' },
+          { titel: kt(z.sprache, 'zDabei'), wert: String(Object.keys(z.personen).length) }
         ]
       }
     ]
@@ -74,17 +84,17 @@ export const wette: KlassenRegeln<Wette> = {
   },
   geraet(z, wer) {
     const konto = z.konto[wer] ?? 0
-    const kopf = { typ: 'text' as const, text: `💰 Dein Konto: ${konto}`, gross: false }
-    if (z.einsatz[wer]) return [kopf, { typ: 'text', text: `Einsatz: ${'●'.repeat(z.einsatz[wer]!)}`, ton: 'leise' }]
+    const kopf = { typ: 'text' as const, text: kt(z.sprache, 'weKonto', konto), gross: false }
+    if (z.einsatz[wer]) return [kopf, { typ: 'text', text: kt(z.sprache, 'weEinsatz', '●'.repeat(z.einsatz[wer]!)), ton: 'leise' }]
     return [
       kopf,
-      { typ: 'text', text: 'Wie sicher bist du bei der nächsten Frage?', gross: true },
+      { typ: 'text', text: kt(z.sprache, 'weFrage'), gross: true },
       {
         typ: 'knoepfe',
         knoepfe: [
-          { text: '1 – unsicher', aktion: 'einsatz', wert: '1', farbe: 'gray' },
-          { text: '2 – ziemlich sicher', aktion: 'einsatz', wert: '2', farbe: 'blue' },
-          { text: '3 – ganz sicher', aktion: 'einsatz', wert: '3', farbe: 'grape' }
+          { text: kt(z.sprache, 'we1'), aktion: 'einsatz', wert: '1', farbe: 'gray' },
+          { text: kt(z.sprache, 'we2'), aktion: 'einsatz', wert: '2', farbe: 'blue' },
+          { text: kt(z.sprache, 'we3'), aktion: 'einsatz', wert: '3', farbe: 'grape' }
         ]
       }
     ]
@@ -102,22 +112,20 @@ export const wette: KlassenRegeln<Wette> = {
   eigenText(z, wer) {
     const j = z.je[wer]
     if (!j) return null
-    const teile = STUFEN.filter((e) => j[e]?.[0]).map((e) => `Einsatz ${e}: ${j[e][1]} von ${j[e][0]} richtig (${Math.round((j[e][1] / j[e][0]) * 100)} %)`)
+    const teile = STUFEN.filter((e) => j[e]?.[0]).map((e) => kt(z.sprache, 'weStufe', e, j[e][1], j[e][0], Math.round((j[e][1] / j[e][0]) * 100)))
     let tipp = ''
     const drei = j[3]
     const eins = j[1]
-    if (drei && drei[0] >= 3 && drei[1] / drei[0] < 0.6) tipp = 'Tipp: Bei „ganz sicher" lagst du oft daneben – prüf dich vorher kurz.'
-    else if (eins && eins[0] >= 3 && eins[1] / eins[0] > 0.85) tipp = 'Tipp: Du wusstest mehr, als du dachtest – trau dir mehr zu!'
-    else if (teile.length) tipp = 'Deine Einschätzung passt gut zu dem, was du weißt.'
-    return [`Konto: ${z.konto[wer] ?? 0}`, ...teile, tipp].filter(Boolean).join(' · ')
+    if (drei && drei[0] >= 3 && drei[1] / drei[0] < 0.6) tipp = kt(z.sprache, 'weZuSicher')
+    else if (eins && eins[0] >= 3 && eins[1] / eins[0] > 0.85) tipp = kt(z.sprache, 'weMehrZutrauen')
+    else if (teile.length) tipp = kt(z.sprache, 'wePasst')
+    return [kt(z.sprache, 'weKontoKurz', z.konto[wer] ?? 0), ...teile, tipp].filter(Boolean).join(' · ')
   },
   ergebnis(z) {
     const k = klasse(z)
     const drei = k[2]
-    const text = drei.anzahl
-      ? `Bei „ganz sicher" lag die Klasse zu ${Math.round((drei.richtig / drei.anzahl) * 100)} % richtig.`
-      : 'Niemand hat 3 Punkte gesetzt – mehr Mut beim nächsten Mal!'
+    const text = drei.anzahl ? kt(z.sprache, 'weErgebnis', Math.round((drei.richtig / drei.anzahl) * 100)) : kt(z.sprache, 'weKeiner')
     const w = klassenwertVon(z)
-    return { text, klassenwert: w, klassenwertText: `${w} Punkte (Treffer × Quote)` }
+    return { text, klassenwert: w, klassenwertText: kt(z.sprache, 'wePunkte', w) }
   }
 }

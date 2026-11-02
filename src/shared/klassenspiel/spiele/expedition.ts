@@ -7,11 +7,12 @@
  *
  * FAUSTREGEL: Schritte je Lager = max(8, 2,5 × Personen) · Dauer/10; Quote 70 %.
  */
+import { kt, ktListe } from '../texte'
 import { klassenQuote, klassenwertVon, meldung, type BBlock, type KBasis, type KlassenRegeln } from '../kern'
 
 export const LAGER = 6
 export const ZIEL_QUOTE = 0.7
-const NAMEN = ['Basislager', 'Waldgrenze', 'Felsband', 'Gletscher', 'Grat', 'Gipfel']
+const namen = (z: KBasis): string[] => Array.from({ length: LAGER }, (_, i) => ktListe(z.sprache, 'lager', i))
 
 export interface Expedition extends KBasis {
   lager: number
@@ -36,7 +37,7 @@ export const expedition: KlassenRegeln<Expedition> = {
     const q = klassenQuote(z)
     if (q !== null && q < ZIEL_QUOTE) {
       z.fort = ziel
-      if (!z.gebremst) meldung(z, 'Zu viele Fehler – erst sorgfältiger werden, dann geht es weiter!', 'warn')
+      if (!z.gebremst) meldung(z, kt(z.sprache, 'exZuVieleFehler'), 'warn')
       z.gebremst = true
       return
     }
@@ -47,21 +48,21 @@ export const expedition: KlassenRegeln<Expedition> = {
     if (z.lager >= LAGER) {
       z.sieg = true
       z.ende = true
-      meldung(z, 'Gipfel erreicht! 🏔️', 'gut')
-    } else meldung(z, `${NAMEN[z.lager - 1]} geschafft – weiter zum ${NAMEN[z.lager]}!`, 'gut')
+      meldung(z, kt(z.sprache, 'exGipfel'), 'gut')
+    } else meldung(z, kt(z.sprache, 'exGeschafft', namen(z)[z.lager - 1], namen(z)[z.lager]), 'gut')
   },
   beamer(z) {
     const ziel = schritteJeLager(z)
     const q = klassenQuote(z)
     const r = Object.values(z.personen).reduce((s, p) => s + p.richtig, 0)
     const aus: BBlock[] = [
-      { typ: 'berg', lager: z.lager, von: LAGER, anteil: Math.min(1, z.fort / ziel), quote: q, zielQuote: ZIEL_QUOTE, namen: NAMEN, ...(z.gebremst ? { hinweis: 'Sorgfalt! Die Quote muss über 70 % steigen.' } : {}) },
+      { typ: 'berg', lager: z.lager, von: LAGER, anteil: Math.min(1, z.fort / ziel), quote: q, zielQuote: ZIEL_QUOTE, namen: namen(z), titel: kt(z.sprache, 'exLager', z.lager, LAGER), ...(z.gebremst ? { hinweis: kt(z.sprache, 'exHinweis') } : {}) },
       {
         typ: 'zahlen',
         eintraege: [
-          { titel: 'Richtig', wert: String(r) },
-          { titel: 'Sorgfalt (letzte 30)', wert: q === null ? '–' : `${Math.round(q * 100)} %` },
-          { titel: 'Dabei', wert: String(Object.keys(z.personen).length) }
+          { titel: kt(z.sprache, 'zRichtig'), wert: String(r) },
+          { titel: kt(z.sprache, 'exSorgfalt'), wert: q === null ? '–' : `${Math.round(q * 100)} %` },
+          { titel: kt(z.sprache, 'zDabei'), wert: String(Object.keys(z.personen).length) }
         ]
       }
     ]
@@ -70,13 +71,13 @@ export const expedition: KlassenRegeln<Expedition> = {
   geraet(z) {
     const ziel = schritteJeLager(z)
     return [
-      { typ: 'fortschritt', titel: `🏔️ ${NAMEN[Math.min(LAGER - 1, z.lager)]} · ${z.lager}/${LAGER}`, wert: Math.min(ziel, z.fort), max: ziel, ton: z.gebremst ? 'warn' : 'info' },
-      ...(z.gebremst ? [{ typ: 'text' as const, text: 'Sorgfalt zählt – lieber genau als schnell!', ton: 'warn' as const }] : [])
+      { typ: 'fortschritt', titel: `🏔️ ${namen(z)[Math.min(LAGER - 1, z.lager)]} · ${z.lager}/${LAGER}`, wert: Math.min(ziel, z.fort), max: ziel, ton: z.gebremst ? 'warn' : 'info' },
+      ...(z.gebremst ? [{ typ: 'text' as const, text: kt(z.sprache, 'exSorgfaltGeraet'), ton: 'warn' as const }] : [])
     ]
   },
   ergebnis(z) {
-    const text = z.sieg ? 'Die Klasse hat den Gipfel erreicht!' : `Die Klasse ist bis ${z.lager ? `zum ${NAMEN[z.lager - 1]}` : 'kurz vor das erste Lager'} gekommen.`
+    const text = z.sieg ? kt(z.sprache, 'exErgebnisGipfel') : kt(z.sprache, 'exErgebnis', z.lager, LAGER)
     // Rekord: Lager zählen vor allem, dazu der Klassenwert
-    return { text, sieg: z.sieg, klassenwert: z.lager * 1000 + Math.min(999, klassenwertVon(z)), klassenwertText: `${z.lager}/${LAGER} Lager` }
+    return { text, sieg: z.sieg, klassenwert: z.lager * 1000 + Math.min(999, klassenwertVon(z)), klassenwertText: kt(z.sprache, 'exLager', z.lager, LAGER) }
   }
 }
