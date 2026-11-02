@@ -91,7 +91,7 @@ import { grammatikVorgabe, Hinzufuegen } from './KursHinzufuegen'
 import { LernendeTabelle, regelnVon } from './KursLernende'
 import { LernstandSymbol, StufenDiagramm } from './LernstandVerlauf'
 import KalenderHinweis from '../../../shared/components/KalenderHinweis'
-import { TestAbschnitte } from './TestAbschnitte'
+import { TESTPLAN_GEAENDERT, TestPlanenKnopf } from './TestPlanen'
 import { alsFeld, ausFeld, type KursReiter, type Lernende, type Lernstanddaten } from './kursDaten'
 import { entwurfHinweis, geplanteAbschnitte, HINWEIS_FARBE, kursHinweise, kursKennzahlen, type KursBedarf, type KursHinweis } from './kursHinweise'
 import { zumHinweis } from './kursFokus'
@@ -670,7 +670,12 @@ export function KursSeite({
   useEffect(() => {
     const auf = (): void => (laden(), geaendert?.())
     window.addEventListener(KURS_GEAENDERT, auf)
-    return () => window.removeEventListener(KURS_GEAENDERT, auf)
+    // „Test planen" gespeichert (02.11.2026) – auch aus „Meine Klassen" über der eingebetteten Kursseite
+    window.addEventListener(TESTPLAN_GEAENDERT, auf)
+    return () => {
+      window.removeEventListener(KURS_GEAENDERT, auf)
+      window.removeEventListener(TESTPLAN_GEAENDERT, auf)
+    }
   }, [laden]) // eslint-disable-line react-hooks/exhaustive-deps
   const neuLaden = (): void => (laden(), geaendert?.())
   const [bedarfStand, setBedarfStand] = useState(0)
@@ -1153,6 +1158,8 @@ export function KursSeite({
             <Group gap="xs">
               {/* „Als Schüler ansehen" (09.10.2026, wie in „Meine Klassen"): Fenster gleich auf diesem Kurs */}
               <AlsSchuelerAnsehen kursId={id} gruppe={d.lerngruppeId || undefined} klasse={d.lerngruppeId && d.lerngruppe ? d.lerngruppe : titel} />
+              {/* „Test planen" (02.11.2026): ersetzt „Zeitraum und Test" der Kurseinstellungen */}
+              <TestPlanenKnopf kursId={id} termin={d.testTermin} klasse={titel} />
               {d.code && d.link && !d.iservGruppe && (
                 <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-vokabel-qr-zeigen>
                   QR-Code
@@ -1329,43 +1336,25 @@ function Einstellungen({
   return (
     <OptionenBereich>
       <Stack gap="lg" maw={760} data-kurs-einstellungen>
-        <Card withBorder radius="md" padding="md">
-          <Text fw={700} mb="sm">
-            Zeitraum und Test
-          </Text>
-          <Group gap="md" align="flex-start">
-            {/* Feste Klasse (09.10.2026, abgestimmt): kein Enddatum – ein schon gesetztes lässt sich noch löschen */}
-            {(!d.klassenKurs || d.bis) && (
-              <div style={{ width: 220 }}>
-                <TextInput
-                  type="date"
-                  label="Lernzeitraum bis"
-                  description={d.klassenKurs ? 'Kurs der Klasse: Datum löschen, dann läuft er weiter.' : 'Danach ist der Kurs abgeschlossen.'}
-                  leftSection={<IconCalendarEvent size={14} />}
-                  value={alsFeld(d.bis)}
-                  onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
-                  data-vokabel-bis-aendern
-                />
-                <KalenderHinweis wert={alsFeld(d.bis)} richtung="vor" verschieben={(t) => aendern('zeitraum', { bis: ausFeld(t, '23:59:00') })} />
-              </div>
-            )}
-            <div style={{ width: 220 }}>
+        {/* „Zeitraum und Test" entfällt (02.11.2026, Wunsch der Lehrkraft): Testtermin und Inhalt im Fenster „Test planen"
+             (Knopf neben „Als Schüler ansehen"); hier bleibt nur das Ende des Lernzeitraums. Feste Klasse (09.10.2026): kein
+             Enddatum – ein schon gesetztes lässt sich noch löschen */}
+        {(!d.klassenKurs || d.bis) && (
+          <Card withBorder radius="md" padding="md" data-kurs-lernzeitraum>
+            <div style={{ width: 260 }}>
               <TextInput
                 type="date"
-                label="Testtermin"
-                description="Der Karteikasten plant bis dahin."
-                value={alsFeld(d.testTermin)}
-                onChange={(e) => aendern('termin', { testTermin: ausFeld(e.currentTarget.value, '08:00:00') })}
-                data-vokabel-termin
+                label="Lernzeitraum bis"
+                description={d.klassenKurs ? 'Kurs der Klasse: Datum löschen, dann läuft er weiter.' : 'Danach ist der Kurs abgeschlossen.'}
+                leftSection={<IconCalendarEvent size={14} />}
+                value={alsFeld(d.bis)}
+                onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
+                data-vokabel-bis-aendern
               />
-              <KalenderHinweis wert={alsFeld(d.testTermin)} verschieben={(t) => aendern('termin', { testTermin: ausFeld(t, '08:00:00') })} />
+              <KalenderHinweis wert={alsFeld(d.bis)} richtung="vor" verschieben={(t) => aendern('zeitraum', { bis: ausFeld(t, '23:59:00') })} />
             </div>
-          </Group>
-          {/* Abschnitte des Tests (12.10.2026): nur mit kommendem Termin */}
-          {d.testTermin && d.testTermin > Date.now() && d.testAbschnitte && (
-            <TestAbschnitte daten={d.testAbschnitte} speichern={(keys) => aendern('termin', { testTermin: d.testTermin, testAbschnitte: keys })} />
-          )}
-        </Card>
+          </Card>
+        )}
         {mitWoertern && (
           <Card withBorder radius="md" padding="md" data-vokabel-tag>
             <Text fw={700} mb="sm">

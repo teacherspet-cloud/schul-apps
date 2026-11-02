@@ -134,6 +134,34 @@ function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction
   }
 }
 
+/** Klammer mit der Vokabel am Satzende entfernen („… wettbewerbsfähig. (competitive)“ → „… wettbewerbsfähig.“) */
+export function ohneWortInKlammern(satz: string, wort?: string): string {
+  const s = String(satz ?? '').trim()
+  const m = /\s*\(([^()]{1,60})\)\s*$/.exec(s)
+  if (!m) return s
+  const innen = m[1].trim().toLowerCase()
+  const w = String(wort ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^(to|the|a|an)\s+/, '')
+  // Nur eine Klammer, die nach dem Zielwort aussieht – nicht „(z. B. im Urlaub)" im deutschen Satz
+  const istWort = Boolean(w) && (innen.includes(w) || w.includes(innen))
+  return istWort ? s.slice(0, m.index).trim() : s
+}
+/** Anweisung ohne Hinweis auf ein vorgegebenes Wort in Klammern (alle Testsprachen); leer, wenn nichts übrig bleibt */
+export function ohneKlammerHinweis(anweisung: string): string {
+  return String(anweisung ?? '')
+    .split(/(?<=[.!。])\s*/)
+    .filter((satz) => satz && !/bracket|parenthes|parenth[eè]se|par[eé]ntesis|parentesi|klammer|haakjes|скобк|nawias|závork|parantez|括号|かっこ|القوسين|parentes|παρένθεσ/i.test(satz))
+    .join(' ')
+    .trim()
+}
+/** Anweisung ohne „das unterstrichene/markierte Wort" – die Lernenden suchen das falsche Wort selbst; leer = Rückfall */
+export function ohneMarkierungsHinweis(anweisung: string): string {
+  const a = String(anweisung ?? '').trim()
+  return /underlin|highlight|in bold|souligné|subrayad|sottolineat|unterstrich|markiert|onderstreept|подчёркн|podkreśl|podtrž|sublinhad|altı çizili|画线|下線|تحتها خط|understreg|υπογραμμισμ/i.test(a) ? '' : a
+}
+
 /**
  * „Write sentences": Situation und Musterbeispiel helfen am Gymnasium zu sehr (Lehrkraft,
  * 02.10.2026) – dort steht nur das Wort. Mit Vorgabe: Haupt- und Realschule, Förderschule,
@@ -924,21 +952,39 @@ ${vocabLines(vocab)}`,
   {
     id: 'mediation',
     label: 'Sinngemäß übertragen (Mediation)',
-    description: 'Deutsche Sätze sinngemäß in die Zielsprache übertragen, die Vokabel muss verwendet werden.',
+    description: 'Deutsche Sätze sinngemäß in die Zielsprache übertragen – ohne Hinweis auf die Vokabel; die Lernenden finden sie selbst.',
     kind: 'open',
     minLevel: 'A2',
     ab: { niveau: 'B1', klasse: 8 },
     usesVocab: true,
     defaultPoints: 2,
     defaultTitle: 'Mediation',
-    defaultInstruction: 'Say it in English. Use the word in brackets.',
-    schema: itemSchema({ vocabId: str(), prompt: str('German sentence followed by the target word in brackets'), modelAnswer: str() }),
+    /*
+     * Ohne Wort in Klammern (02.11.2026, Wunsch der Lehrkraft): „Die Preise … sind sehr wettbewerbsfähig. (competitive)“
+     * verriet die Vokabel – das Abrufen gehört zur Aufgabe. Ältere bzw. abweichende KI-Antworten: Klammer am Satzende
+     * und Hinweise auf „brackets“ in der Anweisung werden entfernt (`ohneWortInKlammern`, `ohneKlammerHinweis`).
+     */
+    defaultInstruction: 'Say it in English.',
+    schema: itemSchema({
+      vocabId: str(),
+      prompt: str('The GERMAN sentence only – no target word, no brackets, no hint'),
+      modelAnswer: str('Rendering in the target language that uses the tested word')
+    }),
     prompt: (vocab) =>
-      `Task type: mediation. For each word write a natural GERMAN sentence from everyday life that students should render in the target language using the tested word. "prompt" = German sentence + " (" + word + ")". Keep the German simple so the difficulty lies in the vocabulary.\n\nWords:\n${vocabLines(
+      `Task type: mediation. For each word write a natural GERMAN sentence from everyday life that students should render in the target language. The sentence must express the meaning of the tested word so clearly that a good rendering needs exactly this word. "prompt" = the German sentence ONLY – never add the target word, brackets or any hint, and do not mention brackets in the instruction. Keep the German simple so the difficulty lies in the vocabulary. "modelAnswer" uses the tested word.\n\nWords:\n${vocabLines(
         vocab
       )}`,
     build(vocab, data, ctx) {
-      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+      const b = base(this, data, ctx)
+      return {
+        ...b,
+        instruction: ohneKlammerHinweis(b.instruction) || aufgabenText(this.id, ctx.settings.targetLanguage)?.instruction || this.defaultInstruction,
+        kind: 'open',
+        items: openItems(vocab, data, ctx, 2).map((it: { prompt: string; vocabId?: string }) => ({
+          ...it,
+          prompt: ohneWortInKlammern(it.prompt, findVocab(vocab, it.vocabId ?? '')?.term)
+        }))
+      }
     }
   },
   {
@@ -1052,7 +1098,8 @@ ${vocabLines(vocab)}`,
     usesVocab: true,
     defaultPoints: 1,
     defaultTitle: 'Correct the mistakes',
-    defaultInstruction: 'One word in each sentence is wrong. Cross it out and write the correct word.',
+    // Das falsche Wort steht unmarkiert im Satz (02.11.2026, Wunsch der Lehrkraft): Finden gehört zur Aufgabe
+    defaultInstruction: 'One word in each sentence is wrong. Find it, cross it out and write the correct word.',
     schema: itemSchema({
       vocabId: str(),
       before: str(),
@@ -1069,7 +1116,16 @@ ${vocabLines(vocab)}`,
         const v = findVocab(vocab, it.vocabId)
         return v ? [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, hint: it.wrongWord }] : []
       })
-      return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
+      const b = base(this, data, ctx)
+      return {
+        ...b,
+        instruction: ohneMarkierungsHinweis(b.instruction) || aufgabenText(this.id, ctx.settings.targetLanguage)?.instruction || this.defaultInstruction,
+        kind: 'gap',
+        items,
+        wordBank: false,
+        firstLetterHint: false,
+        extraBankWords: []
+      }
     }
   },
   {

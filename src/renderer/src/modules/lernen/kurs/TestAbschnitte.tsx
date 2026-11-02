@@ -7,7 +7,21 @@
 import { Anchor, Chip, Group, Stack, Text } from '@mantine/core'
 
 export interface TestAbschnitteDaten {
-  eintraege: { key: string; titel: string; zeit: number; art: 'vok' | 'gram' }[]
+  eintraege: {
+    key: string
+    titel: string
+    zeit: number
+    art: 'vok' | 'gram'
+    /** Stelle im Lehrwerk (02.11.2026, Fenster „Test planen") */
+    buch?: string
+    unit?: string
+    name?: string
+    station?: string
+    anzahl?: number
+    aufgaben?: number
+    unitRang?: number
+    abschnittRang?: number
+  }[]
   gewaehlt: string[]
   /** false = Vorbelegung (noch nie von Hand gewählt) */
   eigeneWahl: boolean

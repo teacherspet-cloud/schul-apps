@@ -175,7 +175,7 @@ export function TestZumTermin({ k, schliessen, geaendert }: { k: StartKurs; schl
       <Stack gap="sm">
         {(k.testInhalt ?? []).length > 0 && (
           <Text size="sm" c="dimmed">
-            Dran kommt: {(k.testInhalt ?? []).map((t) => t.titel).join(' · ')}
+            Dran kommt: {(k.testInhalt ?? []).map((t) => t.titel).join('; ')}
           </Text>
         )}
         {k.testMaterial && !andere ? (

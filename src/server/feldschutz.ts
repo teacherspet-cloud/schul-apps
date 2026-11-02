@@ -106,7 +106,9 @@ export const SENSIBEL: Record<string, string[]> = {
   // Verlauf der Bewertung (23.10.2026, Prüfung des Schulträgers, bewertungSpur.ts): KI-Vorschlag und Entscheidung der Lehrkraft
   bewertung_spur: ['ki_vorschlag', 'entscheidung'],
   // Datenpannen (22.10.2026, Prüfung des Schulträgers, datenpanne.ts): Beschreibung, Betroffene, Maßnahmen
-  datenpannen: ['daten']
+  datenpannen: ['daten'],
+  // Geplante Tests in Fächern ohne Sprachkurs (02.11.2026, testplaene.ts): Thema, Buchseiten, gewähltes Material
+  testplaene: ['daten']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

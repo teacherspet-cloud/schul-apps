@@ -912,10 +912,20 @@ kursHaken.grammatikTestStand = (gramId, schuelerId) => {
   return { titel: z.thema || z.titel, sicher: u.sicher, gesamt: u.gesamt }
 }
 // Testabschnitte (12.10.2026): die Grammatik des Kurses (ohne Extras) steht in der Auswahl unter dem Testtermin
-kursHaken.grammatikTeile = (vokId) =>
+kursHaken.grammatikTeile = (vokId, mitStelle) =>
   (db().prepare("SELECT * FROM gram_zuweisungen WHERE vok_id = ? AND status != 'entfernt' ORDER BY erstellt ASC, rowid").all(vokId) as unknown as Zeile[])
     .filter((z) => !istExtra(z))
-    .map((z) => ({ id: z.id, titel: z.thema || z.titel, zeit: Date.parse(z.erstellt) || 0 }))
+    .map((z) => {
+      // Stelle im Lehrwerk (02.11.2026, Fenster „Test planen": Band › Unit › Station)
+      let stelle: { buch?: string; unit?: string; station?: string } = {}
+      if (mitStelle)
+        try {
+          stelle = lehrwerkDerGrammatik(z)
+        } catch {
+          stelle = {}
+        }
+      return { id: z.id, titel: z.thema || z.titel, zeit: Date.parse(z.erstellt) || 0, ...stelle }
+    })
 
 /**
  * Angekündigter Test, der diese Grammatik abfragt (12.10.2026, Übungsvorrang): der Testtermin des verbundenen Kurses

@@ -339,7 +339,7 @@ export const kursHaken: {
   /** Nach einer Freigabe (10.10.2026, wortliste.ts): doppelte Vokabeln zählen, nur die Zahl ins Protokoll */
   nachFreigabe?: (kursId: string) => void
   /** Verbundene Grammatik eines Kurses für die Auswahl der Testabschnitte (12.10.2026, grammatik.ts) */
-  grammatikTeile?: (vokId: string) => { id: string; titel: string; zeit: number }[]
+  grammatikTeile?: (vokId: string, mitStelle?: boolean) => { id: string; titel: string; zeit: number; buch?: string; unit?: string; station?: string; aufgaben?: number }[]
   /** Testvorbereitung (28.10.2026): Stand einer Person in einer Grammatik des Tests */
   grammatikTestStand?: (gramId: string, schuelerId: string) => { titel: string; sicher: number; gesamt: number } | null
   /** Test zum Termin (28.10.2026): Katalog-Kennungen einer Grammatik des Kurses */
@@ -365,11 +365,51 @@ export const tageszielVon = (z: Pick<Zeile, 'tagesziel'>): number => Math.max(1,
 export const testAuswahlVon = (z: Pick<Zeile, 'test_abschnitte'>): TestAuswahl => testAuswahlAus(z.test_abschnitte)
 
 /** Auswahlliste für die Lehrkraft: Vokabelabschnitte (Titel, Freigabezeit) und verbundene Grammatik („gram:<id>") */
-export function testEintraege(z: Zeile): { key: string; titel: string; zeit: number; art: 'vok' | 'gram' }[] {
+/** `mitStelle`: Band/Unit/Station dazu (nur für das Fenster der Lehrkraft – die Lernenden-Wege brauchen nur die Schlüssel) */
+export function testEintraege(z: Zeile, mitStelle = false): TestEintrag[] {
   const teile = json_(z.woerter, [] as unknown[]).length ? teileVon(z) : []
-  const vok = teile.map((t) => ({ key: teilSchluessel(t), titel: t.titel, zeit: t.zeit || 0, art: 'vok' as const }))
-  const gram = (kursHaken.grammatikTeile?.(z.id) ?? []).map((g) => ({ key: `${GRAM_PRAEFIX}${g.id}`, titel: g.titel, zeit: g.zeit, art: 'gram' as const }))
+  // Band, Unit und Station je Eintrag (02.11.2026, Fenster „Test planen"): „Station 1" aus Green Line 5 und 6 auseinanderhalten
+  const e = teile.length && mitStelle ? teileEingeordnet(z, teile) : []
+  const vok = teile.map((t, i) => ({
+    key: teilSchluessel(t),
+    titel: t.titel,
+    zeit: t.zeit || 0,
+    art: 'vok' as const,
+    anzahl: t.anzahl,
+    ...(e[i]?.buch ? { buch: e[i].buch } : {}),
+    unit: e[i]?.unit ?? '',
+    name: e[i]?.name ?? t.titel,
+    ...(e[i]?.unitRang !== undefined ? { unitRang: e[i].unitRang } : {}),
+    ...(e[i]?.abschnittRang !== undefined ? { abschnittRang: e[i].abschnittRang } : {})
+  }))
+  const gram = (kursHaken.grammatikTeile?.(z.id, mitStelle) ?? []).map((g) => ({
+    key: `${GRAM_PRAEFIX}${g.id}`,
+    titel: g.titel,
+    zeit: g.zeit,
+    art: 'gram' as const,
+    ...(g.buch ? { buch: g.buch } : {}),
+    ...(g.unit ? { unit: g.unit } : {}),
+    ...(g.station ? { station: g.station } : {}),
+    ...(g.aufgaben ? { aufgaben: g.aufgaben } : {})
+  }))
   return [...vok, ...gram]
+}
+
+/** Eintrag der Testauswahl (Kurstermin) – mit Stelle im Lehrwerk für die gegliederte Auswahl */
+export interface TestEintrag {
+  key: string
+  titel: string
+  zeit: number
+  art: 'vok' | 'gram'
+  buch?: string
+  unit?: string
+  /** Vokabeln: Name des Abschnitts in der Unit („Station 1"); Grammatik: Station im Lehrwerk */
+  name?: string
+  station?: string
+  anzahl?: number
+  aufgaben?: number
+  unitRang?: number
+  abschnittRang?: number
 }
 
 /**
@@ -452,7 +492,7 @@ export function kursUebung(
 
 /** Auswahl der Testabschnitte für die Kurseinstellungen der Lehrkraft (12.10.2026) */
 export function testAbschnitteFuerLehrkraft(z: Zeile): {
-  eintraege: { key: string; titel: string; zeit: number; art: 'vok' | 'gram' }[]
+  eintraege: TestEintrag[]
   gewaehlt: string[]
   eigeneWahl: boolean
   letzter: number | null
@@ -460,7 +500,7 @@ export function testAbschnitteFuerLehrkraft(z: Zeile): {
 } {
   const a = testAuswahlVon(z)
   return {
-    eintraege: testEintraege(z),
+    eintraege: testEintraege(z, true),
     gewaehlt: testKeysVon(z),
     eigeneWahl: Boolean(a.keys),
     letzter: a.letzter ?? null,
@@ -1610,6 +1650,19 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    // Fenster „Test planen" (02.11.2026): nur Termin und Auswahl – ohne die schwere Kursübersicht
+    if (req.method === 'GET' && teile[1] === 'testplan')
+      return (
+        json(res, 200, {
+          id: z.id,
+          titel: z.titel,
+          fach: z.fach,
+          sprache: z.sprache,
+          testTermin: z.test_termin ?? null,
+          testAbschnitte: testAbschnitteFuerLehrkraft(z)
+        }),
+        true
+      )
     // Lernende einer Klasse zuordnen (08.10.2026): Vorschau für den Dialog – je eigene Lerngruppe, wer schon dazugehört
     // Inhalt des Termins zum Erstellen eines Tests (28.10.2026, Startseite „Test zum Termin"): Wörter der gewählten
     // Abschnitte und die Katalog-Kennungen der gewählten Grammatik

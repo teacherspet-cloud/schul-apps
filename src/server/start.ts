@@ -22,6 +22,7 @@ import { sprechenRoute } from './sprechen'
 import { partnerarbeitRoute } from './partnerarbeit'
 import { kriseRoute, krisenErinnerungStarten } from './krise'
 import { datenpanneRoute } from './datenpanne'
+import { testplaeneAufraeumen, testplaeneRoute } from './testplaene'
 import { sprechBankRoute } from './sprechBank'
 import { erinnerungenRoute, erinnerungenStarten } from './erinnerungen'
 import { rekordbuchRoute } from './rekordbuch'
@@ -224,6 +225,12 @@ async function main(): Promise<void> {
     }
   }, 10 * 60 * 1000).unref()
   if (umgeschrieben) console.log(`${umgeschrieben} Dateien der Ablagen verschlüsselt.`)
+  // Vergangene Testpläne nach 400 Tagen (testplaene.ts, Löschkonzept)
+  try {
+    testplaeneAufraeumen()
+  } catch {
+    /* beim nächsten Start */
+  }
 
   const hosts = (env.SCHULAPPS_HOSTS || new URL(adresse).host)
     .split(',')
@@ -302,6 +309,8 @@ async function main(): Promise<void> {
       kriseRoute(),
       // Datenpannen nach Art. 33/34 DSGVO (22.10.2026, Prüfung des Schulträgers, datenpanne.ts) – nur Admins
       datenpanneRoute(),
+      // Test planen in Fächern ohne Sprachkurs (02.11.2026, testplaene.ts) – nur Lehrkräfte
+      testplaeneRoute(),
       // Freischaltungen planen: „Geplant" der Lehrkraft, „Demnächst"/„Neu freigeschaltet" der Lernenden (09.10.2026)
       planenRoute(),
       // Schüler-Startseite: Lernstand und Lerntipps (06.10.2026)

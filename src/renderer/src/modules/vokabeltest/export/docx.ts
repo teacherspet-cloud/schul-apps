@@ -444,7 +444,8 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
           if (it.sentences.length > 1) children.push(run(`${letter(si)}) `, { bold: true }))
           children.push(run(`${s.before} `))
           const teile = teileVon(it.answer)
-          if (wrong) children.push(new TextRun({ text: it.hint ?? '', underline: { type: 'thick' }, bold: true }))
+          // Falsches Wort unmarkiert (02.11.2026); im Lösungsblatt durchgestrichen
+          if (wrong) children.push(mode === 'print' ? run(it.hint ?? '') : new TextRun({ text: it.hint ?? '', strike: true, bold: true }))
           else if (twoSentences) children.push(run('__________'))
           // Zweiteilige Wendung (02.10.2026): zwei Lücken mit dem Mittelteil dazwischen
           else if (s.mitte !== undefined && teile.length === 2)

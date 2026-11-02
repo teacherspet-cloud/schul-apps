@@ -229,6 +229,18 @@ export function onlineFassung(variante: Variant): OnlineFassung {
             einheit(f, [f, f2])
             continue
           }
+          if (b.taskType === 'wrongWord') {
+            /*
+             * Falsches Wort ersetzen (02.11.2026, Wunsch der Lehrkraft): Der Satz steht vollständig mit dem falschen Wort da –
+             * unmarkiert, ohne Hinweis darunter; die Lernenden finden es selbst und schreiben das richtige Wort ins Feld.
+             */
+            const s0 = it.sentences[0] ?? { before: '', after: '' }
+            const satz = [s0.before, it.hint ?? '', s0.after].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ').replace(/\s+([,.;:!?])/g, '$1')
+            a.eintraege.push({ einheit: f, text: satz, felder: [{ id: f, art: 'text', beschriftung: 'richtiges Wort' }] })
+            loesungen[f] = { art: 'genau', werte: [it.answer, ...(it.auchRichtig ?? [])] }
+            einheit(f, [f])
+            continue
+          }
           a.eintraege.push({
             einheit: f,
             saetze: it.sentences.map((s) => ({ vor: s.before, nach: s.after })),
