@@ -393,7 +393,8 @@ interface TestZeile {
 
 interface Test extends Omit<TestZeile, 'fassungen' | 'einstellungen'> {
   /** `original`: die Variante des Vokabeltests (Abgabe als Blatt); fehlt bei Tests vor dem 02.10.2026 abends */
-  fassungen: { label: string; fassung: OnlineFassung; original?: TestDocument['variants'][number] }[]
+  /** `blatt` (02.11.2026): Druckfassung ohne Lösungen für „Als Blatt ansehen" der Lernenden; fehlt bei älteren Tests */
+  fassungen: { label: string; fassung: OnlineFassung; original?: TestDocument['variants'][number]; blatt?: string }[]
   einstellungen: Einstellungen
 }
 
@@ -450,7 +451,9 @@ export function bereinigeFassung(roh: unknown): OnlineFassung {
     id: String(e.id),
     aufgabe: String(e.aufgabe),
     felder: (e.felder ?? []).map(String).slice(0, 60),
-    punkte: Math.max(1, Math.min(100, Math.round(Number(e.punkte) || 1)))
+    punkte: Math.max(1, Math.min(100, Math.round(Number(e.punkte) || 1))),
+    // Eigene Lösung je Einheit (Teilpunkte „Sätze übersetzen") bleibt erhalten
+    ...(e.loesung ? { loesung: String(e.loesung).slice(0, 160) } : {})
   }))
   const loesungen = Object.fromEntries(Object.entries(f.loesungen ?? {}).slice(0, 4000)) as OnlineFassung['loesungen']
   if (JSON.stringify(aufgaben).length > 6_000_000) throw new Error('Der Test ist zu groß für einen Onlinetest.')
@@ -467,6 +470,19 @@ export function bereinigeFassung(roh: unknown): OnlineFassung {
         }
       : {})
   }
+}
+
+/**
+ * Druckfassung für „Als Blatt ansehen" (02.11.2026): nur Text bis 6 MB, ohne Skripte und Ereignis-Attribute – sie steht
+ * bei den Lernenden zusätzlich in einem Rahmen ohne Skriptrechte.
+ */
+export function blattBereinigt(roh: unknown): string | null {
+  if (typeof roh !== 'string' || !roh.trim() || roh.length > 6_000_000) return null
+  return roh
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<(iframe|object|embed)[\s\S]*?>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript:/gi, '')
 }
 
 export function testErstellen(
@@ -487,6 +503,8 @@ export function testErstellen(
     /** Termin „JJJJ-MM-TT" (10.10.2026) und „Für Lernende ausblenden" */
     termin?: string | null
     terminVerborgen?: boolean
+    /** Druckfassungen ohne Lösungen je Fassung (02.11.2026) */
+    blaetter?: unknown
   }
 ): Test {
   if (!e.test?.variants?.length && !e.blatt?.fassungen?.length) throw new Error('Der Test hat keine Variante.')
@@ -516,11 +534,16 @@ export function testErstellen(
     ...(terminBereinigt(e.termin) ? { termin: terminBereinigt(e.termin)!, ...(e.terminVerborgen ? { terminVerborgen: true } : {}) } : {}),
     ...(e.test ? { blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize } } : {})
   }
-  const fassungen = e.test
+  const fassungen0 = e.test
     ? e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v), original: v }))
     : e
         .blatt!.fassungen.slice(0, 4)
         .map((f, i) => ({ label: String(f.label || String.fromCharCode(65 + i)).slice(0, 20), fassung: bereinigeFassung(f.fassung) }))
+  const blaetter = Array.isArray(e.blaetter) ? e.blaetter : []
+  const fassungen = fassungen0.map((f, i) => {
+    const b = blattBereinigt(blaetter[i])
+    return b ? { ...f, blatt: b } : f
+  })
   const id = neueId()
   const code = neuerCode()
   db()
@@ -970,6 +993,93 @@ async function kiAuswerten(
   return { anfragen, bewertet }
 }
 
+/**
+ * KI-Prüfung in der Vorschau (02.11.2026, Wunsch der Lehrkraft): Die Lehrkraft macht einen Test vor dem Anlegen selbst
+ * und lässt ihre Antworten prüfen – dieselben Fälle und dieselbe Anfrage wie nach einer echten Abgabe (`kiAuswerten`),
+ * im Namen der Lehrkraft, aber ohne Teilnahme, ohne Speichern, ohne Verlauf. Höchstens ein Paket (40 Antworten).
+ */
+export function vorschauFaelle(fassung: OnlineFassung, antworten: Antworten, b: Bewertung): Fall[] {
+  const faelle: Fall[] = []
+  let nr = 0
+  for (const e of fassung.einheiten) {
+    const be = b[e.id]
+    if (!be) continue
+    if (be.status === 'ki') {
+      for (const feld of e.felder) {
+        const l = fassung.loesungen[e.loesung ?? feld]
+        if (!l || (l.art !== 'ki' && l.art !== 'menge')) continue
+        faelle.push({
+          id: `A${++nr}`,
+          frage: l.frage,
+          erwartung: l.art === 'ki' ? l.erwartung : `eines dieser Wörter oder ein anderes passendes: ${l.werte.join(', ')}`,
+          antwort: antworten[feld] ?? '',
+          teilnahme: 'vorschau',
+          einheit: e.id,
+          feld,
+          art: 'ki'
+        })
+      }
+    } else if (be.status === 'falsch') {
+      const falsche: string[] = []
+      let anderer = false
+      for (const feld of e.felder) {
+        const l = fassung.loesungen[e.loesung ?? feld]
+        if (!l) continue
+        const a = antworten[feld] ?? ''
+        if (l.art === 'genau') {
+          const vgl = vergleiche(a, l.werte, l.artikelFrei)
+          if (vgl === 'leer') anderer = true
+          else if (vgl !== 'richtig') falsche.push(feld)
+        } else if (l.art === 'auswahl' && a !== l.wert) anderer = true
+      }
+      if (anderer) continue
+      for (const feld of falsche) {
+        const l = fassung.loesungen[feld] as { art: 'genau'; werte: string[] }
+        faelle.push({
+          id: `A${++nr}`,
+          frage: kontextVon(fassung, feld),
+          erwartung: l.werte.join(' / '),
+          antwort: antworten[feld] ?? '',
+          wortloesung: true,
+          teilnahme: 'vorschau',
+          einheit: e.id,
+          feld,
+          art: 'wort'
+        })
+      }
+    }
+  }
+  return faelle.slice(0, PAKET_MAX)
+}
+
+/** Urteile in eine Bewertung übernehmen – dieselben Regeln wie `einarbeiten`, nur im Speicher */
+export function vorschauEinarbeiten(fassung: OnlineFassung, b: Bewertung, faelle: Fall[], urteile: Map<string, KiUrteil>): Bewertung {
+  const aus: Bewertung = { ...b }
+  const jeEinheit = new Map<string, Fall[]>()
+  for (const f of faelle) jeEinheit.set(f.einheit, [...(jeEinheit.get(f.einheit) ?? []), f])
+  for (const [eid, efs] of jeEinheit) {
+    const us = efs.map((f) => urteile.get(f.id))
+    if (us.some((u) => !u)) continue
+    const e = fassung.einheiten.find((x) => x.id === eid)
+    if (!e) continue
+    const hinweis = us
+      .map((u) => u!.begruendung)
+      .filter(Boolean)
+      .join(' ')
+    const pruefen = us.some((u) => u!.urteil === 'kleinerFehler') ? 'kleinerFehler' : 'sinnvoll'
+    const abw = us.find((u) => u!.urteil === 'kleinerFehler' || u!.urteil === 'vertretbar')
+    const fehler = { ...(abw?.fehlerGruppe ? { fehlerGruppe: abw.fehlerGruppe } : {}), ...(abw?.fehlerArt ? { fehlerArt: abw.fehlerArt } : {}) }
+    if (efs[0].art === 'wort')
+      aus[eid] = us.some((u) => u!.urteil === 'falsch')
+        ? { ...aus[eid], kiGeprueft: true, ...(hinweis ? { hinweis: [aus[eid]?.hinweis, `KI: ${hinweis}`].filter(Boolean).join('; ') } : {}) }
+        : { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, kiGeprueft: true, hinweis, ...fehler }
+    else if (us.every((u) => u!.urteil === 'richtig')) aus[eid] = { status: 'richtig', punkte: e.punkte, quelle: 'ki', hinweis, unbestaetigt: true }
+    else if (us.some((u) => u!.urteil === 'falsch')) aus[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', hinweis, unbestaetigt: true }
+    else aus[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis, ...fehler }
+  }
+  return aus
+}
+
 /** Ein Urteil, wie es in den Verlauf der Bewertung kommt (23.10.2026): ohne Antworttext, nur Ergebnis und Begründung */
 function spurUrteil(x: Bewertung[string]): { status: string; punkte: number; pruefen?: string; hinweis?: string; knapp?: true; frage?: true } {
   return {
@@ -1368,6 +1478,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
         t = teilnahme(t.id)!
       }
       const fassung = test.fassungen[t.variante].fassung
+      const blattFassung = test.fassungen[t.variante].blatt
       const wartet = !t.abgabe && t.beginn === 0
       return (
         json(res, 200, {
@@ -1387,6 +1498,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
           // NUR die Schülerfassung – die Lösungen bleiben hier (bis zum Ergebnis)
           aufgaben: t.abgabe || wartet ? [] : fassung.aufgaben,
           ...(fassung.stil && !(t.abgabe || wartet) ? { stil: fassung.stil } : {}),
+          // Als Blatt ansehen (02.11.2026): Druckfassung ohne Lösungen, erst wenn der Test läuft
+          ...(blattFassung && !(t.abgabe || wartet) ? { blatt: blattFassung } : {}),
           antworten: t.abgabe || wartet ? {} : json_(t.antworten, {})
         }),
         true
@@ -1664,6 +1777,35 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       }
       return (json(res, 200, { ausgeblendet: n }), true)
     }
+    // KI-Prüfung der Vorschau (02.11.2026): Fassung samt Lösungen kommt von der Lehrkraft selbst – nichts wird gespeichert
+    if (req.method === 'POST' && teile[0] === 'vorschau-ki') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      try {
+        const fassung = bereinigeFassung(k0.fassung)
+        const antworten: Antworten = {}
+        for (const [f, w] of Object.entries((k0.antworten ?? {}) as Record<string, unknown>)) if (typeof w === 'string') antworten[f.slice(0, 120)] = w.slice(0, 4000)
+        const b = bewerte(fassung, antworten)
+        const faelle = vorschauFaelle(fassung, antworten, b)
+        if (!faelle.length) return (json(res, 200, { bewertung: b, gefragt: 0 }), true)
+        const art = typeof k0.art === 'string' ? k0.art : 'Vokabeltest'
+        const antwort = await imNutzer(alsNutzer(ich), () =>
+          aufruf('ai:structured', [
+            {
+              ...kiAnfrage(
+                String(k0.sprache ?? ''),
+                String(k0.niveau ?? ''),
+                faelle,
+                art === 'Vokabeltest' ? undefined : { art, fach: String(k0.fach ?? '') }
+              ),
+              vonLernenden: false
+            }
+          ])
+        )
+        return (json(res, 200, { bewertung: vorschauEinarbeiten(fassung, b, faelle, urteileAus(antwort, faelle)), gefragt: faelle.length }), true)
+      } catch (e) {
+        return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+      }
+    }
     if (req.method === 'POST' && teile[0] === 'erstellen') {
       const k0 = (await k.koerper()) as Record<string, unknown>
       try {
@@ -1681,7 +1823,8 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           handschrift: k0.handschrift !== false,
           gaeste: k0.gaeste !== false,
           termin: typeof k0.termin === 'string' ? k0.termin : null,
-          terminVerborgen: k0.terminVerborgen === true
+          terminVerborgen: k0.terminVerborgen === true,
+          blaetter: k0.blaetter
         })
         return (json(res, 200, { id: t.id, code: t.code, link: link(t.code) }), true)
       } catch (e) {

@@ -17,6 +17,7 @@ import { maskottchenBild, useMaskottchen } from '../../shared/maskottchenStore'
 import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
 import { holen, senden } from './serverApi'
 import { onlineFassung, type OnlineFassung } from './kern'
+import { druckBlattHtml } from './blattAnsicht'
 import type { VorschauFassung } from './TestVorschau'
 
 // Vorschau lädt die Schüler-Bausteine erst bei Bedarf (02.11.2026)
@@ -76,7 +77,7 @@ export interface BlattQuelleOnline {
   thema: string
   /** Bezeichnungen der Fassungen (A, B …) */
   varianten: string[]
-  fassungen: () => { label: string; fassung: OnlineFassung }[]
+  fassungen: () => { label: string; fassung: OnlineFassung; blatt?: string }[]
 }
 
 /** Name: „10b 05.10.2026 - Lernzielkontrolle Potenzgesetze" */
@@ -175,9 +176,14 @@ export function Erstellen({
   const erstellen = async (): Promise<void> => {
     setLaeuft(true)
     try {
+      const bf = blatt ? blatt.fassungen() : []
       const r = await senden<{ id: string; code: string; link: string }>('/server/onlinetest/erstellen', {
         titel,
-        ...(doc ? { thema: testThema(doc), test: doc } : { thema: blatt!.thema, blatt: { art: blatt!.art, fach: blatt!.fach, fassungen: blatt!.fassungen() } }),
+        ...(doc
+          ? { thema: testThema(doc), test: doc }
+          : { thema: blatt!.thema, blatt: { art: blatt!.art, fach: blatt!.fach, fassungen: bf.map(({ label, fassung }) => ({ label, fassung })) } }),
+        // „Als Blatt ansehen" für die Lernenden (02.11.2026): je Fassung die Druckfassung ohne Lösungen
+        blaetter: doc ? doc.variants.map((v) => druckBlattHtml(doc, v)) : bf.map((f) => f.blatt ?? ''),
         lerngruppeId: gruppe ?? '',
         ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
         handschrift,
@@ -197,7 +203,7 @@ export function Erstellen({
   }
   const vorschauOeffnen = (): void => {
     try {
-      const f = doc ? doc.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v) })) : blatt!.fassungen()
+      const f = doc ? doc.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v) })) : blatt!.fassungen().map(({ label, fassung }) => ({ label, fassung }))
       if (!f.length) throw new Error('Der Test hat noch keine Fassung.')
       setVorschau(f)
     } catch (e) {
@@ -208,7 +214,13 @@ export function Erstellen({
     <>
       {vorschau && (
         <Suspense fallback={null}>
-          <TestVorschau fassungen={vorschau} titel={titel} zeitMin={zeit} schliessen={() => setVorschau(null)} />
+          <TestVorschau
+            fassungen={vorschau}
+            titel={titel}
+            zeitMin={zeit}
+            ki={doc ? { sprache: doc.settings.targetLanguage, niveau: doc.settings.level, art: 'Vokabeltest' } : { art: blatt!.art, fach: blatt!.fach }}
+            schliessen={() => setVorschau(null)}
+          />
         </Suspense>
       )}
     <Modal opened onClose={schliessen} title="Als Onlinetest durchführen" size="lg">

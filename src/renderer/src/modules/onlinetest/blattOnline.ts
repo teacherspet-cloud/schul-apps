@@ -9,13 +9,15 @@ import { taskNumbersFor } from '../arbeitsblatt/render/SheetPages'
 import type { OnlineFassung } from './kern'
 import { materialAusDruck, onlineFassungAusBloecke } from './kernBlatt'
 
-export function fassungenAusBlatt(ws: Worksheet, logo: string | null, schoolName: string): { label: string; fassung: OnlineFassung }[] {
+/** `blatt` (02.11.2026): die Druckfassung ohne Lösungen – „Als Blatt ansehen" für die Lernenden */
+export function fassungenAusBlatt(ws: Worksheet, logo: string | null, schoolName: string): { label: string; fassung: OnlineFassung; blatt: string }[] {
   const ergebnis = ws.sheets.map((sheet, i) => {
     const html = buildWorksheetHtml(ws, new Map(), { sheetIds: [sheet.id], includeKey: false }, logo, schoolName)
     const m = materialAusDruck(html)
     return {
       label: (sheet.label || '').replace(/^(Gruppe|Fassung|Variante)\s+/i, '').trim() || String.fromCharCode(65 + i),
-      fassung: onlineFassungAusBloecke(sheet.blocks, { materialHtml: m.material, stil: m.stil, nummern: taskNumbersFor(sheet) })
+      fassung: onlineFassungAusBloecke(sheet.blocks, { materialHtml: m.material, stil: m.stil, nummern: taskNumbersFor(sheet) }),
+      blatt: html
     }
   })
   if (!ergebnis.some((e) => e.fassung.einheiten.length)) throw new Error('Der Test hat keine Aufgaben, die sich online bearbeiten lassen.')

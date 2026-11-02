@@ -2,13 +2,18 @@
  * „Als Vorschau durchführen" (02.11.2026, Wunsch der Lehrkraft) im Fenster „Als Onlinetest durchführen": Die Lehrkraft
  * macht den Test so, wie ihn die Lernenden sehen (dieselben Aufgabenkarten wie im Schülerbereich), und sieht danach das
  * Ergebnis – automatisch Prüfbares sofort mit Lösung, freie Antworten als „prüft nach der Abgabe die KI" mit Erwartung.
- * Nichts wird gespeichert, kein Onlinetest angelegt, keine KI-Anfrage.
+ * Nichts wird gespeichert, kein Onlinetest angelegt.
+ *
+ * KI-Prüfung (02.11.2026, Wunsch der Lehrkraft): auf Knopfdruck prüft die KI die Antworten wie nach einer echten Abgabe
+ * (POST /server/onlinetest/vorschau-ki, eigener KI-Zugang der Lehrkraft) – freie Antworten und abweichende Wörter.
  */
 import { Alert, Badge, Button, Card, Group, Modal, Paper, SegmentedControl, Stack, Text } from '@mantine/core'
-import { IconCheck, IconEye, IconRefresh, IconSparkles, IconX } from '@tabler/icons-react'
+import { IconCheck, IconEye, IconQuestionMark, IconRefresh, IconSparkles, IconX } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { antwortAlsText, bewerte, felderVon, loesungAlsText, summe, type Antworten, type Bewertung, type OnlineFassung } from './kern'
 import { AufgabeKarte, MaterialKarte } from './SchuelerBereich'
+import { senden } from './serverApi'
+import { notifyError } from '../../shared/util'
 
 export interface VorschauFassung {
   label: string
@@ -21,16 +26,21 @@ export default function TestVorschau({
   fassungen,
   titel,
   zeitMin,
+  ki,
   schliessen
 }: {
   fassungen: VorschauFassung[]
   titel: string
   zeitMin: number
+  /** Angaben für die KI-Prüfung (Sprache/Niveau beim Vokabeltest, Art/Fach bei Grammatiktest und Lernzielkontrolle) */
+  ki?: { sprache?: string; niveau?: string; art?: string; fach?: string }
   schliessen: () => void
 }): React.JSX.Element {
   const [wahl, setWahl] = useState(0)
   const [antworten, setAntworten] = useState<Antworten>({})
   const [ergebnis, setErgebnis] = useState<Bewertung | null>(null)
+  const [kiLaeuft, setKiLaeuft] = useState(false)
+  const [kiGefragt, setKiGefragt] = useState<number | null>(null)
   const [start, setStart] = useState(() => Date.now())
   const [jetzt, setJetzt] = useState(() => Date.now())
   useEffect(() => {
@@ -44,6 +54,7 @@ export default function TestVorschau({
     setWahl(i)
     setAntworten({})
     setErgebnis(null)
+    setKiGefragt(null)
     setStart(Date.now())
     setJetzt(Date.now())
   }
@@ -57,6 +68,23 @@ export default function TestVorschau({
   const setze = (id: string, w: string): void => setAntworten((a) => ({ ...a, [id]: w }))
   const punkte = ergebnis ? summe(ergebnis) : 0
   const offen = ergebnis ? Object.values(ergebnis).filter((b) => b.status === 'ki' || b.status === 'lehrkraft').length : 0
+  const zuEntscheiden = ergebnis ? Object.values(ergebnis).filter((b) => b.pruefen).length : 0
+  const kiPruefen = async (): Promise<void> => {
+    setKiLaeuft(true)
+    try {
+      const r = await senden<{ bewertung: Bewertung; gefragt: number }>(
+        '/server/onlinetest/vorschau-ki',
+        { fassung: f, antworten, ...(ki ?? {}) },
+        180_000
+      )
+      setErgebnis(r.bewertung)
+      setKiGefragt(r.gefragt)
+    } catch (e) {
+      notifyError(e, 'KI-Prüfung nicht möglich')
+    } finally {
+      setKiLaeuft(false)
+    }
+  }
 
   return (
     <Modal
@@ -124,10 +152,26 @@ export default function TestVorschau({
               </Text>
               {offen > 0 && (
                 <Text size="sm">
-                  {offen} {offen === 1 ? 'Antwort prüft' : 'Antworten prüft'} im echten Test nach der Abgabe die KI (bzw. Sie entscheiden) – hier nicht bewertet.
+                  {offen} {offen === 1 ? 'Antwort prüft' : 'Antworten prüft'} im echten Test nach der Abgabe die KI (bzw. Sie entscheiden).
+                </Text>
+              )}
+              {kiGefragt !== null && (
+                <Text size="sm" data-vorschau-ki-fertig>
+                  {kiGefragt ? `Die KI hat ${kiGefragt} ${kiGefragt === 1 ? 'Antwort' : 'Antworten'} geprüft – wie nach einer echten Abgabe.` : 'Für die KI gab es nichts zu prüfen.'}
+                  {zuEntscheiden ? ` ${zuEntscheiden} davon würden Sie entscheiden (?).` : ''}
                 </Text>
               )}
             </Alert>
+            {kiGefragt === null && (
+              <Group gap="xs" data-vorschau-ki-bereich>
+                <Button variant="light" leftSection={<IconSparkles size={16} />} loading={kiLaeuft} onClick={() => void kiPruefen()} data-vorschau-ki>
+                  Von der KI prüfen lassen
+                </Button>
+                <Text size="xs" c="dimmed" style={{ flex: 1, minWidth: 200 }}>
+                  Wie nach einer echten Abgabe: freie Antworten und abweichende Wörter (Tippfehler, sinnvolle Alternativen). Nutzt Ihren KI-Zugang.
+                </Text>
+              </Group>
+            )}
             {f.aufgaben
               .filter((a) => a.art !== 'material')
               .map((a, i) => {
@@ -144,6 +188,8 @@ export default function TestVorschau({
                         const zeichen =
                           b?.status === 'richtig' ? (
                             <IconCheck size={16} color="var(--mantine-color-green-6)" />
+                          ) : b?.pruefen ? (
+                            <IconQuestionMark size={16} color="var(--mantine-color-orange-6)" />
                           ) : b?.status === 'falsch' ? (
                             <IconX size={16} color="var(--mantine-color-red-6)" />
                           ) : (
@@ -179,7 +225,11 @@ export default function TestVorschau({
                                 )}
                               </Stack>
                               <Text size="xs" c="dimmed">
-                                {b?.status === 'ki' || b?.status === 'lehrkraft' ? 'prüft die KI' : `${b?.punkte ?? 0}/${e.punkte} P.`}
+                                {b?.status === 'ki' || b?.status === 'lehrkraft'
+                                  ? 'prüft die KI'
+                                  : b?.pruefen
+                                    ? `Sie entscheiden${b.pruefen === 'kleinerFehler' ? ' (kleiner Fehler)' : ' (sinnvoll?)'}`
+                                    : `${b?.punkte ?? 0}/${e.punkte} P.${b?.quelle === 'ki' ? ' · KI' : ''}`}
                               </Text>
                             </Group>
                           </Paper>

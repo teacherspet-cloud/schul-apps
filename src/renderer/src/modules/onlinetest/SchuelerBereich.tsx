@@ -60,6 +60,7 @@ import {
   TextInput,
   Textarea,
   ThemeIcon,
+  UnstyledButton,
   Title
 } from '@mantine/core'
 import {
@@ -145,6 +146,8 @@ interface Beitritt {
   aufgaben: OnlineAufgabe[]
   /** Stilregeln für Material-Karten (Grammatiktest, Lernzielkontrolle) */
   stil?: string
+  /** Druckfassung des Tests OHNE Lösungen (02.11.2026) – Umschalter „Als Blatt“; fehlt bei älteren Tests */
+  blatt?: string
   antworten: Antworten
 }
 
@@ -1659,6 +1662,8 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   // Handschrift: Standard für alle Felder (Kopfleiste) und Ausnahmen je Feld
   const [stiftStandard, setStiftStandard] = useState(false)
   const [ausnahmen, setAusnahmen] = useState<Record<string, boolean>>({})
+  // Als Blatt ansehen (02.11.2026)
+  const [alsBlatt, setAlsBlatt] = useState(false)
   const hand = useMemo<HandKontext>(
     () => ({
       an: Boolean(t?.handschrift),
@@ -1971,8 +1976,22 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
           />
         )}
       </Paper>
+      {/* Ansicht als Blatt (02.11.2026, Wunsch der Lehrkraft): die Druckfassung ohne Lösungen zum Ansehen */}
+      {t.blatt && (
+        <SegmentedControl
+          size="sm"
+          value={alsBlatt ? 'blatt' : 'aufgaben'}
+          onChange={(v) => setAlsBlatt(v === 'blatt')}
+          data={[
+            { value: 'aufgaben', label: 'Aufgaben bearbeiten' },
+            { value: 'blatt', label: 'Als Blatt ansehen' }
+          ]}
+          data-ansicht-blatt-wahl
+        />
+      )}
+      {t.blatt && alsBlatt && <BlattKarte html={t.blatt} />}
       <Handschrift.Provider value={hand}>
-        {t.aufgaben.map((a, i) =>
+        {!(t.blatt && alsBlatt) && t.aufgaben.map((a, i) =>
           a.art === 'material' ? (
             <MaterialKarte key={a.id} html={a.html ?? ''} stil={t.stil ?? ''} nachweise={a.bildnachweise} />
           ) : (
@@ -2169,6 +2188,49 @@ function FeldEingabe({ feld, wert, setze }: { feld: Feld; wert: string; setze: (
       />
     )
   }
+  if (feld.art === 'streichen') {
+    // Wörter antippen = durchstreichen, nochmals = zurück (02.11.2026); Wert: Stellen aufsteigend („4,5")
+    const an = new Set(wert ? wert.split(',') : [])
+    return (
+      <div data-streichen={feld.id}>
+        {feld.beschriftung && (
+          <Text size="xs" c="dimmed" mb={2}>
+            {feld.beschriftung}
+          </Text>
+        )}
+        <div style={{ lineHeight: 2.2 }}>
+          {(feld.optionen ?? []).map((o) => {
+            const weg = an.has(o.wert)
+            return (
+              <span key={o.wert}>
+                <UnstyledButton
+                  onClick={() => {
+                    const neu = new Set(an)
+                    if (weg) neu.delete(o.wert)
+                    else neu.add(o.wert)
+                    setze(feld.id, [...neu].map(Number).sort((x, y) => x - y).join(','))
+                  }}
+                  aria-pressed={weg}
+                  data-wort={o.wert}
+                  style={{
+                    padding: '1px 3px',
+                    borderRadius: 4,
+                    fontSize: 'var(--mantine-font-size-md)',
+                    textDecoration: weg ? 'line-through' : undefined,
+                    textDecorationThickness: weg ? 2 : undefined,
+                    textDecorationColor: weg ? 'var(--mantine-color-red-6)' : undefined,
+                    background: weg ? 'var(--mantine-color-red-light)' : undefined
+                  }}
+                >
+                  {o.text}
+                </UnstyledButton>{' '}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
   if (feld.art === 'langtext')
     return <Textarea autosize minRows={3} value={wert} onChange={(e) => setze(feld.id, e.currentTarget.value)} label={feld.beschriftung} {...KEINE_HILFE} />
   if (feld.art === 'wahr')
@@ -2233,7 +2295,7 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
           </Group>
         )}
         {e.saetze?.map((s, i) => (
-          <Text key={i}>
+          <Text key={i} style={{ whiteSpace: 'pre-line' }}>
             {s.vor} <b>{s.mitte !== undefined ? '(1) _____' : '_____'}</b>{' '}
             {s.mitte !== undefined && (
               <>
@@ -2244,11 +2306,15 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
           </Text>
         ))}
         {(e.vor || e.nach) && (
-          <Text>
+          <Text style={{ whiteSpace: 'pre-line' }}>
             {e.vor} <b>_____</b> {e.nach}
           </Text>
         )}
-        {e.text && <Text fw={500}>{e.text}</Text>}
+        {e.text && (
+          <Text fw={500} style={{ whiteSpace: 'pre-line' }}>
+            {e.text}
+          </Text>
+        )}
         {e.woerter && !e.felder.some((f) => f.art === 'auswahl') && <Text c="dimmed">{e.woerter.map((w) => w || '…').join(' · ')}</Text>}
         {e.hinweis && (
           <Text size="sm" c="dimmed">
@@ -2297,7 +2363,9 @@ function FliessText({ aufgabe, antworten, setze }: { aufgabe: OnlineAufgabe; ant
   }
   return (
     <Paper withBorder p="md" radius="md" data-fliesstext={dialog ? 'dialog' : 'text'}>
-      <div style={{ lineHeight: 2.4 }}>
+      {/* Absätze wie auf dem Blatt (02.11.2026, Befund der Lehrkraft: Überschrift und Absätze flossen zusammen); im Dialog
+           setzt der Sprecherwechsel die Zeilen */}
+      <div style={{ lineHeight: 2.4, whiteSpace: dialog ? undefined : 'pre-wrap' }}>
         {stuecke.map((x, k) =>
           'text' in x ? (
             textTeil(x.text, k)
@@ -2316,6 +2384,41 @@ function FliessText({ aufgabe, antworten, setze }: { aufgabe: OnlineAufgabe; ant
  * Material eines Grammatiktests/einer Lernzielkontrolle (05.10.2026): wie auf dem Papierblatt gezeichnet, in
  * einem abgeschotteten Rahmen ohne Skripte; die Höhe richtet sich nach dem Inhalt.
  */
+/**
+ * Der Test als Blatt (02.11.2026): die Druckfassung ohne Lösungen in einem abgeschotteten Rahmen (keine Skripte), nur zum
+ * Ansehen; Markieren gesperrt wie im übrigen Test.
+ */
+export function BlattKarte({ html }: { html: string }): React.JSX.Element {
+  const rahmen = useRef<HTMLIFrameElement>(null)
+  const [hoehe, setHoehe] = useState(600)
+  const messen = (): void => {
+    const d = rahmen.current?.contentDocument
+    if (d) setHoehe(Math.min(20000, d.documentElement.scrollHeight + 8))
+  }
+  const sperre = '<style>html,body{background:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}</style>'
+  const doc = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${sperre}</head>`) : `${sperre}${html}`
+  return (
+    <Card withBorder padding={4} radius="md" data-blatt-karte>
+      <Text size="xs" c="dimmed" px={6} pt={2}>
+        Nur zum Ansehen – eingetragen wird unter „Aufgaben bearbeiten“.
+      </Text>
+      <div style={{ overflowX: 'auto' }}>
+        <iframe
+          ref={rahmen}
+          title="Test als Blatt"
+          sandbox="allow-same-origin"
+          srcDoc={doc}
+          onLoad={() => {
+            messen()
+            setTimeout(messen, 400)
+          }}
+          style={{ width: '100%', minWidth: 640, height: hoehe, border: 0, display: 'block' }}
+        />
+      </div>
+    </Card>
+  )
+}
+
 export function MaterialKarte({ html, stil, nachweise }: { html: string; stil: string; nachweise?: string[] }): React.JSX.Element {
   const rahmen = useRef<HTMLIFrameElement>(null)
   const [hoehe, setHoehe] = useState(200)
@@ -2366,7 +2469,9 @@ export function AufgabeKarte({
         <Text fw={700}>{/^Aufgabe \d+$/.test(aufgabe.titel) ? aufgabe.titel : `${nr}. ${aufgabe.titel}`}</Text>
         <Badge variant="light">{aufgabe.punkte} P.</Badge>
       </Group>
-      <Text mb="xs">{aufgabe.anweisung}</Text>
+      <Text mb="xs" style={{ whiteSpace: 'pre-line' }}>
+        {aufgabe.anweisung}
+      </Text>
       {aufgabe.hilfe && (
         <Text size="sm" c="dimmed" mb="xs">
           ⓘ {aufgabe.hilfe}
@@ -2391,7 +2496,11 @@ export function AufgabeKarte({
           ))}
         </Paper>
       )}
-      {aufgabe.vorlage && aufgabe.art === 'freeText' && <Text mb="sm">{aufgabe.vorlage}</Text>}
+      {aufgabe.vorlage && aufgabe.art === 'freeText' && (
+        <Text mb="sm" style={{ whiteSpace: 'pre-line' }}>
+          {aufgabe.vorlage}
+        </Text>
+      )}
       {aufgabe.art === 'gapText' ? (
         <FliessText aufgabe={aufgabe} antworten={antworten} setze={setze} />
       ) : (

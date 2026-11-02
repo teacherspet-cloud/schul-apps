@@ -21,7 +21,8 @@ import { nachweisAusBildquelle, nachweisOhneLoesung } from '@shared/bildLizenz'
 import { abkuerzungAus, abkVergleich, auchRichtigAus, platzhalterNormal } from '@shared/abkuerzung'
 import type { Block, Variant } from '../vokabeltest/model/types'
 
-export type FeldArt = 'text' | 'langtext' | 'auswahl' | 'wahr'
+/** `streichen` (02.11.2026): Wörter eines Satzes antippen und durchstreichen – Wert = Stellen der Wörter („4,5"), `optionen` = Wörter */
+export type FeldArt = 'text' | 'langtext' | 'auswahl' | 'wahr' | 'streichen'
 
 export interface Feld {
   id: string
@@ -235,10 +236,26 @@ export function onlineFassung(variante: Variant): OnlineFassung {
              * unmarkiert, ohne Hinweis darunter; die Lernenden finden es selbst und schreiben das richtige Wort ins Feld.
              */
             const s0 = it.sentences[0] ?? { before: '', after: '' }
-            const satz = [s0.before, it.hint ?? '', s0.after].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ').replace(/\s+([,.;:!?])/g, '$1')
-            a.eintraege.push({ einheit: f, text: satz, felder: [{ id: f, art: 'text', beschriftung: 'richtiges Wort' }] })
+            /*
+             * Durchstreichen auch online (02.11.2026, Wunsch der Lehrkraft): Der Satz steht als antippbare Wörter da; das
+             * falsche Wort (auch mehrteilig, „take up") wird durchgestrichen, das richtige ins Feld geschrieben. Ein Punkt
+             * für beides zusammen – wie auf dem Blatt („cross it out and write the correct word").
+             */
+            const woerter = (x: string): string[] => String(x ?? '').split(/\s+/).filter(Boolean)
+            const vorW = woerter(s0.before)
+            const falschW = woerter(it.hint ?? '')
+            const alle = [...vorW, ...falschW, ...woerter(s0.after)]
+            const fx = feldId(b.id, it.id, 'x')
+            a.eintraege.push({
+              einheit: f,
+              felder: [
+                { id: fx, art: 'streichen', beschriftung: 'Falsches Wort antippen (durchstreichen)', optionen: alle.map((w, i) => ({ wert: String(i), text: w })) },
+                { id: f, art: 'text', beschriftung: 'richtiges Wort' }
+              ]
+            })
+            loesungen[fx] = { art: 'genau', werte: [falschW.map((_, i) => String(vorW.length + i)).join(',')] }
             loesungen[f] = { art: 'genau', werte: [it.answer, ...(it.auchRichtig ?? [])] }
-            einheit(f, [f])
+            einheit(f, falschW.length ? [fx, f] : [f])
             continue
           }
           a.eintraege.push({
@@ -633,6 +650,8 @@ export const ergebnisVorlaeufig = (b: Bewertung, kiLaeuft = false): boolean =>
 export function antwortAlsText(antwort: string | undefined, optionen?: { wert: string; text: string }[]): string {
   const a = String(antwort ?? '')
   if (!a) return ''
+  // Durchgestrichene Wörter („4,5" → „take up", 02.11.2026)
+  if (optionen && /^\d+(,\d+)+$/.test(a)) return a.split(',').map((i) => optionen.find((o) => o.wert === i)?.text ?? i).join(' ')
   return optionen?.find((o) => o.wert === a)?.text ?? a
 }
 

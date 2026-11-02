@@ -366,6 +366,21 @@ const ENTSCHEIDEN_KNOPF = (farbe: string): React.CSSProperties => ({
 const dokument = (kopf: BlattKopf, variants: Variant[]): TestDocument =>
   ({ ...kopf, variants, version: 1, vocab: [], createdAt: '' } as unknown as TestDocument)
 
+/**
+ * Leeres Blatt einer Fassung für die Lernenden (02.11.2026, „Als Blatt ansehen" im Onlinetest): Druckfassung OHNE
+ * Lösungen (Modus `print`) als fertiges HTML – entsteht beim Anlegen in der Oberfläche der Lehrkraft.
+ */
+export function druckBlattHtml(doc: TestDocument, variante: Variant): string {
+  const wert: RenderContextValue = { mode: 'print', language: doc.settings.targetLanguage }
+  const html = renderToStaticMarkup(
+    <RenderContext.Provider value={wert}>
+      <TestPage doc={doc} variant={variante} />
+    </RenderContext.Provider>
+  )
+  return `<!doctype html><html lang="${doc.settings.targetLanguage || 'en'}" translate="no"><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:#fff}.vt-page{margin:0 auto}
+${testCss}</style></head><body>${html}</body></html>`
+}
+
 /** Druck/PDF: ein Blatt je Abgabe, jedes auf eigenen Seiten */
 export function abgabenHtml(kopf: BlattKopf, abgaben: { variante: Variant; antworten: Antworten; bewertung: Bewertung; abgabe: Abgabe }[]): string {
   const seiten = abgaben.map(({ variante, antworten, bewertung, abgabe }) => blattHtml(kopf, variante, antworten, bewertung, abgabe))

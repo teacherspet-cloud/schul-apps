@@ -26,6 +26,7 @@ import type { TestDocument } from '../modules/vokabeltest/model/types'
 import { TEST_APP_NAME, type TestApp } from '@shared/testMaterial'
 import type { StartKurs } from '@shared/startseiteKurse'
 import { verknuepfen } from './TestZumTermin'
+import { druckBlattHtml } from '../modules/onlinetest/blattAnsicht'
 
 interface TerminInhalt {
   sprache: string
@@ -91,6 +92,8 @@ async function onlinetestAnlegen(o: OffenerOnlinetest): Promise<void> {
     titel,
     thema: testThema(doc),
     test: doc,
+    // „Als Blatt ansehen" für die Lernenden (02.11.2026)
+    blaetter: doc.variants.map((v) => druckBlattHtml(doc, v)),
     lerngruppeId: o.lerngruppeId,
     handschrift: o.handschrift,
     gaeste: o.gaeste,

@@ -81,6 +81,9 @@ try {
   await vs.locator('[data-vorschau-abgeben]').click()
   pruefe(await da(vs.locator('[data-vorschau-ergebnis]'), 5000), 'Vorschau zeigt nach der Probe-Abgabe das Ergebnis')
   pruefe((await vs.locator('[data-vorschau-einheit]').count()) > 0, 'Ergebnis je Teilaufgabe mit Lösung')
+  // KI-Prüfung der Vorschau (02.11.2026) – mit der Attrappe
+  await vs.locator('[data-vorschau-ki]').click()
+  pruefe(await da(vs.locator('[data-vorschau-ki-fertig]'), 20000), 'Vorschau: „Von der KI prüfen lassen" liefert ein Ergebnis')
   await p.screenshot({ path: join(out, '0-vorschau-ergebnis.png') })
   await vs.getByRole('button', { name: 'Vorschau beenden' }).click()
   await vs.waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined)
@@ -106,6 +109,14 @@ try {
   await s.locator('[data-wartebildschirm]').waitFor({ timeout: 15000 })
   await lk.request.post(`${A}/server/onlinetest/${t.id}/status`, { headers: KOPF, data: { status: 'starten' } })
   pruefe(await da(s.locator('[data-material-karte]').first(), 15000), 'Lernende sehen das Material wie auf dem Blatt')
+  // Als Blatt ansehen (02.11.2026)
+  pruefe(await da(s.locator('[data-ansicht-blatt-wahl]'), 5000), 'Lernende können „Als Blatt ansehen" wählen')
+  await s.getByText('Als Blatt ansehen', { exact: true }).click()
+  pruefe(await da(s.locator('[data-blatt-karte] iframe'), 5000), 'Blattansicht erscheint')
+  const blattText = await s.locator('[data-blatt-karte] iframe').evaluate((f) => f.contentDocument?.body?.innerText ?? '')
+  pruefe(blattText.length > 50, `Blatt hat Inhalt (${blattText.length} Zeichen)`)
+  await s.screenshot({ path: join(out, '2-blatt.png') })
+  await s.getByText('Aufgaben bearbeiten', { exact: true }).click()
   const quelltext = await s.evaluate(
     async (code) =>
       JSON.stringify(
