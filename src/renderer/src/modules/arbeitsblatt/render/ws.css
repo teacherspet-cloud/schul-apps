@@ -1486,9 +1486,15 @@
   width: 30%;
 }
 
-/* Unsichtbarer Messbereich für den Seitenumbruch */
+/*
+ * Unsichtbarer Messbereich für den Seitenumbruch.
+ * `fixed` statt `absolute` (02.11.2026, Befund der Lehrkraft in Firefox: „beim Scrollen wird ein grauer Bereich über das
+ * Arbeitsblatt gezogen, es ist nur noch ganz klein oben zu sehen"): Die Messkopie aller Seiten ist mehrere tausend Punkte
+ * hoch. Als `absolute` am Dokument zählte Firefox sie zur Seitenhöhe – das ganze Dokument bekam einen eigenen Rollbalken
+ * rechts, und ein Klick darauf rollte die App aus dem Bild. Feste Elemente zählen nie zur Rollfläche (wie `.vt-measure`).
+ */
 .ws-measure {
-  position: absolute;
+  position: fixed;
   left: -20000px;
   top: 0;
   visibility: hidden;
