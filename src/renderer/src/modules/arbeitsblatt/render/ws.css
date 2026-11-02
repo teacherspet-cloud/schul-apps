@@ -2439,6 +2439,16 @@ html[data-griff-zug] * {
   margin-right: 1.5mm;
   vertical-align: middle;
 }
+/* Kästchen im Satz hinter dem Ankreuz-Wort (02.11.2026): „tick ☒ the correct answer" – fließt mit dem Text */
+.ws-check-demo.ws-check-im-satz {
+  display: inline-flex;
+  margin: 0 1mm;
+  vertical-align: -0.6mm;
+}
+.ws-instruction-geteilt > .rt-inline,
+.ws-instruction-geteilt > .rt-editable-inline {
+  display: inline;
+}
 
 /*
  * Anweisung mit angekreuztem Kästchen: eine Zeile, nicht zwei.

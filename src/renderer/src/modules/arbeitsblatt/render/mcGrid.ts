@@ -112,6 +112,34 @@ export function mcZeilen<T>(items: T[], spalten: number): (T | null)[][] {
 const ANKREUZ_OPERATOREN = ['tick', 'choose', 'select', 'mark', 'kreuze an', 'kreuze', 'ankreuzen', 'wähle', 'coche', 'choisis', 'marca', 'elige', 'segna']
 
 /**
+ * Stelle für das angekreuzte Kästchen IN der Arbeitsanweisung (02.11.2026, Wunsch der Lehrkraft): direkt hinter dem
+ * Ankreuz-Wort – „Read M1. Then decide and **tick** ☒ the correct answer …" statt des Kästchens vor dem ganzen Satz.
+ * Steht das Wort in einer längeren Fettung („**decide and tick**"), kommt das Kästchen hinter deren Ende, damit die
+ * Auszeichnung nicht zerbricht. Ohne Ankreuz-Wort: null (dann bleibt das Kästchen vorn).
+ */
+export function ankreuzTeilung(instruction: string, operator = ''): [string, string] | null {
+  const woerter = [...new Set([operator.trim().toLowerCase(), ...ANKREUZ_OPERATOREN].filter((w) => w && ANKREUZ_OPERATOREN.includes(w)))]
+  let ende = -1
+  let anfang = Infinity
+  for (const w of woerter) {
+    const muster = new RegExp(`(?<![\\p{L}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}(?![\\p{L}])`, 'iu')
+    const m = muster.exec(instruction)
+    // Das früheste Wort gewinnt, bei gleichem Anfang das längere („kreuze an" vor „kreuze")
+    if (m && (m.index < anfang || (m.index === anfang && m.index + m[0].length > ende))) {
+      anfang = m.index
+      ende = m.index + m[0].length
+    }
+  }
+  if (ende < 0) return null
+  // Innerhalb einer Fettung? Dann hinter deren Ende
+  if (((instruction.slice(0, ende).match(/\*\*/g)?.length ?? 0) % 2) === 1) {
+    const zu = instruction.indexOf('**', ende)
+    if (zu >= 0) ende = zu + 2
+  }
+  return [instruction.slice(0, ende), instruction.slice(ende)]
+}
+
+/**
  * Den wiederholten Operator vom Anfang einer Ankreuzfrage nehmen.
  *
  * Gemeldet wurde: „Die Multiple-Choice-Antworten werden alle formuliert mit **Tick** …" –

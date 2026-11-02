@@ -14,7 +14,7 @@ import { taskItems } from '../../model/items'
 import { exampleNote } from '../../../../shared/exampleNote'
 import { continuedNote } from '../../../../shared/continuedNote'
 import { bereinigeSkizze } from '../../generation/solution'
-import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
+import { ankreuzTeilung, istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
 import { linieGebunden, stars, useSetter } from './hilfen'
 import { stufenZeile } from '../../../../shared/verstehen/anzeige'
 import { fundstellen, hoertextZu, hoerzeit } from '../../../../shared/verstehen/hoerzeit'
@@ -55,6 +55,8 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   const mcListe = istMcListe(block.parts)
   // Das Kästchen an der Anweisung gilt auch für eine einzelne Ankreuzfrage
   const ankreuzen = istAnkreuzAufgabe(block)
+  // Kästchen hinter dem Ankreuz-Wort der Anweisung („tick ☒"), wenn es eines gibt (02.11.2026)
+  const kreuzTeilung = ankreuzen ? ankreuzTeilung(block.instruction ?? '', block.operator) : null
 
   /*
    * LEERE LÖSUNG (01.10.2026). In der Lösungsansicht des Editors steht für eine noch leere Lösung
@@ -552,7 +554,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
                 dangerouslySetInnerHTML={{ __html: SOCIAL_FORM_SVG[block.socialForm] }}
               />
             ))}
-          <div className={`ws-task-instruction ${ankreuzen ? 'ws-with-check' : ''}`}>
+          <div className={`ws-task-instruction ${ankreuzen ? (kreuzTeilung ? 'ws-with-check-inline' : 'ws-with-check') : ''}`}>
             {/* Das Symbol steht VOR der Anweisung, ersetzt sie aber nie: Wer das Zeichen nicht
               kennt, liest weiterhin das Wort. */}
             {instructionPicto && <PictogramIcon picto={instructionPicto} size={15} />}
@@ -561,7 +563,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
              * Lehrkraft („choose ☒ the correct answer"). Es zeigt in einem Zeichen, was zu tun
              * ist, und macht damit das wiederholte „Tick" vor jeder einzelnen Frage entbehrlich.
              */}
-            {ankreuzen && (
+            {ankreuzen && !kreuzTeilung && (
               <span className="ws-check ws-check-demo" aria-hidden="true">
                 ✗
               </span>
@@ -578,13 +580,37 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
                 <RichText value={block.brief.situation} inline editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).brief!.situation = v))} />{' '}
               </span>
             )}
-            <RichText
-              value={block.instruction}
-              editable={schreiben}
-              onChange={set((d, v) => ((d as TaskBlock).instruction = v))}
-              // Ohne Sternchen: Der Platzhalter laeuft jetzt durch RichText und wuerde sie sonst woertlich zeigen
-              placeholder="Arbeitsanweisung – Operator fett hervorheben"
-            />
+            {kreuzTeilung ? (
+              /*
+               * Kästchen hinter dem Ankreuz-Wort (02.11.2026, Wunsch der Lehrkraft): „decide and tick ☒ the correct
+               * answer". Die Anweisung bleibt EIN Text – beide Hälften schreiben beim Bearbeiten das Ganze zurück.
+               */
+              <span className="ws-instruction-geteilt">
+                <RichText
+                  value={kreuzTeilung[0]}
+                  inline
+                  editable={schreiben}
+                  onChange={set((d, v) => ((d as TaskBlock).instruction = `${v}${kreuzTeilung[1]}`))}
+                />
+                <span className="ws-check ws-check-demo ws-check-im-satz" aria-hidden="true">
+                  ✗
+                </span>
+                <RichText
+                  value={kreuzTeilung[1]}
+                  inline
+                  editable={schreiben}
+                  onChange={set((d, v) => ((d as TaskBlock).instruction = `${kreuzTeilung[0]}${v}`))}
+                />
+              </span>
+            ) : (
+              <RichText
+                value={block.instruction}
+                editable={schreiben}
+                onChange={set((d, v) => ((d as TaskBlock).instruction = v))}
+                // Ohne Sternchen: Der Platzhalter laeuft jetzt durch RichText und wuerde sie sonst woertlich zeigen
+                placeholder="Arbeitsanweisung – Operator fett hervorheben"
+              />
+            )}
             {/*
              * „There is one example." – ERGÄNZT, nicht in die Anweisung geschrieben.
              * Wird das Beispiel entfernt, verschwindet der Satz von selbst mit.

@@ -1,7 +1,7 @@
 import { ActionIcon, Button, Tooltip } from '@mantine/core'
 import { IconArrowsHorizontal, IconBook2, IconZoomIn, IconZoomOut } from '@tabler/icons-react'
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { abstand, pinchZoom, zoomBegrenzen, zoomSchritt, zoomTaste, type Punkt, type ZoomAktion as Aktion } from './gestenLogik'
+import { abstand, pinchZoom, zoomBegrenzen, zoomSchritt, zoomTaste, zweiFingerArt, type Punkt, type ZoomAktion as Aktion } from './gestenLogik'
 
 /**
  * Zoom der Blätter – EINE Bedienung für alle Programme (30.09.2026).
@@ -176,7 +176,8 @@ export function useZweiFingerZoom(opts: {
   useEffect(() => {
     const el = opts.flaeche.current
     if (!opts.aktiv || !el) return
-    let start: { abstand: number; faktor: number } | null = null
+    // art: erst offen, dann einmal entschieden – Zoom oder Rollen (gestenLogik.ts zweiFingerArt, 02.11.2026)
+    let start: { abstand: number; faktor: number; mitte: Punkt; letzteMitte: Punkt; art: 'zoom' | 'rollen' | null } | null = null
     let letzter = opts.faktor
 
     /*
@@ -216,7 +217,8 @@ export function useZweiFingerZoom(opts: {
       if (e.touches.length !== 2) return
       const [a, b] = punkte(e.touches, ab)
       letzter = aktuell.current.faktor
-      start = { abstand: abstand(a, b), faktor: letzter }
+      const m0 = mitte(e.touches, ab)
+      start = { abstand: abstand(a, b), faktor: letzter, mitte: m0, letzteMitte: m0, art: null }
       /*
        * Der erste Finger lag schon – für das Blatt sah das wie „langes Drücken zum Verschieben"
        * eines Bausteins aus (BausteinRahmen). Ein pointercancel beendet solche angefangenen
@@ -229,14 +231,30 @@ export function useZweiFingerZoom(opts: {
       // Zwei Finger gehören dem Zoom – nicht dem Rollen und nicht dem Zoom der ganzen Seite
       e.preventDefault()
       const [a, b] = punkte(e.touches, ab)
-      const { min, max } = aktuell.current
-      const f = pinchZoom(start.faktor, start.abstand, abstand(a, b), min, max)
-      if (Math.abs(f - letzter) >= 0.01) anwenden(f, mitte(e.touches, ab))
+      const m = mitte(e.touches, ab)
+      const d = abstand(a, b)
+      if (!start.art) {
+        start.art = zweiFingerArt(start.abstand, d, start.mitte, m)
+        // Zoom beginnt erst hier: Ausgangsabstand neu setzen, damit das Blatt nicht um die Schwelle springt
+        if (start.art === 'zoom') start.abstand = d
+      }
+      if (start.art === 'rollen') {
+        // Rollen mit zwei Fingern: die Fläche folgt den Fingern (die Seite selbst soll nicht zoomen)
+        const senk = senkrechtRollend(el)
+        if (senk) senk.scrollTop -= m.y - start.letzteMitte.y
+        el.scrollLeft -= m.x - start.letzteMitte.x
+      } else if (start.art === 'zoom') {
+        const { min, max } = aktuell.current
+        const f = pinchZoom(start.faktor, start.abstand, d, min, max)
+        if (Math.abs(f - letzter) >= 0.01) anwenden(f, m)
+      }
+      start.letzteMitte = m
     }
     const ende = (e: TouchEvent): void => {
       if (!start || e.touches.length >= 2) return
+      const gezoomt = start.art === 'zoom'
       start = null
-      aktuell.current.setFaktor(letzter)
+      if (gezoomt) aktuell.current.setFaktor(letzter)
     }
     /*
      * Bewegen und Loslassen am DOKUMENT: Touch-Ereignisse gehen immer an das Element, auf dem der
@@ -402,11 +420,33 @@ export function useBlattAnsicht(opts: {
     let summe = 0
     let takt = 0
     let punkt: Punkt = { x: 0, y: 0 }
+    /*
+     * Totzone je Geste (02.11.2026, Befund „grauer Bereich, Blatt nur noch klein oben"): Ein Trackpad meldet beim Rollen mit
+     * zwei Fingern gelegentlich kleine „Aufziehen"-Signale (Strg + Rad) – die zoomten das Blatt schleichend klein. Erst ab
+     * RAD_SCHWELLE in derselben Geste (Pause > 300 ms = neue Geste) wird gezoomt; ein Mausrad-Schritt (≈ 100) sofort.
+     */
+    const RAD_SCHWELLE = 24
+    let geste = 0
+    let gesteZeit = 0
+    let gesteAn = false
     const rad = (e: WheelEvent): void => {
       if (!(e.ctrlKey || e.metaKey)) return
       e.preventDefault()
       // Zeilen/Seiten in Punkte umrechnen; das Trackpad liefert kleine Schritte, das Mausrad große
-      summe += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1)
+      const d = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1)
+      const jetzt = performance.now()
+      if (jetzt - gesteZeit > 300) {
+        geste = 0
+        gesteAn = false
+      }
+      gesteZeit = jetzt
+      geste += d
+      if (!gesteAn && Math.abs(geste) < RAD_SCHWELLE) return
+      // Beim Überschreiten der Schwelle zählt die ganze bisherige Geste, danach jeder Schritt
+      if (!gesteAn) {
+        gesteAn = true
+        summe += geste
+      } else summe += d
       punkt = { x: e.clientX, y: e.clientY }
       if (takt) return
       takt = requestAnimationFrame(() => {

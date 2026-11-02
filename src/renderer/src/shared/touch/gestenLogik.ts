@@ -62,6 +62,23 @@ export function pinchZoom(startZoom: number, startAbstand: number, abstandJetzt:
   return zoomBegrenzen(startZoom * (abstandJetzt / startAbstand), min, max)
 }
 
+/**
+ * Zwei Finger: Rollen oder Zoomen? (02.11.2026, Befund der Lehrkraft: „beim Scrollen im Arbeitsblatt wird ein grauer
+ * Bereich über das Blatt gezogen, es ist nur noch ganz klein oben zu sehen") – wer mit zwei Fingern rollt, ändert den
+ * Fingerabstand immer ein wenig, und jede kleine Änderung zoomte das Blatt bis auf 30 % hinunter. Jetzt entscheidet die
+ * Geste einmal: Zoom erst ab einer deutlichen Abstandsänderung (ZOOM_SCHWELLE_PX), die größer ist als die gemeinsame
+ * Bewegung der Finger; bewegen sich beide Finger vor allem gemeinsam, ist es Rollen. Vorher geschieht nichts.
+ */
+export const ZOOM_SCHWELLE_PX = 30
+export const ROLLEN_SCHWELLE_PX = 12
+export function zweiFingerArt(abstandStart: number, abstandJetzt: number, mitteStart: Punkt, mitteJetzt: Punkt): 'zoom' | 'rollen' | null {
+  const spreizen = Math.abs(abstandJetzt - abstandStart)
+  const schieben = abstand(mitteStart, mitteJetzt)
+  if (spreizen >= ZOOM_SCHWELLE_PX && spreizen > schieben * 0.8) return 'zoom'
+  if (schieben >= ROLLEN_SCHWELLE_PX && schieben >= spreizen) return 'rollen'
+  return null
+}
+
 /** Nächste Zoomstufe für die Knöpfe „+" und „–" */
 export function zoomSchritt(z: number, richtung: 1 | -1, min = ZOOM_MIN, max = ZOOM_MAX): number {
   const stufen = [0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5, 3].filter((s) => s >= min && s <= max)

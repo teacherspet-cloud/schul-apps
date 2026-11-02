@@ -546,6 +546,28 @@ async function lauf(name, breite, hoehe) {
     const nachKnopf = parseInt(await wert(), 10)
     pruefe(nachKnopf > vorher, `${name}: Knopf „Vergrößern" als Weg mit einem Finger (${vorher} % → ${nachKnopf} %)`)
     await page.locator('[data-zoom-wert]').filter({ visible: true }).last().tap()
+    await page.waitForTimeout(300)
+
+    // ---------- 5c. Zwei Finger gemeinsam schieben = Rollen, kein Zoom (02.11.2026, Befund der Lehrkraft: „grauer Bereich,
+    // Blatt nur noch klein oben") – mit leichtem Wackeln des Fingerabstands wie beim echten Rollen
+    const vorRollen = parseInt(await wert(), 10)
+    const y0 = Math.min(fm.y + 120, hoehe - 40)
+    await finger('touchStart', [
+      { x: fm.x - 60, y: y0 },
+      { x: fm.x + 60, y: y0 }
+    ])
+    for (let i = 1; i <= 8; i++) {
+      const w = i % 2 ? 8 : -6
+      await finger('touchMove', [
+        { x: fm.x - 60 - w, y: y0 - i * 15 },
+        { x: fm.x + 60 + w, y: y0 - i * 15 }
+      ])
+      await page.waitForTimeout(20)
+    }
+    await finger('touchEnd', [])
+    await page.waitForTimeout(400)
+    const nachRollen = parseInt(await wert(), 10)
+    pruefe(nachRollen === vorRollen, `${name}: zwei Finger gemeinsam schieben zoomt nicht (${vorRollen} % → ${nachRollen} %)`)
 
     // ---------- 6. Langer Druck auf einen Symbolknopf: Beschreibung
     const undo = page.getByRole('button', { name: 'Rückgängig' }).filter({ visible: true }).first()

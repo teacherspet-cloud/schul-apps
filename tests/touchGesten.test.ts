@@ -91,3 +91,19 @@ describe('Stift oder Finger', () => {
     expect(zeichnetZeiger('touch', true)).toBe(true)
   })
 })
+
+describe('zweiFingerArt – Rollen oder Zoomen (02.11.2026)', () => {
+  it('gemeinsames Schieben mit leichtem Abstandswackeln ist Rollen, nie Zoom', async () => {
+    const { zweiFingerArt } = await import('../src/renderer/src/shared/touch/gestenLogik')
+    expect(zweiFingerArt(200, 212, { x: 100, y: 300 }, { x: 102, y: 220 })).toBe('rollen')
+    expect(zweiFingerArt(200, 225, { x: 100, y: 300 }, { x: 100, y: 200 })).toBe('rollen')
+  })
+  it('deutliches Spreizen ist Zoom', async () => {
+    const { zweiFingerArt } = await import('../src/renderer/src/shared/touch/gestenLogik')
+    expect(zweiFingerArt(200, 140, { x: 100, y: 300 }, { x: 104, y: 296 })).toBe('zoom')
+  })
+  it('kleine Bewegungen: noch nicht entschieden', async () => {
+    const { zweiFingerArt } = await import('../src/renderer/src/shared/touch/gestenLogik')
+    expect(zweiFingerArt(200, 210, { x: 100, y: 300 }, { x: 103, y: 305 })).toBeNull()
+  })
+})

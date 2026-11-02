@@ -60,6 +60,13 @@ const seen = await page.evaluate(() => {
     buchstaben: [...wurzel.querySelectorAll('.ws-mc-letter')].map((e) => e.textContent),
     demoKaestchen: wurzel.querySelectorAll('.ws-task-instruction .ws-check-demo').length,
     anweisung: (wurzel.querySelector('.ws-task-instruction')?.textContent ?? '').trim(),
+    // Kästchen hinter dem Ankreuz-Wort (02.11.2026): Text der Anweisung VOR dem Kästchen endet auf „Tick"
+    vorKaestchen: [...wurzel.querySelectorAll('.ws-task-instruction .ws-check-demo')].map((k) => {
+      const r = document.createRange()
+      r.setStart(k.closest('.ws-task-instruction'), 0)
+      r.setEndBefore(k)
+      return r.toString().replace(/\s+/g, ' ').trim()
+    }),
     // Zweiter Fall: einzelne Frage mit acht kurzen Möglichkeiten – zweispaltig, untereinander
     einzelfrage: (() => {
       const alle = [...wurzel.querySelectorAll('.ws-mc-options')]
@@ -113,6 +120,9 @@ if (seen.demoKaestchen !== 2) problems.push(`${seen.demoKaestchen} angekreuzte K
 // Der Kern der Beschwerde
 if (seen.tickImFragetext !== 0) problems.push(`„Tick" steht noch in ${seen.tickImFragetext} Fragetext(en)`)
 if (!/Tick/i.test(seen.anweisung)) problems.push('Der Operator fehlt jetzt auch in der Arbeitsanweisung')
+// Das Kästchen steht hinter „Tick", nicht vor der ganzen Anweisung (Wunsch der Lehrkraft, 02.11.2026)
+console.log('Vor dem Kästchen:', JSON.stringify(seen.vorKaestchen))
+for (const v of seen.vorKaestchen) if (!/tick$/i.test(v)) problems.push(`Kästchen steht nicht hinter „Tick" (davor: „${v.slice(-30)}")`)
 
 // Einzelne Frage mit vielen kurzen Möglichkeiten: zweispaltig, aber jede Möglichkeit
 // in eigener Zeile (Haladyna u. a. 2002, Guideline 10 – nicht nebeneinander)
