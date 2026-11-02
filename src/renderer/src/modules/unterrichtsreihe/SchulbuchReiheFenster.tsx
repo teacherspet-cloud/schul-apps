@@ -20,7 +20,6 @@ import {
   Group,
   Image,
   Modal,
-  NumberInput,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -61,6 +60,7 @@ import {
   type Kuerzung,
   type Uebernahme
 } from './reiheAusSchulbuch'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
@@ -308,11 +308,11 @@ export function ReiheAusSchulbuch({
                 <Group align="end">
                   {umfangArt === 'wochen' ? (
                     <>
-                      <NumberInput label="Wochen" min={1} max={30} value={wochen} onChange={(v) => setWochen(Number(v) || 1)} w={110} data-umfang-wochen />
-                      <NumberInput label="Wochenstunden" min={1} max={8} value={wochenstunden} onChange={(v) => setWochenstunden(Number(v) || 1)} w={140} />
+                      <ZahlFeld label="Wochen" min={1} max={30} value={wochen} onChange={(v) => setWochen(Number(v) || 1)} w={110} data-umfang-wochen />
+                      <ZahlFeld label="Wochenstunden" min={1} max={8} value={wochenstunden} onChange={(v) => setWochenstunden(Number(v) || 1)} w={140} />
                     </>
                   ) : (
-                    <NumberInput
+                    <ZahlFeld
                       label="Unterrichtsstunden"
                       min={1}
                       max={120}

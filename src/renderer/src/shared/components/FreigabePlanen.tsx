@@ -7,10 +7,11 @@
  *    Abstand und einzeln verschiebbar; der Testtermin kann am letzten Abschnitt hängen.
  * Bis zum Zeitpunkt sehen die Lernenden nur einen grauen Hinweis „Demnächst" im Fachordner.
  */
-import { Badge, Group, NumberInput, SegmentedControl, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Badge, Group, SegmentedControl, Stack, Switch, Text, TextInput } from '@mantine/core'
 import { IconClock } from '@tabler/icons-react'
 import { abschnittsTermine, kurzDatum, naechsterSchultag, testterminNach } from '@shared/freigabePlan'
 import KalenderHinweis from './KalenderHinweis'
+import ZahlFeld from './ZahlFeld'
 
 /** Kurzangabe „geplant ab Mo., 13.10., 07:30" (leer, wenn nichts mehr aussteht) */
 export const geplantText = (ab: number | null | undefined): string => (ab && ab > Date.now() ? `geplant ab ${kurzDatum(ab)}, ${zeitFeld(new Date(ab))}` : '')
@@ -177,7 +178,7 @@ export default function FreigabePlanen({
             />
           )}
           {(n > 1 && wert.nacheinander) || mitTest ? (
-            <NumberInput
+            <ZahlFeld
               label={n > 1 && wert.nacheinander ? 'Abstand (Tage)' : 'Test nach (Tagen)'}
               min={1}
               max={60}

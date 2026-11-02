@@ -9,7 +9,7 @@
  *    angelegt und verknüpft (Wächter `starteTerminWaechter`).
  * Der neue Test ist sofort mit dem Termin verknüpft; „Zurück" führt zur Startseite.
  */
-import { Alert, Button, Group, NumberInput, Radio, Stack, Switch, Text } from '@mantine/core'
+import { Alert, Button, Group, Radio, Stack, Switch, Text } from '@mantine/core'
 import { IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { holen, senden } from '../modules/onlinetest/serverApi'
@@ -27,6 +27,7 @@ import { TEST_APP_NAME, type TestApp } from '@shared/testMaterial'
 import type { StartKurs } from '@shared/startseiteKurse'
 import { verknuepfen } from './TestZumTermin'
 import { druckBlattHtml } from '../modules/onlinetest/blattAnsicht'
+import ZahlFeld from '../shared/components/ZahlFeld'
 
 interface TerminInhalt {
   sprache: string
@@ -258,7 +259,7 @@ export function TestErstellen({ k, fertig }: { k: StartKurs; stichwoerter: strin
           </Radio.Group>
           {app === 'onlinetest' && (
             <Group gap="md" align="flex-end">
-              <NumberInput label="Zeit (Minuten)" value={zeit} onChange={(v) => setZeit(Math.max(5, Math.min(120, Number(v) || 20)))} min={5} max={120} w={140} />
+              <ZahlFeld label="Zeit (Minuten)" value={zeit} onChange={(v) => setZeit(Math.max(5, Math.min(120, Number(v) || 20)))} min={5} max={120} w={140} />
               <Switch label="Auch Gäste mit Namen" checked={gaeste} onChange={(e) => setGaeste(e.currentTarget.checked)} />
               <Switch label="Handschrift erlaubt" checked={handschrift} onChange={(e) => setHandschrift(e.currentTarget.checked)} />
             </Group>

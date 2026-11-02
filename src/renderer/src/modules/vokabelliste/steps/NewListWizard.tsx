@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Group, Modal, NumberInput, Progress, ScrollArea, Select, Stack, Table, Text, TextInput } from '@mantine/core'
+import { Alert, Badge, Button, Group, Modal, Progress, ScrollArea, Select, Stack, Table, Text, TextInput } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList } from '@shared/types'
 import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
@@ -15,6 +15,7 @@ import { aiCall } from '../../vokabeltest/store'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import type { VerbListeMeta } from '@shared/verben'
 import { vokabelnAusVerbliste } from '../../../shared/verben/quellen'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 
 /** Vorgaben, die der Wizard mitnimmt (Land, Schulform, Fach kommen aus der Übersicht) */
 export interface WizardDefaults {
@@ -192,7 +193,7 @@ export default function NewListWizard({
               </Group>
             </SchulAngabe>
             <Group grow align="flex-start">
-              <NumberInput
+              <ZahlFeld
                 label="Jahrgang (optional)"
                 placeholder="z. B. 8"
                 min={1}

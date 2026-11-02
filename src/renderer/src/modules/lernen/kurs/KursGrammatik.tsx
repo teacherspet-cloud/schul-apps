@@ -16,7 +16,6 @@ import {
   Loader,
   Menu,
   Modal,
-  NumberInput,
   SegmentedControl,
   Stack,
   Progress,
@@ -49,6 +48,7 @@ import { LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 import { BandGruppe } from '../../../shared/components/BandCover'
 import { extraDocId, mehrAufgabenDocId } from './auftragsZiel'
 import { useAufZu, useOffenGemerkt } from '../../../shared/sitzung'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 
 /** Land und Schulform aus den Einstellungen – Maßstab für das Niveau der Grammatikaufgaben (09.10.2026, grammatikNiveau.ts) */
 const niveauOrt = (): { land?: string; schulform?: string } => {
@@ -351,7 +351,7 @@ export function MehrAufgabenFenster({ g, schliessen }: { g: GrammatikZeile; schl
             Bisher {d.paket.aufgaben.length} Aufgaben zu {d.paket.regeln.length} {d.paket.regeln.length === 1 ? 'Regel' : 'Regeln'}. Die neuen kommen dazu; der
             Lernstand der Lernenden bleibt.
           </Text>
-          <NumberInput
+          <ZahlFeld
             label="Anzahl"
             min={4}
             max={20}

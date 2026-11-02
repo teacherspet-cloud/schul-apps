@@ -17,7 +17,6 @@ import {
   Group,
   Modal,
   MultiSelect,
-  NumberInput,
   Paper,
   SegmentedControl,
   Select,
@@ -36,6 +35,7 @@ import { AuswahlFeld } from './AuswahlFeld'
 import { LernzieleFeld } from './Lernziele'
 import { schrittLernziele } from './lernzieleKi'
 import { GrundlageZeile } from './GrundlageChips'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
@@ -164,7 +164,7 @@ export function SchrittBearbeiten({
                   value={s.wahlGruppe ?? ''}
                   onChange={(e) => setze({ wahlGruppe: e.currentTarget.value })}
                 />
-                <NumberInput label="Davon nötig" min={1} max={10} value={s.wahlMindestens ?? 1} onChange={(v) => setze({ wahlMindestens: Number(v) || 1 })} />
+                <ZahlFeld label="Davon nötig" min={1} max={10} value={s.wahlMindestens ?? 1} onChange={(v) => setze({ wahlMindestens: Number(v) || 1 })} />
               </>
             )}
             {s.rolle === 'foerder' && (
@@ -248,7 +248,7 @@ export function SchrittBearbeiten({
                 />
               )}
               {s.erfolg.art === 'punkte' && (
-                <NumberInput
+                <ZahlFeld
                   label="mindestens (%)"
                   min={0}
                   max={100}
@@ -462,7 +462,7 @@ function Inhalt({
           {/* Aufgaben/Bausteine für diesen Schritt ausblenden oder freiwillig machen (05.10.2026) */}
           <AuswahlFeld reihe={reihe} schritt={s} inhalt={i} setzeInhalt={(t) => setzeInhalt(t as Record<string, unknown>)} beschaeftigt={beschaeftigt} />
           <Group>
-            <NumberInput label="Einreichungen je Person" min={1} max={5} value={i.runden} onChange={(v) => setzeInhalt({ runden: Number(v) || 2 })} w={200} />
+            <ZahlFeld label="Einreichungen je Person" min={1} max={5} value={i.runden} onChange={(v) => setzeInhalt({ runden: Number(v) || 2 })} w={200} />
             <Checkbox mt="lg" label="Stift erlauben" checked={i.stift} onChange={(e) => setzeInhalt({ stift: e.currentTarget.checked })} />
             {/* Korrekturrand (05.10.2026): Vorgabe an – dort steht das KI-Feedback; Seiten werden neu gesetzt */}
             <Checkbox
@@ -536,7 +536,7 @@ function Inhalt({
               if (!s.titel) setze({ titel: r.meta?.title || d.name })
             }}
           />
-          <NumberInput label="Feedback-Runden je Person" min={1} max={10} value={i.runden} onChange={(v) => setzeInhalt({ runden: Number(v) || 2 })} w={220} />
+          <ZahlFeld label="Feedback-Runden je Person" min={1} max={10} value={i.runden} onChange={(v) => setzeInhalt({ runden: Number(v) || 2 })} w={220} />
         </Stack>
       )
     case 'onlinetest':
@@ -559,7 +559,7 @@ function Inhalt({
               if (!s.titel) setze({ titel: t.name })
             }}
           />
-          <NumberInput label="Zeitlimit (Minuten)" min={1} max={240} value={i.zeitMin} onChange={(v) => setzeInhalt({ zeitMin: Number(v) || 20 })} w={200} />
+          <ZahlFeld label="Zeitlimit (Minuten)" min={1} max={240} value={i.zeitMin} onChange={(v) => setzeInhalt({ zeitMin: Number(v) || 20 })} w={200} />
           <Text size="xs" c="dimmed">
             Im eigenen Tempo: Der Test startet, wenn jemand ihn öffnet; das Ergebnis erscheint gleich nach der Abgabe.
           </Text>
@@ -744,8 +744,8 @@ function Inhalt({
             }
           />
           <Group align="end">
-            <NumberInput label="Bestanden ab (%)" min={1} max={100} value={i.schwelle} onChange={(v) => setzeInhalt({ schwelle: Number(v) || 80 })} w={160} />
-            <NumberInput
+            <ZahlFeld label="Bestanden ab (%)" min={1} max={100} value={i.schwelle} onChange={(v) => setzeInhalt({ schwelle: Number(v) || 80 })} w={160} />
+            <ZahlFeld
               label="Erneut nach (Min.)"
               description="0 = nur einmal"
               min={0}
@@ -837,7 +837,7 @@ function Inhalt({
       return (
         <Stack gap="xs">
           <Textarea label="Sprechauftrag" autosize minRows={2} value={i.anweisung} onChange={(e) => setzeInhalt({ anweisung: e.currentTarget.value })} />
-          <NumberInput label="Höchstens (Minuten)" min={1} max={10} value={i.minuten} onChange={(v) => setzeInhalt({ minuten: Number(v) || 2 })} w={180} />
+          <ZahlFeld label="Höchstens (Minuten)" min={1} max={10} value={i.minuten} onChange={(v) => setzeInhalt({ minuten: Number(v) || 2 })} w={180} />
           <Alert variant="light">Die Lernenden nehmen sich auf; du hörst die Aufnahme in der Übersicht und bewertest.</Alert>
         </Stack>
       )

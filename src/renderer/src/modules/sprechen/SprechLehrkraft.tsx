@@ -5,7 +5,7 @@
  * wie oft geübt hat, Klassenschnitt je Kriterium, je Person Verlauf und Tipps; Vorfälle mit dem einen Satz und
  * „Entsperren". Alles eine Hilfe für die Vorbereitung, nicht für die Note.
  */
-import { Alert, Badge, Button, Card, Checkbox, Group, Loader, MultiSelect, NumberInput, Progress, Select, Stack, Switch, Table, Text } from '@mantine/core'
+import { Alert, Badge, Button, Card, Checkbox, Group, Loader, MultiSelect, Progress, Select, Stack, Switch, Table, Text } from '@mantine/core'
 import { IconLock, IconMicrophone } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -13,6 +13,7 @@ import { notifyError, notifySuccess } from '../../shared/util'
 import { KRITERIEN } from '@shared/sprechen/kriterien'
 import { NIVEAUS, TEIL_NAME, TEILE, type Niveau, type Teil } from '@shared/sprechen/niveaus'
 import { gewertet, type LehrUebung, type Uebung } from './typen'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 interface Ueberblick {
   verfuegbar: boolean
@@ -113,8 +114,8 @@ export function SprechLehrkraft({ vokId, lernende = [] }: { vokId: string; lerne
             />
           )}
           <Group gap="md" align="flex-end">
-            <NumberInput label="Tage" min={1} max={90} value={tage} onChange={(v) => setTage(Number(v) || 14)} w={90} />
-            <NumberInput label="Minuten je Woche und Person" description="Höchstens die Hälfte davon an einem Tag" min={5} max={300} value={minuten} onChange={(v) => setMinuten(Number(v) || 30)} w={210} />
+            <ZahlFeld label="Tage" min={1} max={90} value={tage} onChange={(v) => setTage(Number(v) || 14)} w={90} />
+            <ZahlFeld label="Minuten je Woche und Person" description="Höchstens die Hälfte davon an einem Tag" min={5} max={300} value={minuten} onChange={(v) => setMinuten(Number(v) || 30)} w={210} />
             <Select
               label="Niveau"
               placeholder="nach Jahrgang"

@@ -20,7 +20,6 @@ import {
   Menu,
   Modal,
   MultiSelect,
-  NumberInput,
   Paper,
   Progress,
   SegmentedControl,
@@ -102,6 +101,7 @@ import { feldMitVorwissen, ladeVorwissen, LerngruppeWahl, type LerngruppeBezug, 
 import { IconArrowsMove, IconRefresh } from '@tabler/icons-react'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 /**
  * Lohnt sich das automatische Speichern? (08.10.2026) Gespeicherte Reihen immer; neue erst, wenn mehr als die Art gewählt
@@ -666,7 +666,7 @@ export function ReiheEditor({
                 onChange={(v) => v && setze({ fachId: v, fachLabel: FAECHER.find((f) => f.id === v)?.label ?? v })}
                 allowDeselect={false}
               />
-              <NumberInput label="Jahrgang" min={1} max={13} value={r.grade} onChange={(v) => setze({ grade: Number(v) || r.grade })} w={110} />
+              <ZahlFeld label="Jahrgang" min={1} max={13} value={r.grade} onChange={(v) => setze({ grade: Number(v) || r.grade })} w={110} />
             </Group>
             <Select
               label="Oberthema"
@@ -1056,7 +1056,7 @@ export function ReiheEditor({
           {anzahlOptional > 0 && (
             <Group gap="xs" data-optional-mindestens>
               <Text size="sm">Die Reihe ist abgeschlossen, wenn alle Pflichtschritte und mindestens</Text>
-              <NumberInput
+              <ZahlFeld
                 size="xs"
                 w={70}
                 min={0}

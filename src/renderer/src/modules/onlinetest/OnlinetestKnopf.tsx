@@ -5,7 +5,7 @@
  * wird in der App „Onlinetest" – für alle gemeinsam.
  */
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
-import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stack, Text, TextInput, Radio } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Image, Modal, Select, Stack, Text, TextInput, Radio } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceLaptop, IconEye } from '@tabler/icons-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import type { TestDocument } from '../vokabeltest/model/types'
@@ -26,6 +26,7 @@ import { PRUEF_HINWEIS, Zugang } from './OnlinetestModule'
 import { nameMitTermin } from '@shared/onlinetestTermin'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 /** Thema des Tests (Unit, Themenbereich, Thema) – macht gleichnamige Tests unterscheidbar */
 export function testThema(doc: Pick<TestDocument, 'header' | 'settings'>): string {
@@ -314,7 +315,7 @@ export function Erstellen({
                 </Group>
               </Radio.Group>
             </NurExperte>
-            <NumberInput label="Zeitlimit (Minuten)" min={1} max={240} value={zeit} onChange={(v) => setZeit(Number(v) || 20)} />
+            <ZahlFeld label="Zeitlimit (Minuten)" min={1} max={240} value={zeit} onChange={(v) => setZeit(Number(v) || 20)} />
             <NurExperte geaendert={zuteilung !== 'abwechselnd' && 'Fassungen verteilen'}>
               {(doc ? doc.variants.length : blatt!.varianten.length) > 1 && (
                 <Select

@@ -123,6 +123,31 @@ try {
   // Spiele-Schalter und Tagesziel im Reiter „Einstellungen"
   await kursReiter(p, 'einstellungen')
   pruefe(await da(p.locator('[data-vokabel-tagesziel]')), 'Feld „Neue Vokabeln pro Tag"')
+  // Rücktaste leert das Feld (02.11.2026, Befund der Lehrkraft: aus 50 wurde 5 und dann wieder 50)
+  const zielFeld = p.locator('input[data-vokabel-tagesziel], [data-vokabel-tagesziel] input').first()
+  const tagesziel = async () => (await (await lk.request.get(`${A}/server/vokabeln/${vid}`, { headers: KOPF })).json()).tagesziel
+  const zielVorher = await tagesziel()
+  await zielFeld.fill('50')
+  await zielFeld.press('Tab')
+  await p.waitForTimeout(800)
+  await zielFeld.click()
+  await zielFeld.press('End')
+  await zielFeld.press('Backspace')
+  await zielFeld.press('Backspace')
+  const leer = await zielFeld.inputValue()
+  await zielFeld.type('30')
+  await zielFeld.press('Tab')
+  await p.waitForTimeout(800)
+  const zielNachher = await tagesziel()
+  pruefe(leer === '' && zielNachher === 30, `Tagesziel: Rücktaste leert das Feld („${leer}"), neu getippt gespeichert (${zielVorher} → ${zielNachher})`)
+  await zielFeld.click()
+  await zielFeld.press('Control+A')
+  await zielFeld.press('Backspace')
+  await zielFeld.press('Tab')
+  await p.waitForTimeout(800)
+  pruefe((await tagesziel()) === 30 && (await zielFeld.inputValue()) === '30', 'Leer verlassen: der bisherige Wert bleibt')
+  // Für den weiteren Ablauf wieder der Ausgangswert
+  await lk.request.post(`${A}/server/vokabeln/${vid}/tagesziel`, { headers: KOPF, data: { tagesziel: zielVorher } })
   await p.screenshot({ path: join(out, '4-details.png'), fullPage: true })
 
   // ---------- Lernende: Anmelden mit dem Code vom Zettel, Zehnerschritte, Lernkarte ohne Weiter

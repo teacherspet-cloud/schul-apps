@@ -1,8 +1,9 @@
-import { Autocomplete, NumberInput, Select, SimpleGrid, TextInput } from '@mantine/core'
+import { Autocomplete, Select, SimpleGrid, TextInput } from '@mantine/core'
 import { useMemo } from 'react'
 import type { TextbookMeta } from '@shared/types'
 import { landZuAusgabe, schulformAuswahl } from '@shared/lehrwerkSchulform'
 import { STATES } from '../../modules/arbeitsblatt/didactics/states'
+import ZahlFeld from './ZahlFeld'
 
 /** Die Angaben zur Schulbuchreihe eines Lehrwerks (Paket 15, src/shared/lehrwerkReihe.ts) */
 export interface LehrwerkAngabenWerte {
@@ -72,7 +73,7 @@ export default function LehrwerkAngaben({
       <Autocomplete size="xs" label="Reihe" placeholder="z. B. Green Line" data={listen.reihe} value={w.reihe ?? ''} onChange={(v) => onChange({ reihe: v })} />
       {mitBand && <TextInput size="xs" label="Band" placeholder="z. B. 3" value={w.band ?? ''} onChange={(e) => onChange({ band: e.currentTarget.value })} />}
       {mitBand && (
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label="Jahrgang"
           placeholder="z. B. 7"

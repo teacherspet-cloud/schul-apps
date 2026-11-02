@@ -47,7 +47,6 @@ import {
   Loader,
   Menu,
   Modal,
-  NumberInput,
   Popover,
   ScrollArea,
   SegmentedControl,
@@ -99,6 +98,7 @@ import { pdfVorschauAusHtml } from '../../shared/export/PdfVorschau'
 import { AbgabeBlatt, abgabenHtml, type BlattKopf } from './blattAnsicht'
 import type { Variant } from '../vokabeltest/model/types'
 import { ergebnisDocx, ergebnisHtml, ergebnisXlsx, notenSpalte, teachertoolCsv, type ErgebnisDaten, type NotenFormat } from './ergebnisExport'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 interface TestListe {
   id: string
@@ -1321,7 +1321,7 @@ function EinheitZeile({
         )}
       </Stack>
       {e.punkte > 1 && f.loesungen[e.loesung ?? e.felder[0]]?.art === 'lehrkraft' ? (
-        <NumberInput
+        <ZahlFeld
           size="xs"
           w={80}
           min={0}

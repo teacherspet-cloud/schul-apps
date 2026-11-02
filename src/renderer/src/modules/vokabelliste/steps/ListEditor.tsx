@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Group, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Badge, Button, Card, Group, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { anfrageVon } from '@shared/medienBedeutung'
 import { IconCheck, IconClipboard, IconDeviceFloppy, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
@@ -20,6 +20,7 @@ import { EinfuegenFenster, PruefFenster } from '../../vokabeltest/steps/VokabelU
 import type { VocabRow } from './VocabRow'
 import { MedienLeiste, useMedienAdmin, useMedienbank, useMedienZiel } from '../../../shared/medien/MedienUi'
 import { setzeVokabelAnsicht, zielListe } from '../../../shared/medien/medienAuftrag'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 
 /** Eine leere Liste bekommt gleich eine Zeile zum Eintippen */
 const toRows = (list: SavedVocabList): VocabRow[] => {
@@ -202,7 +203,7 @@ export default function ListEditor({
             }}
             allowDeselect={false}
           />
-          <NumberInput
+          <ZahlFeld
             label="Jahrgang (optional)"
             placeholder="z. B. 8"
             min={1}

@@ -16,7 +16,6 @@ import {
   Card,
   ColorInput,
   Group,
-  NumberInput,
   SegmentedControl,
   Select,
   Stack,
@@ -39,6 +38,7 @@ import { buchName, buecherDesFachs } from '@shared/schulbuecher'
 import { useAppSettings } from '../shared/settingsStore'
 import { senden } from '../modules/onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../shared/util'
+import ZahlFeld from '../shared/components/ZahlFeld'
 
 const JAHRGAENGE = Array.from({ length: 9 }, (_, i) => String(i + 5))
 const STANDARD_NOTEN = [91, 78, 64, 50, 25]
@@ -179,7 +179,7 @@ export default function MeinFach(): React.JSX.Element {
             {v.notenschluessel && (
               <Group gap="xs">
                 {v.notenschluessel.map((w, i) => (
-                  <NumberInput
+                  <ZahlFeld
                     key={i}
                     label={`Note ${i + 1} ab`}
                     suffix=" %"

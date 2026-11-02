@@ -11,7 +11,7 @@
  * QR-Code und Namen (solange IServ nicht eingerichtet ist). KI: Zugang der Lehrkraft, auch Abo.
  */
 import { NurExperte } from '../../../shared/components/NurExperte'
-import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text } from '@mantine/core'
+import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, Select, Stack, Text } from '@mantine/core'
 import { IconDownload, IconQrcode, IconSend } from '@tabler/icons-react'
 import { Zugang } from '../../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
@@ -22,6 +22,7 @@ import { notifyError, notifySuccess } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
 import FreigabePlanen, { GeplantMarke, planBis, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../../shared/components/FreigabePlanen'
 import { gruppenAuswahl } from '../../../shared/lerngruppenWahl'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 
 interface FreigabeListe {
   id: string
@@ -176,7 +177,7 @@ export default function LernendeKarte({
           w={220}
         />
         <NurExperte>
-          <NumberInput label="Feedback-Runden je Person" min={1} max={10} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={180} />
+          <ZahlFeld label="Feedback-Runden je Person" min={1} max={10} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={180} />
         </NurExperte>
         <Button
           leftSection={<IconSend size={16} />}

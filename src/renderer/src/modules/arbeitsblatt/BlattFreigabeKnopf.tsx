@@ -9,7 +9,7 @@
  */
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { hilfenZuordnung } from './didactics/aufgabenVerweise'
-import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, Select, Stack, Text, TextInput } from '@mantine/core'
 import { IconQrcode, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { BlattAufgabe } from '@shared/blattFreigabe'
@@ -30,6 +30,7 @@ import { taskNumbersFor } from './render/SheetPages'
 import { aufgabenSchluessel } from './blattSchluessel'
 import FreigabePlanen, { GeplantMarke, planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 /** Aufgaben eines Blattes für den Server: Anweisung (wie gedruckt) und Erwartung samt Lösung */
 export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
@@ -362,7 +363,7 @@ export function BlattFreigabeDialog({
               checked={aufgabenFeedback}
               onChange={(e) => setAufgabenFeedback(e.currentTarget.checked)}
             />
-            <NumberInput label="Einreichungen je Person" min={1} max={5} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={170} />
+            <ZahlFeld label="Einreichungen je Person" min={1} max={5} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={170} />
           </Group>
         )}
         {/* Hinweis nur, wenn Handschrift wirklich an die KI geht: bei Rückmeldung oder Aufgaben-Feedback (26.10.2026) */}

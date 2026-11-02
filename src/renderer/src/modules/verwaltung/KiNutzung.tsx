@@ -10,12 +10,13 @@
  * der Server schickt weder Namen noch Kennungen), Monate, Preise für die Kosten-Schätzung.
  * Diagramme aus shared/components/diagramme (feste, geprüfte Farbreihenfolge; Grau nur für „Andere").
  */
-import { Alert, Button, Card, Group, NumberInput, SegmentedControl, SimpleGrid, Stack, Table, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Button, Card, Group, SegmentedControl, SimpleGrid, Stack, Table, Text, TextInput, Title } from '@mantine/core'
 import { IconAlertTriangle, IconCoin, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { budgetStand, type KiBudget, type KiPreise } from '@shared/kiKosten'
 import { FortschrittsRing, GestapelteSaeulen, Kennzahl, RingDiagramm, useFarbenMitAndere, useReihenFarben } from '../../shared/components/diagramme'
 import { KlappKarte } from '../../shared/components/KlappKarte'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 export type KiZeitraum = 'woche' | 'monat' | 'schuljahr'
 export type KiMass = 'anfragen' | 'token' | 'kosten'
@@ -243,7 +244,7 @@ function BudgetKarte({ daten, speichern }: { daten: KiNutzungDaten; speichern: (
               Euro erst nach Eintragen der Preise (unten).
             </Text>
           )}
-          <NumberInput
+          <ZahlFeld
             label={art === 'euro' ? 'Euro je Monat' : 'Token je Monat'}
             value={wert}
             onChange={setWert}

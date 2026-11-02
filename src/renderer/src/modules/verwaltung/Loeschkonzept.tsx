@@ -7,12 +7,13 @@
  *  - Löschkonzept: Fristen einstellen, letzter Lauf, „Zur Löschung vorgesehen" (Aufschieben), abgegangene Lehrkräfte
  *    (nur von Hand: „Konto und Daten löschen" mit Bestätigung). Server: server/loeschkonzept.ts.
  */
-import { Alert, Badge, Button, Card, Checkbox, Group, Loader, Modal, NumberInput, SimpleGrid, Stack, Switch, Table, Text, Title, Tooltip } from '@mantine/core'
+import { Alert, Badge, Button, Card, Checkbox, Group, Loader, Modal, SimpleGrid, Stack, Switch, Table, Text, Title, Tooltip } from '@mantine/core'
 import { IconAlertTriangle, IconClockPause, IconPlayerPlay, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlappKarte } from '../../shared/components/KlappKarte'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 type Ampel = 'ok' | 'warnung' | 'fehler'
 interface Einstellung {
@@ -248,7 +249,7 @@ export function LoeschkonzeptKarten({ sichtbar }: { sichtbar: boolean }): React.
           <Switch checked={entwurf.an} onChange={(e) => setEntwurf({ ...entwurf, an: e.currentTarget.checked })} label="Konten abgegangener Lernender und alter Gäste automatisch löschen" />
           <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
             {FELDER.map((f) => (
-              <NumberInput
+              <ZahlFeld
                 key={f.k}
                 label={f.titel}
                 description={f.hilfe}

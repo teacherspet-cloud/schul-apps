@@ -7,13 +7,14 @@
  *  - Modelle über den Schulzugang: Freigabeliste je Anbieter; andere Modelle werden durch das erste ersetzt.
  *  - „Missbrauch prüfen": Namen zur anonymen Übersicht nur mit Grund – der Server protokolliert ihn vor der Antwort.
  */
-import { Alert, Button, Group, Modal, NumberInput, Stack, Table, Text, Textarea, TextInput } from '@mantine/core'
+import { Alert, Button, Group, Modal, Stack, Table, Text, Textarea, TextInput } from '@mantine/core'
 import { IconShieldCheck } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlappKarte } from '../../shared/components/KlappKarte'
 import { euroText, zahl, type KiZeitraum } from './KiNutzung'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 export interface KiSchutzDaten {
   lehrkraftBudget: number
@@ -89,7 +90,7 @@ export default function KiSchutz({
             100 % pausieren KI-Rückmeldungen für ihre Lernenden bis zum Monatsende – ihre eigene Materialerstellung läuft weiter. 0 = ohne Grenze.
           </Text>
           <Group gap="xs" align="flex-end">
-            <NumberInput
+            <ZahlFeld
               label="Euro je Monat"
               value={budget}
               onChange={setBudget}

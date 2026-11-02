@@ -23,7 +23,6 @@ import {
   Loader,
   Modal,
   MultiSelect,
-  NumberInput,
   Progress,
   SegmentedControl,
   Select,
@@ -73,6 +72,7 @@ import { grammatikKapitel, lehrwerkeMitGrammatik, unitEintraege } from '../arbei
 import { abgleichText, freigabeAbgleich, schonImKurs, type BestehendeGrammatik } from './kurs/freigabeAbgleich'
 import FreigabePlanen, { planGeaendert, planKnopf, planKoerper, planMeldung, planStart, type PlanWahl } from '../../shared/components/FreigabePlanen'
 import { gruppenAuswahl } from '../../shared/lerngruppenWahl'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 interface Zuweisung {
   id: string
@@ -731,7 +731,7 @@ export function Freigeben({ schliessen, vorgabe }: { schliessen: () => void; vor
               onChange={(v) => v !== fachId && (setFachId(v), setThemenIds([]), setTeilWahl([]))}
               data-grammatik-fach
             />
-            <NumberInput label="Klasse" min={1} max={13} value={jahrgang} onChange={(v) => setJahrgang(Number(v) || 6)} data-grammatik-jahrgang />
+            <ZahlFeld label="Klasse" min={1} max={13} value={jahrgang} onChange={(v) => setJahrgang(Number(v) || 6)} data-grammatik-jahrgang />
           </Group>
           {verbSprache && (
             <SegmentedControl

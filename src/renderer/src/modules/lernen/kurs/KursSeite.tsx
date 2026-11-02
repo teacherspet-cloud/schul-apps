@@ -1318,7 +1318,8 @@ function Einstellungen({
   loeschen: () => void
   eingebettet: boolean
 }): React.JSX.Element {
-  const [ziel, setZiel] = useState<number | string>('')
+  // null = nicht in Bearbeitung; '' = Feld gerade leer (02.11.2026: Rücktaste setzte sonst den alten Wert zurück)
+  const [ziel, setZiel] = useState<number | string | null>(null)
   const [ueberschrift, setUeberschrift] = useState(d.ueberschrift ?? '')
   const [symbol, setSymbol] = useState<string | null>(null)
   const experte = useExperte()
@@ -1367,12 +1368,18 @@ function Einstellungen({
                 min={1}
                 max={200}
                 w={230}
-                value={ziel === '' ? d.tagesziel ?? 10 : ziel}
+                value={ziel === null ? d.tagesziel ?? 10 : ziel}
                 onChange={setZiel}
                 onBlur={() => {
-                  if (ziel !== '' && Number(ziel) !== d.tagesziel) aendern('tagesziel', { tagesziel: Number(ziel) })
-                  setZiel('')
+                  // Leer gelassen: der bisherige Wert bleibt; sonst auf 1–200 begrenzt speichern
+                  const n = ziel === null || ziel === '' ? NaN : Math.round(Number(ziel))
+                  if (Number.isFinite(n)) {
+                    const neu = Math.max(1, Math.min(200, n))
+                    if (neu !== d.tagesziel) aendern('tagesziel', { tagesziel: neu })
+                  }
+                  setZiel(null)
                 }}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 data-vokabel-tagesziel
               />
               <Switch

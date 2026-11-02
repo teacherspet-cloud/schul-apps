@@ -5,7 +5,7 @@
  * der Stunde; „Mit KI vorschlagen" läuft als Hintergrund-Auftrag (verlaufAuftrag.ts). Unter der Tabelle stehen die
  * Materialien der Stunde als Schrittkarten (vom Editor gereicht) – sie lassen sich wie gewohnt erstellen und drucken.
  */
-import { ActionIcon, Alert, Autocomplete, Badge, Button, Group, Menu, MultiSelect, NumberInput, Paper, Stack, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
+import { ActionIcon, Alert, Autocomplete, Badge, Button, Group, Menu, MultiSelect, Paper, Stack, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
 import { IconAlertTriangle, IconArrowDown, IconArrowUp, IconFileExport, IconPlus, IconScale, IconSparkles, IconTemplate, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { SCHRITT_ARTEN, type Reihe, type ReihenPhase, type StundenPlanung } from '@shared/reihe'
@@ -17,6 +17,7 @@ import { starteVerlaufVorschlag, useVerlaufEntsteht } from './verlaufAuftrag'
 import { planungAusgeben } from './planungDruck'
 import { datumKurz, stundenDaten } from './stundenAnsicht'
 import type { DruckArt } from './reiheDruck'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 const PHASEN = ['Einstieg', 'Erarbeitung', 'Sicherung', 'Übung', 'Vertiefung', 'Transfer', 'Reflexion', 'Hausaufgabe']
 
@@ -126,7 +127,7 @@ export function PlanungsStunde({
                       <Autocomplete size="xs" data={PHASEN} value={ph.phase} onChange={(v) => setzePhase(k, { phase: v })} aria-label="Phase" data-phase-feld="phase" />
                     </Table.Td>
                     <Table.Td>
-                      <NumberInput
+                      <ZahlFeld
                         size="xs"
                         min={0}
                         max={180}

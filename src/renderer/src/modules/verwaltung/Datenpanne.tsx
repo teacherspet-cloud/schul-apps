@@ -6,7 +6,7 @@
  *  - vorbefüllter Text für das Online-Formular der LfD Niedersachsen (kopieren/drucken – gesendet wird nichts)
  *  - Liste vergangener Vorfälle (Dokumentationspflicht Art. 33 Abs. 5)
  */
-import { Alert, Anchor, Badge, Button, Checkbox, Group, Loader, NumberInput, Paper, SegmentedControl, Stack, Text, Textarea, TextInput } from '@mantine/core'
+import { Alert, Anchor, Badge, Button, Checkbox, Group, Loader, Paper, SegmentedControl, Stack, Text, Textarea, TextInput } from '@mantine/core'
 import { IconAlertTriangle, IconCopy, IconPrinter } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -26,6 +26,7 @@ import {
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlappKarte } from '../../shared/components/KlappKarte'
+import ZahlFeld from '../../shared/components/ZahlFeld'
 
 /** Wert für <input type="datetime-local"> in Ortszeit */
 const alsEingabe = (ms: number): string => {
@@ -185,8 +186,8 @@ export function Datenpanne(): React.JSX.Element {
                   onChange={(e) => setForm({ ...form, datenarten: e.currentTarget.value })}
                 />
                 <Group grow>
-                  <NumberInput label="Betroffene Personen (ungefähr)" min={0} value={form.personen} onChange={(v) => setForm({ ...form, personen: Number(v) || 0 })} />
-                  <NumberInput label="Betroffene Datensätze (ungefähr)" min={0} value={form.datensaetze} onChange={(v) => setForm({ ...form, datensaetze: Number(v) || 0 })} />
+                  <ZahlFeld label="Betroffene Personen (ungefähr)" min={0} value={form.personen} onChange={(v) => setForm({ ...form, personen: Number(v) || 0 })} />
+                  <ZahlFeld label="Betroffene Datensätze (ungefähr)" min={0} value={form.datensaetze} onChange={(v) => setForm({ ...form, datensaetze: Number(v) || 0 })} />
                 </Group>
                 <Textarea
                   label="Ergriffene und geplante Maßnahmen"
