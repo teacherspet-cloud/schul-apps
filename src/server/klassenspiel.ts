@@ -16,7 +16,8 @@
  *             GET  /s/api/klassenspiel/zugang?code=               Code erkennen
  *             POST /s/api/klassenspiel/beitreten {code}
  *             GET  /s/api/klassenspiel/strom?code= · /zustand?code=
- *             POST /s/api/klassenspiel/antwort {code, wert}
+ *             POST /s/api/klassenspiel/antwort {code, wert, nr}
+ *             POST /s/api/klassenspiel/zug {code, aktion, wert}           Einsatz (Wett-Quiz), Sterne (Gebiet)
  */
 import { randomInt } from 'node:crypto'
 import { datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
@@ -38,7 +39,7 @@ import {
   zeile as vokZeile
 } from './vokabeln'
 import { grammatikFuerSpiel as G } from './grammatik'
-import { achievementZusammen } from './achievementsDaten'
+import { achievementKlasse, achievementZusammen } from './achievementsDaten'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
@@ -133,6 +134,8 @@ interface Raum {
   /** Beamer-Takt drosseln (höchstens 4 Sichten je Sekunde) */
   beamerZuletzt: number
   beamerOffen: boolean
+  /** Gedrosselte Sichten der Lernenden stehen noch aus (der Takt reicht sie nach) */
+  lernendeOffen: boolean
 }
 
 const raeume = new Map<string, Raum>()
@@ -354,6 +357,14 @@ function eintragen(r: Raum, jetzt: number): void {
       r.sprache,
       true
     )
+    const extra = KLASSEN_REGELN[r.einst.spiel]?.auszeichnung?.(z, p.id) ?? {}
+    achievementKlasse(n, {
+      boss: r.einst.spiel === 'boss' && e.sieg === true,
+      gipfel: r.einst.spiel === 'expedition' && e.sieg === true,
+      rekord: r.rekord?.neu === true && r.rekord.bisher !== null,
+      tischSiege: extra.tischSiege ?? 0,
+      einschaetzung: extra.einschaetzung === true
+    })
     schreib.run(
       r.id,
       r.kurs,
@@ -406,6 +417,8 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
             siegerTeams: r.ergebnis.siegerTeams ?? [],
             top3: t3.map((x) => ({ name: r.namen.get(x.id) ?? x.name, ich: x.id === wer })),
             eigen: p ? { richtig: p.richtig, falsch: p.falsch, punkte: p.punkte, gewonnen: team ? (r.ergebnis.siegerTeams ?? []).includes(p.team) : null } : null,
+            // Private Rückmeldung des Spiels (Wett-Quiz: Treffsicherheit je Einsatz)
+            eigenText: p ? regeln.eigenText?.(z, wer) ?? null : null,
             rekord: r.rekord?.neu ? r.rekord.text : null
           }
         }
@@ -491,7 +504,10 @@ function takt(jetzt = Date.now()): void {
       const regeln = KLASSEN_REGELN[r.einst.spiel]!
       const geaendert = kTakt(r.zustand, regeln, jetzt)
       if (r.zustand.ende) beenden(r, jetzt)
-      if (geaendert || r.zustand.ende) verteilen(r, jetzt)
+      if (geaendert || r.zustand.ende || r.lernendeOffen) {
+        r.lernendeOffen = false
+        verteilen(r, jetzt)
+      }
     }
     if (r.phase === 'teams' && r.losenSeit && jetzt - r.losenSeit < 6000) r.beamerOffen = true
     // Beamer: ausstehende Änderungen nachreichen, Anwesenheit jede Sekunde
@@ -547,7 +563,8 @@ function raumNeu(z: VokZeile, ich: NutzerInfo, einst: KlassenEinstellungen, jetz
     erstellt: jetzt,
     aktiv: jetzt,
     beamerZuletzt: 0,
-    beamerOffen: true
+    beamerOffen: true,
+    lernendeOffen: false
   }
 }
 
@@ -559,6 +576,9 @@ function starten(r: Raum, jetzt: number): string | null {
   if (info.teams !== 'keine' && !z.teams.length) teamsLosen(z)
   z.start = jetzt
   z.bis = jetzt + r.einst.dauer * 60_000
+  // „Klasse gegen den Rekord" (und die Anzeige der anderen Spiele) kennt den bisherigen Bestwert
+  const rek = rekordLesen(r.kurs, r.einst.spiel)
+  z.rekordBisher = rek ? { wert: rek.wert, text: rek.text } : null
   KLASSEN_REGELN[r.einst.spiel]!.start(z, jetzt)
   r.phase = 'spiel'
   r.aktiv = jetzt
@@ -645,6 +665,14 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
         r.lernende.abgefragt(ich.id, jetzt)
         return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
       }
+      if (req.method === 'POST' && teile[0] === 'zug') {
+        if (r.phase !== 'spiel') return json(res, 409, { fehler: 'Gerade läuft kein Spiel.' }), true
+        const regeln = KLASSEN_REGELN[r.einst.spiel]!
+        if (!r.zustand.personen[ich.id] || r.zustand.pause !== null) return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
+        const ok = regeln.zug?.(r.zustand, ich.id, String(k0.aktion ?? '').slice(0, 30), String(k0.wert ?? '').slice(0, 30), jetzt) ?? false
+        if (ok) r.beamerOffen = true
+        return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
+      }
       if (req.method === 'POST' && teile[0] === 'antwort') {
         if (r.phase !== 'spiel') return json(res, 409, { fehler: 'Gerade läuft kein Spiel.' }), true
         const regeln = KLASSEN_REGELN[r.einst.spiel]!
@@ -658,12 +686,16 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
         if (r.zustand.ende) verteilen(r, jetzt)
         else {
           r.lernende.schreibe(ich.id, lernSicht(r, ich.id, jetzt))
-          // Die anderen sehen den gemeinsamen Stand (Kopf) – gedrosselt mit dem Beamer
+          // Das eigene Team sofort (Team-Puzzle: neue gemeinsame Frage, Rückmeldung für alle)
+          const team = p && p.team >= 0 ? r.zustand.teams[p.team]?.mitglieder ?? [] : []
+          for (const id of team) if (id !== ich.id) r.lernende.schreibe(id, lernSicht(r, id, jetzt))
+          // Die anderen sehen den gemeinsamen Stand (Kopf) – gedrosselt mit dem Beamer; sonst holt der Takt es nach
           r.beamerOffen = true
           if (jetzt - r.beamerZuletzt >= 250) {
             r.lernende.verteilen((id) => lernSicht(r, id, jetzt))
+            r.lernendeOffen = false
             beamerVerteilen(r, jetzt)
-          }
+          } else r.lernendeOffen = true
         }
         return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
       }

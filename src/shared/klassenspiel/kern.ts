@@ -92,6 +92,14 @@ export type BBlock =
   | { typ: 'zahlen'; eintraege: { titel: string; wert: string }[] }
   | { typ: 'podest'; titel: string; plaetze: { name: string; wert: string }[] }
   | { typ: 'text'; text: string; gross?: boolean; ton?: 'gut' | 'info' | 'warn' }
+  /** Gebietseroberung: Felder (Sterne 1–3, Team oder frei) und Stand je Team (je Mitglied) */
+  | { typ: 'karte'; spalten: number; felder: { sterne: number; team: number | null; neu?: boolean }[]; teams: (BBlockTeam & { wert: number })[] }
+  /** Klasse gegen Rekord: jetzt gegen bisher */
+  | { typ: 'rekord'; jetzt: number; bisher: number | null; richtig: number; quote: number | null }
+  /** Wett-Quiz: Treffsicherheit der Klasse je Einsatz (ohne Namen) */
+  | { typ: 'treffsicherheit'; stufen: { einsatz: number; anzahl: number; richtig: number }[] }
+  /** Turnier: Runde und Fortschritt der Tische (ohne Namen – die Tische sind nach Stärke gebildet) */
+  | { typ: 'tische'; runde: number; von: number; tische: { name: string; fertig: number; gesamt: number }[] }
 
 export interface KBasis {
   spiel: KlassenspielId
@@ -121,6 +129,8 @@ export interface KBasis {
   stat: Record<string, { r: number; f: number }>
   ticker: { nr: number; text: string; ton: 'gut' | 'info' | 'warn' }[]
   nr: number
+  /** Bisheriger Klassenrekord dieses Spiels (vom Server beim Start gesetzt) */
+  rekordBisher: { wert: number; text: string } | null
 }
 
 export interface KErgebnis {
@@ -142,6 +152,22 @@ export interface KlassenRegeln<Z extends KBasis = KBasis> {
   /** Bevorzugtes Item für diese Person (z. B. Boss-Angriff) – null = freie Wahl */
   vorschlag?(z: Z, wer: string): string | null
   nachAntwort(z: Z, wer: string, a: KAufgabe, richtig: boolean, p: number, jetzt: number): void
+  /** Eigene Aufgabe (Tisch, Team) statt der freien Wahl – null = freie Wahl */
+  aufgabeFuer?(z: Z, wer: string, jetzt: number): KAufgabe | null
+  /** Ziel-Wahrscheinlichkeit für diese Person (★ leichter, ★★★ schwerer) – null = ZIEL_P */
+  zielP?(z: Z, wer: string): number | null
+  /** false = noch keine Frage (erst eine Wahl im Kopf, z. B. Einsatz oder Sterne) */
+  frageZeigen?(z: Z, wer: string): boolean
+  /** Eigene Frage-Bausteine (Team-Puzzle: geteilte Karten) – null = Standard */
+  geraetFrage?(z: Z, wer: string, jetzt: number): Block[] | null
+  /** Ganze Antwort selbst werten (Team-Puzzle) – sonst `antworten` */
+  antwort?(z: Z, wer: string, wert: unknown, jetzt: number): { richtig: boolean } | null
+  /** Zug außerhalb der Antwort (Einsatz, Sterne) – true = angenommen */
+  zug?(z: Z, wer: string, aktion: string, wert: unknown, jetzt: number): boolean
+  /** Private Rückmeldung am Ende (nur für diese Person) */
+  eigenText?(z: Z, wer: string): string | null
+  /** Besonderes für Achievements (Tischsiege, gute Einschätzung) */
+  auszeichnung?(z: Z, wer: string): { tischSiege?: number; einschaetzung?: boolean }
   tick?(z: Z, jetzt: number): boolean
   beamer(z: Z, jetzt: number): BBlock[]
   /** Kopf am Gerät (Stand des Spiels, eigenes Team) */
@@ -179,7 +205,8 @@ export function kNeu(k: {
     verlauf: [],
     stat: {},
     ticker: [],
-    nr: 0
+    nr: 0,
+    rekordBisher: null
   }
 }
 
@@ -263,13 +290,13 @@ const pseudoBasis = (z: KBasis, inhalt: SpielInhalt): Basis =>
   ({ saat: z.saat, inhalt, jahrgang: z.jahrgang, tippen: false }) as unknown as Basis
 
 /** Frage zu Item und Stufe bauen (Antwortform: Stufe 1–2 auswählen, 3–4 schreiben – abgestimmt) */
-export function frageFuer(z: KBasis, item: SpielItem, bereich: 'vok' | 'gram', stufe: Stufe): Frage {
+export function frageFuer(z: KBasis, item: SpielItem, bereich: 'vok' | 'gram', stufe: Stufe, optionenZahl?: number): Frage {
   const inhalt = bereich === 'vok' ? z.inhalt.vok : z.inhalt.gram
   const pb = pseudoBasis(z, inhalt)
   let art: FragenArt = 'standard'
   if (bereich === 'vok') art = stufe === 1 ? 'erkennen' : stufe === 4 && item.vok?.luecke ? 'luecke' : 'abrufen'
   const tippen = stufe >= 3
-  const optionen = stufe === 1 ? 3 : 4
+  const optionen = optionenZahl ?? (stufe === 1 ? 3 : 4)
   const f = frageAus(pb, item, art, optionen, tippen)
   z.saat = (pb as unknown as { saat: number }).saat
   return f
@@ -289,13 +316,20 @@ const itemSuchen = (z: KBasis, id: string): { item: SpielItem; bereich: 'vok' | 
  *  3. sonst: adaptiv/level → Item und Stufe mit P(richtig) nahe ZIEL_P; fest → Bänder der Stufe zuerst.
  *  Kürzlich Gesehenes wird gemieden, Schwächen der Klasse (Vorrang) leicht bevorzugt.
  */
-export function naechsteAufgabe(z: KBasis, wer: string, jetzt: number, vorschlag?: string | null): KAufgabe | null {
+export function naechsteAufgabe(
+  z: KBasis,
+  wer: string,
+  jetzt: number,
+  vorschlag?: string | null,
+  opt: { stufen?: Stufe[]; zielP?: number | null; optionen?: number; meiden?: string[] } = {}
+): KAufgabe | null {
   const p = z.personen[wer]
   if (!p) return null
-  const erlaubt = erlaubteStufen(z)
+  const ziel = opt.zielP ?? ZIEL_P
+  const erlaubt = opt.stufen?.length ? opt.stufen : erlaubteStufen(z)
   const band = z.band[wer] ?? {}
   const vorrang = new Set(z.inhalt.vorrang)
-  const zuletzt = new Set(p.zuletzt)
+  const zuletzt = new Set([...p.zuletzt, ...(opt.meiden ?? [])])
 
   const bauen = (id: string, wunsch?: Stufe): KAufgabe | null => {
     const g = itemSuchen(z, id)
@@ -307,10 +341,10 @@ export function naechsteAufgabe(z: KBasis, wer: string, jetzt: number, vorschlag
     if (!wunsch) {
       // Stufe mit P nahe am Ziel
       stufe = [...stufen].sort(
-        (a, b) => Math.abs(wahrscheinlichkeit(p.theta, schwierigkeitVon(band[id], a)) - ZIEL_P) - Math.abs(wahrscheinlichkeit(p.theta, schwierigkeitVon(band[id], b)) - ZIEL_P)
+        (a, b) => Math.abs(wahrscheinlichkeit(p.theta, schwierigkeitVon(band[id], a)) - ziel) - Math.abs(wahrscheinlichkeit(p.theta, schwierigkeitVon(band[id], b)) - ziel)
       )[0]
     }
-    return { nr: ++z.nr, item: id, bereich: g.bereich, stufe, frage: frageFuer(z, g.item, g.bereich, stufe), b: schwierigkeitVon(band[id], stufe), seit: jetzt }
+    return { nr: ++z.nr, item: id, bereich: g.bereich, stufe, frage: frageFuer(z, g.item, g.bereich, stufe, opt.optionen), b: schwierigkeitVon(band[id], stufe), seit: jetzt }
   }
 
   // 1. Wiederholung
@@ -349,7 +383,7 @@ export function naechsteAufgabe(z: KBasis, wer: string, jetzt: number, vorschlag
         const ord = BAND_FEST[z.einst.feste]
         const bnd = band[i.id]
         wert = (bnd ? (ord.indexOf(bnd) < 0 ? 3 : ord.indexOf(bnd)) : 1) * 0.3
-      } else wert = Math.abs(wahrscheinlichkeit(p.theta, schwierigkeitVon(band[i.id], s)) - ZIEL_P)
+      } else wert = Math.abs(wahrscheinlichkeit(p.theta, schwierigkeitVon(band[i.id], s)) - ziel)
       wert += neu + vor + zufall(z) * 0.12
       if (!best || wert < best.wert) best = { id: i.id, stufe: s, wert }
     }
@@ -360,16 +394,44 @@ export function naechsteAufgabe(z: KBasis, wer: string, jetzt: number, vorschlag
   return irgend ? bauen(irgend.id) : null
 }
 
+/** Aufgabe zu einem bestimmten Item und einer Stufe (Tisch: alle bekommen dasselbe; Optionen je Gerät neu gemischt) */
+export function aufgabeBauen(z: KBasis, wer: string, id: string, stufe: Stufe, jetzt: number, optionen?: number): KAufgabe | null {
+  const g = itemSuchen(z, id)
+  if (!g) return null
+  return { nr: ++z.nr, item: id, bereich: g.bereich, stufe, frage: frageFuer(z, g.item, g.bereich, stufe, optionen), b: schwierigkeitVon(z.band[wer]?.[id], stufe), seit: jetzt }
+}
+
+/** Nächste Aufgabe nach den Regeln (eigene Aufgabe des Spiels, sonst freie Wahl mit Vorschlag und Ziel-P) */
+export function neueAufgabe<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer: string, jetzt: number): KAufgabe | null {
+  if (regeln.aufgabeFuer) {
+    const a = regeln.aufgabeFuer(z, wer, jetzt)
+    if (a) return a
+  }
+  return naechsteAufgabe(z, wer, jetzt, regeln.vorschlag?.(z, wer), { zielP: regeln.zielP?.(z, wer) ?? null })
+}
+
 // ---------------------------------------------------------------- Antworten
 
 /** FAUSTREGEL: Verbesserungspunkte = 4 + 8 · (1 − P) – wer gegen das eigene Niveau Schweres schafft, bekommt mehr */
 export const punkteFuer = (p: number): number => Math.round(4 + 8 * (1 - p))
 
 export function antworten<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer: string, wert: unknown, jetzt: number): { richtig: boolean } | null {
+  if (z.ende || z.pause !== null) return null
+  if (regeln.antwort) return regeln.antwort(z, wer, wert, jetzt)
   const p = z.personen[wer]
   const a = p?.aufgabe
-  if (!p || !a || z.ende || z.pause !== null) return null
+  if (!p || !a) return null
+  if (regeln.frageZeigen && !regeln.frageZeigen(z, wer)) return null
   const richtig = antwortRichtig(a.frage, wert)
+  verbuchen(z, regeln, wer, a, richtig, jetzt)
+  p.aufgabe = z.ende ? null : neueAufgabe(z, regeln, wer, jetzt)
+  return { richtig }
+}
+
+/** Eine gewertete Antwort verbuchen: Elo, Punkte, Fehler, Wiederholung, Statistik, Regeln */
+export function verbuchen<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer: string, a: KAufgabe, richtig: boolean, jetzt: number): void {
+  const p = z.personen[wer]
+  if (!p) return
   const prob = wahrscheinlichkeit(p.theta, a.b)
   p.theta = eloSchritt(p.theta, a.b, richtig, p.n)
   p.n++
@@ -391,8 +453,6 @@ export function antworten<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer:
   p.zuletzt = [...p.zuletzt, a.item].slice(-8)
   z.verlauf = [...z.verlauf, { zeit: jetzt, richtig, wer }].slice(-300)
   regeln.nachAntwort(z, wer, a, richtig, prob, jetzt)
-  p.aufgabe = z.ende ? null : naechsteAufgabe(z, wer, jetzt, regeln.vorschlag?.(z, wer))
-  return { richtig }
 }
 
 /** Quote der letzten `n` Antworten der Klasse (null = zu wenige) */
@@ -439,7 +499,11 @@ export function geraetSicht<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, we
   const aus: Block[] = [...regeln.geraet(z, wer, jetzt)]
   if (z.pause !== null) return [...aus, { typ: 'text', text: '⏸', gross: true }]
   if (p.rueck) aus.push({ typ: 'text', text: p.rueck.richtig ? tx(z, 'richtig') : tx(z, 'richtigIst', p.rueck.loesung ?? ''), ton: p.rueck.richtig ? 'gut' : 'schlecht' })
-  if (!p.aufgabe && !z.ende) p.aufgabe = naechsteAufgabe(z, wer, jetzt, regeln.vorschlag?.(z, wer))
+  if (z.ende) return aus
+  const eigene = regeln.geraetFrage?.(z, wer, jetzt)
+  if (eigene) return [...aus, ...eigene]
+  if (regeln.frageZeigen && !regeln.frageZeigen(z, wer)) return aus
+  if (!p.aufgabe) p.aufgabe = neueAufgabe(z, regeln, wer, jetzt)
   if (p.aufgabe && !z.ende) aus.push(frageBlock(p.aufgabe.frage, 'antwort', false, p.aufgabe.bereich === 'vok' && p.aufgabe.stufe !== 1 ? z.sprache : undefined))
   return aus
 }

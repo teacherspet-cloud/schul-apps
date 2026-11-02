@@ -72,12 +72,19 @@ const api = (c) => ({
 })
 /** Eine Antwort über die Schnittstelle: Möglichkeit mit Index `i` (falsch bei „###") */
 async function antwortApi(c, code, wahl = 0) {
-  const s = (await api(c).get(`/s/api/klassenspiel/zustand?code=${code}`)).sicht
+  let s = (await api(c).get(`/s/api/klassenspiel/zustand?code=${code}`)).sicht
+  // Erst eine Wahl (Einsatz im Wett-Quiz, Sterne in der Gebietseroberung)
+  const kn = s?.bloecke?.find((b) => b.typ === 'knoepfe')
+  if (kn) {
+    const k0 = kn.knoepfe[(typeof wahl === 'number' ? wahl : 0) % kn.knoepfe.length]
+    s = (await api(c).post('/s/api/klassenspiel/zug', { code, aktion: k0.aktion, wert: k0.wert })).sicht
+  }
   const f = s?.bloecke?.find((b) => b.typ === 'frage')
-  if (!f) return false
+  if (!f || !f.optionen) return false
+  if (!f.tippen && !f.optionen.length) return false
   const wert = f.tippen ? (wahl === 'falsch' ? '###' : 'x') : f.optionen[typeof wahl === 'number' ? wahl % f.optionen.length : 0]
   const r = await api(c).post('/s/api/klassenspiel/antwort', { code, wert, nr: s.aufgabeNr })
-  return r.status === 200
+  return r.status === 200 ? f.frage || true : false
 }
 
 try {
@@ -112,7 +119,7 @@ try {
   // ---------- Angebot
   const ang = await api(lk).get(`/server/klassenspiel?kurs=${vok.id}`)
   const spielbar = (ang.spiele ?? []).filter((s) => s.spielbar).map((s) => s.id)
-  pruefe(['expedition', 'boss', 'rennen'].every((x) => spielbar.includes(x)), `Spielbar: ${spielbar.join(', ')} (${(ang.spiele ?? []).length} Spiele insgesamt)`)
+  pruefe(spielbar.length === 8, `Alle 8 Spiele spielbar: ${spielbar.join(', ')}`)
   pruefe(ang.lernende === 4 && (ang.eintraege ?? []).some((e) => e.art === 'gram'), `Kurs: ${ang.lernende} Lernende, Abschnitte und Grammatik zur Auswahl`)
 
   // ---------- Lehrkraft: Meine Klassen › Klasse › Englisch › Klassenspiel
@@ -219,7 +226,12 @@ try {
   for (const [spiel, schwierigkeit] of [
     ['expedition', 'level'],
     ['boss', 'adaptiv'],
-    ['rennen', 'fest']
+    ['rennen', 'fest'],
+    ['puzzle', 'adaptiv'],
+    ['rekord', 'adaptiv'],
+    ['gebiet', 'adaptiv'],
+    ['turnier', 'adaptiv'],
+    ['wette', 'level']
   ]) {
     const n = await api(lk).post('/server/klassenspiel/neu', { kurs: vok.id, einstellungen: { spiel, schwierigkeit, dauer: 3, teams: 3, gram: true, vok: true } })
     if (!n.code) {
@@ -231,19 +243,84 @@ try {
     let gram = false
     for (let i = 0; i < 10; i++)
       for (const c of [Mia, Ben, Lea, Noah]) {
-        const s = (await api(c).get(`/s/api/klassenspiel/zustand?code=${n.code}`)).sicht
-        const f = s?.bloecke?.find((b) => b.typ === 'frage')
-        if (f && /Yesterday/.test(f.frage)) gram = true
-        await antwortApi(c, n.code, i)
+        // Die Frage, die wirklich beantwortet wurde (bei Gebiet/Wett-Quiz erst nach der Wahl)
+        const frage = await antwortApi(c, n.code, i)
+        if (typeof frage === 'string' && /Yesterday/.test(frage)) gram = true
       }
     const sicht = (await api(lk).get(`/server/klassenspiel/${n.code}/zustand`)).sicht
-    pruefe(st.status === 200 && sicht?.phase === 'spiel' && sicht.bloecke?.length > 0, `${spiel} (${schwierigkeit}): läuft, Beamer-Bausteine ${sicht?.bloecke?.map((b) => b.typ).join('/')}`)
-    pruefe(gram, `${spiel}: Grammatik kommt mit Vokabeln gemischt dran`)
+    // Turnier: nach allen Runden regulär zu Ende
+    pruefe(st.status === 200 && (sicht?.phase === 'spiel' || (spiel === 'turnier' && sicht?.phase === 'ende')) && sicht.bloecke?.length > 0, `${spiel} (${schwierigkeit}): läuft, Beamer-Bausteine ${sicht?.bloecke?.map((b) => b.typ).join('/')}`)
+    // Team-Puzzle stellt eine Teamfrage – Grammatik kommt dort nicht zwingend in 10 Zügen
+    if (spiel !== 'puzzle') pruefe(gram, `${spiel}: Grammatik kommt mit Vokabeln gemischt dran`)
+    const n2 = sicht?.personen?.reduce((x, p) => x + p.n, 0) ?? 0
+    pruefe(n2 >= 10, `${spiel}: ${n2} Antworten gewertet`)
     pruefe(!JSON.stringify(sicht.bloecke).includes('loesung'), `${spiel}: keine Lösung am Beamer`)
+    if (spiel === 'gebiet' || spiel === 'wette' || spiel === 'turnier' || spiel === 'rekord') {
+      const typ = { gebiet: 'karte', wette: 'treffsicherheit', turnier: 'tische', rekord: 'rekord' }[spiel]
+      pruefe(sicht?.bloecke?.some((b) => b.typ === typ), `${spiel}: Beamer zeigt „${typ}"`)
+    }
     const e = await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'ende' })
+    if (spiel === 'wette') {
+      const m = (await api(Mia).get(`/s/api/klassenspiel/zustand?code=${n.code}`)).sicht
+      pruefe(/Einsatz \d/.test(m?.ergebnis?.eigenText ?? ''), `Wett-Quiz: private Rückmeldung „${(m?.ergebnis?.eigenText ?? '').slice(0, 70)}"`)
+    }
     pruefe(Boolean(e.sicht?.ergebnis?.text), `${spiel}: Ergebnis „${e.sicht?.ergebnis?.text}"${e.sicht?.ergebnis?.rekord?.neu ? ' · neuer Klassenrekord' : ''}`)
     await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'schliessen' })
   }
+  // ---------- Browser: Gebietseroberung (Sterne wählen) und Beamer-Karte
+  {
+    const n = await api(lk).post('/server/klassenspiel/neu', { kurs: vok.id, einstellungen: { spiel: 'gebiet', dauer: 5, teams: 2 } })
+    for (const c of [Mia, Ben, Lea, Noah]) await api(c).post('/s/api/klassenspiel/beitreten', { code: n.code })
+    await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'losen' })
+    await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'start' })
+    await mp.goto(`${A}/s/ks/${n.code}`)
+    pruefe(await da(mp.locator('[data-mehr-knopf="sterne"]').first()), 'Gebiet: Mia wählt erst die Sterne')
+    await mp.screenshot({ path: join(out, '11-gebiet-sterne.png') })
+    await mp.locator('[data-mehr-knopf="sterne"]').nth(2).click()
+    pruefe(await da(mp.locator('[data-mehr-frage]')), 'Gebiet: danach kommt die Frage')
+    for (let i = 0; i < 6; i++) for (const c of [Ben, Lea, Noah]) await antwortApi(c, n.code, i)
+    await p.locator('[data-klassenspiel-schliessen]').isVisible().catch(() => false)
+    // Beamer der Lehrkraft für dieses Spiel: Startfenster → „Zum laufenden Spiel"
+    await p.goto(A)
+    await p.waitForTimeout(2000)
+    await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
+    await p.locator(`[data-klasse="${K}"]`).first().click()
+    await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
+    await p.locator('[data-klassenspiel-knopf]').click()
+    await p.locator('[data-klassenspiel-zurueck]').click()
+    pruefe(await da(p.locator('[data-beamer-karte]')), 'Beamer zeigt die Karte (über „Zum laufenden Spiel")')
+    await p.waitForTimeout(800)
+    await p.screenshot({ path: join(out, '12-beamer-gebiet.png') })
+    await p.locator('[data-klassenspiel-schliessen]').click()
+  }
+  // ---------- Browser: Wett-Quiz (Einsatz, Ende mit privater Rückmeldung)
+  {
+    const n = await api(lk).post('/server/klassenspiel/neu', { kurs: vok.id, einstellungen: { spiel: 'wette', dauer: 5 } })
+    for (const c of [Mia, Ben, Lea, Noah]) await api(c).post('/s/api/klassenspiel/beitreten', { code: n.code })
+    await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'start' })
+    await mp.goto(`${A}/s/ks/${n.code}`)
+    for (let i = 0; i < 4; i++) {
+      await mp.locator('[data-mehr-knopf="einsatz"]').nth(i % 3).click({ timeout: 8000 })
+      await mp.locator('[data-mehr-frage]').waitFor({ timeout: 8000 })
+      if (i === 0) await mp.screenshot({ path: join(out, '13-wette-frage.png') })
+      const opt = mp.locator('[data-mehr-option]')
+      if (await opt.count()) await opt.first().click()
+      else {
+        await mp.locator('[data-mehr-eingabe]').fill('###')
+        await mp.locator('[data-mehr-eingabe]').press('Enter')
+      }
+      await mp.waitForTimeout(300)
+    }
+    await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'ende' })
+    pruefe(await da(mp.locator('[data-klasse-eigen-text]')), 'Wett-Quiz: Mia sieht ihre Treffsicherheit (privat)')
+    await mp.screenshot({ path: join(out, '14-wette-ende.png') })
+    await api(lk).post(`/server/klassenspiel/${n.code}/steuern`, { aktion: 'schliessen' })
+  }
+  // Achievements der Klassenspiele
+  const ach = await api(Mia).get('/s/api/achievements')
+  const ids = JSON.stringify(ach)
+  pruefe(ids.includes('klasse-erste'), 'Achievement „Ganze Klasse, ein Spiel" erscheint')
+
   const ang2 = await api(lk).get(`/server/klassenspiel?kurs=${vok.id}`)
   pruefe(Object.keys(ang2.rekorde ?? {}).length >= 2, `Klassenrekorde gespeichert: ${Object.entries(ang2.rekorde ?? {}).map(([k, v]) => `${k}=${v.text}`).join(', ')}`)
 } catch (e) {

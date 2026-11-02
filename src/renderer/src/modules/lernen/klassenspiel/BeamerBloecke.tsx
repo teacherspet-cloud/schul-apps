@@ -127,6 +127,140 @@ function Bahnen({ b }: { b: Extract<BBlock, { typ: 'bahnen' }> }): React.JSX.Ele
   )
 }
 
+/** Gebietseroberung: Karte mit Sternfeldern in Teamfarben, frisch Erobertes leuchtet kurz */
+function Karte({ b }: { b: Extract<BBlock, { typ: 'karte' }> }): React.JSX.Element {
+  return (
+    <Stack gap="md" data-beamer-karte={b.felder.filter((f) => f.team !== null).length}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${b.spalten}, 1fr)`, gap: 6, maxWidth: 'min(100%, 120vh)', margin: '0 auto', width: '100%' }}>
+        {b.felder.map((f, i) => {
+          const t = f.team !== null ? b.teams[f.team] : null
+          return (
+            <div
+              key={i}
+              style={{
+                aspectRatio: '1.35',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 'min(3.2vh, 26px)',
+                fontWeight: 900,
+                background: t ? `var(--mantine-color-${t.farbe}-filled)` : 'var(--mantine-color-default)',
+                color: t ? '#fff' : 'var(--mantine-color-dimmed)',
+                border: '2px solid var(--mantine-color-default-border)',
+                boxShadow: f.neu ? '0 0 0 4px #facc15' : undefined,
+                transition: 'background .4s'
+              }}
+            >
+              {t ? t.symbol : '★'.repeat(f.sterne)}
+            </div>
+          )
+        })}
+      </div>
+      <SimpleGrid cols={Math.max(1, b.teams.length)} spacing="md">
+        {b.teams.map((t) => (
+          <Paper key={t.name} radius="lg" p="sm" withBorder ta="center" style={{ borderTop: `6px solid var(--mantine-color-${t.farbe}-filled)` }}>
+            <Text fw={900} size="xl" c={t.farbe}>
+              {t.symbol} {t.name}
+            </Text>
+            <Text fw={800} size="1.6rem">
+              {t.wert} ★ je Kopf
+            </Text>
+          </Paper>
+        ))}
+      </SimpleGrid>
+    </Stack>
+  )
+}
+
+/** Klasse gegen den Rekord: zwei Balken (jetzt / Rekord) */
+function Rekord({ b }: { b: Extract<BBlock, { typ: 'rekord' }> }): React.JSX.Element {
+  const max = Math.max(1, b.jetzt, b.bisher ?? 0) * 1.1
+  const zahl = (w: number): string => (w / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return (
+    <Paper radius="lg" p="lg" withBorder data-beamer-rekord={b.jetzt}>
+      <Stack gap="lg">
+        <div>
+          <Group justify="space-between">
+            <Text fw={900} size="2rem">
+              🏁 Jetzt
+            </Text>
+            <Text fw={900} size="2.6rem" c={b.bisher !== null && b.jetzt > b.bisher ? 'teal' : undefined}>
+              {zahl(b.jetzt)}
+            </Text>
+          </Group>
+          <Progress value={(b.jetzt / max) * 100} size={34} radius="xl" color="teal" />
+        </div>
+        <div>
+          <Group justify="space-between">
+            <Text fw={800} size="1.6rem" c="dimmed">
+              🏆 Rekord der Klasse
+            </Text>
+            <Text fw={800} size="2rem" c="dimmed">
+              {b.bisher === null ? 'noch keiner' : zahl(b.bisher)}
+            </Text>
+          </Group>
+          <Progress value={b.bisher === null ? 0 : (b.bisher / max) * 100} size={34} radius="xl" color="yellow" />
+        </div>
+        <Text ta="center" size="lg" c="dimmed">
+          Punkte je Kind und Minute = Treffer × Sorgfalt · {b.richtig} richtig{b.quote !== null ? ` · ${Math.round(b.quote * 100)} % Sorgfalt` : ''}
+        </Text>
+      </Stack>
+    </Paper>
+  )
+}
+
+/** Wett-Quiz: Treffsicherheit der Klasse je Einsatz */
+function Treffsicherheit({ b }: { b: Extract<BBlock, { typ: 'treffsicherheit' }> }): React.JSX.Element {
+  const NAMEN: Record<number, string> = { 1: '1 – unsicher', 2: '2 – ziemlich sicher', 3: '3 – ganz sicher' }
+  return (
+    <Paper radius="lg" p="lg" withBorder data-beamer-treffsicherheit>
+      <Text fw={900} size="1.8rem" mb="md">
+        Wie gut schätzt sich die Klasse ein?
+      </Text>
+      <Stack gap="md">
+        {b.stufen.map((x) => {
+          const q = x.anzahl ? x.richtig / x.anzahl : 0
+          return (
+            <div key={x.einsatz}>
+              <Group justify="space-between">
+                <Text fw={800} size="xl">
+                  Einsatz {NAMEN[x.einsatz]}
+                </Text>
+                <Text fw={800} size="xl">
+                  {x.anzahl ? `${Math.round(q * 100)} % richtig (${x.anzahl}×)` : '–'}
+                </Text>
+              </Group>
+              <Progress value={q * 100} size={28} radius="xl" color={['gray', 'blue', 'grape'][x.einsatz - 1]} />
+            </div>
+          )
+        })}
+      </Stack>
+      <Text c="dimmed" mt="md" size="lg">
+        Gut eingeschätzt heißt: Je höher der Einsatz, desto öfter richtig.
+      </Text>
+    </Paper>
+  )
+}
+
+/** Turnier: Runde und Fortschritt der Tische (ohne Namen) */
+function Tische({ b }: { b: Extract<BBlock, { typ: 'tische' }> }): React.JSX.Element {
+  return (
+    <Paper radius="lg" p="md" withBorder data-beamer-tische={b.runde}>
+      <Text fw={900} size="1.6rem" mb="sm">
+        Runde {b.runde} von {b.von}
+      </Text>
+      <Group gap="sm">
+        {b.tische.map((t) => (
+          <Badge key={t.name} size="xl" variant={t.fertig === t.gesamt ? 'filled' : 'light'} color={t.fertig === t.gesamt ? 'teal' : 'blue'} tt="none" h="auto" py={8}>
+            {t.name} · {t.fertig}/{t.gesamt} fertig
+          </Badge>
+        ))}
+      </Group>
+    </Paper>
+  )
+}
+
 export function TeamKarten({ teams, gross = true }: { teams: { name: string; farbe: string; symbol: string; mitglieder: string[] }[]; gross?: boolean }): React.JSX.Element {
   return (
     <SimpleGrid cols={{ base: 1, sm: Math.min(3, teams.length) }} spacing="md" data-beamer-teams={teams.length}>
@@ -221,6 +355,14 @@ export function BeamerBloecke({ bloecke }: { bloecke: BBlock[] }): React.JSX.Ele
             )
           case 'podest':
             return <Podest key={i} titel={b.titel} plaetze={b.plaetze} />
+          case 'karte':
+            return <Karte key={i} b={b} />
+          case 'rekord':
+            return <Rekord key={i} b={b} />
+          case 'treffsicherheit':
+            return <Treffsicherheit key={i} b={b} />
+          case 'tische':
+            return <Tische key={i} b={b} />
           case 'text':
             return (
               <Text key={i} fw={b.gross ? 900 : 600} size={b.gross ? '2rem' : 'lg'} c={b.ton ? TON[b.ton] : undefined} ta="center">

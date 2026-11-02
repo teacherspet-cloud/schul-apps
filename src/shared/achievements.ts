@@ -70,6 +70,17 @@ export interface AchZaehler {
   unmoeglich: number
   /** Bitmaske der ausprobierten Spielarten (shared/mehrspieler/typen.ts SPIELART_BIT) */
   spielarten: number
+  // Klassenspiele der Lehrkraft (02.11.2026, server/klassenspiel.ts)
+  /** Klassenspiele mitgespielt (mit eigener Antwort) */
+  klassenRunden?: number
+  klassenBoss?: number
+  klassenGipfel?: number
+  /** Klassenrekord mit der Klasse gebrochen */
+  klassenRekorde?: number
+  /** Turnier-Tische: Tischsiege (Runde am eigenen Tisch gewonnen) */
+  klassenTische?: number
+  /** Wett-Quiz: gut eingeschätzt (höherer Einsatz → öfter richtig, „ganz sicher" ≥ 80 %) */
+  klassenEinschaetzung?: number
 }
 export const LEERE_ZAEHLER: AchZaehler = {
   rekordeGebrochen: 0,
@@ -86,7 +97,13 @@ export const LEERE_ZAEHLER: AchZaehler = {
   faireSiege: 0,
   comebackSiege: 0,
   unmoeglich: 0,
-  spielarten: 0
+  spielarten: 0,
+  klassenRunden: 0,
+  klassenBoss: 0,
+  klassenGipfel: 0,
+  klassenRekorde: 0,
+  klassenTische: 0,
+  klassenEinschaetzung: 0
 }
 
 /** Anzahl gesetzter Bits (ausprobierte Spielarten) */
@@ -384,6 +401,23 @@ export function berechneAchievements(e: AchEingabe): Achievement[] {
   neu('unmoeglich', 'zusammen', 'gold', '„Unmöglich“ geschafft', 'Auf der Stufe „unmöglich“ das Ziel erreicht.', z.unmoeglich, 1, true)
   neu('alle-spielarten', 'zusammen', 'gold', 'Alle Kernspiele ausprobiert', 'Jedes der Kernspiele zum gemeinsamen Spielen einmal gespielt.', bitZahl(z.spielarten & KERNSPIELE_BITS), bitZahl(KERNSPIELE_BITS))
   neu('viele-spielarten', 'zusammen', 'gold', '15 Zusammen-Spiele ausprobiert', '15 verschiedene Spiele mit anderen gespielt.', bitZahl(z.spielarten), 15)
+  // Klassenspiele (02.11.2026): mit der ganzen Klasse
+  neu('klasse-erste', 'zusammen', 'bronze', 'Ganze Klasse, ein Spiel', 'Zum ersten Mal bei einem Klassenspiel mitgespielt.', z.klassenRunden ?? 0)
+  neu('klasse-boss', 'zusammen', 'silber', 'Boss besiegt', 'Mit der Klasse einen Boss besiegt.', z.klassenBoss ?? 0)
+  neu('klasse-gipfel', 'zusammen', 'silber', 'Gipfel erreicht', 'Mit der Klasse den Gipfel der Expedition erreicht.', z.klassenGipfel ?? 0)
+  neu('klasse-rekord', 'zusammen', 'gold', 'Klassenrekord', 'Mit der Klasse einen neuen Klassenrekord aufgestellt.', z.klassenRekorde ?? 0)
+  stufen(
+    'klasse-tisch',
+    'zusammen',
+    z.klassenTische ?? 0,
+    [
+      [1, 'bronze'],
+      [5, 'silber']
+    ],
+    (n) => (n === 1 ? 'Tischsieg' : `${n} Tischsiege`),
+    (n) => (n === 1 ? 'Eine Turnierrunde am eigenen Tisch gewonnen – gegen Gleichstarke.' : `${n} Turnierrunden am eigenen Tisch gewonnen – gegen Gleichstarke.`)
+  )
+  neu('klasse-einschaetzung', 'zusammen', 'silber', 'Gut eingeschätzt', 'Im Wett-Quiz gewusst, wie sicher du bist: hoher Einsatz meist richtig.', z.klassenEinschaetzung ?? 0)
 
   // 7. Besonderes
   stufen(

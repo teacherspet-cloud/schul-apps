@@ -37,6 +37,7 @@ interface Sicht {
     siegerTeams: number[]
     top3: { name: string; ich: boolean }[]
     eigen: { richtig: number; falsch: number; punkte: number; gewonnen: boolean | null } | null
+    eigenText?: string | null
     rekord: string | null
   }
 }
@@ -98,8 +99,9 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
   })
   const antwort = useCallback(
     (aktion: string, wert?: unknown): void => {
-      if (aktion !== 'antwort') return
-      void liveSenden<Sicht>('/s/api/klassenspiel/antwort', { code, wert, nr: s?.aufgabeNr ?? 0 }, setSicht, setFehler, 15000)
+      // Antwort auf die Frage – oder ein Zug davor (Einsatz im Wett-Quiz, Sterne in der Gebietseroberung)
+      if (aktion === 'antwort') void liveSenden<Sicht>('/s/api/klassenspiel/antwort', { code, wert, nr: s?.aufgabeNr ?? 0 }, setSicht, setFehler, 15000)
+      else void liveSenden<Sicht>('/s/api/klassenspiel/zug', { code, aktion, wert }, setSicht, setFehler, 15000)
     },
     [code, s?.aufgabeNr, setSicht, setFehler]
   )
@@ -183,6 +185,11 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                     {s.ergebnis.eigen.richtig} richtig · {s.ergebnis.eigen.falsch} falsch · {s.ergebnis.eigen.punkte} Verbesserungspunkte
                   </Text>
                   {s.ergebnis.eigen.gewonnen && <Text c="teal">Dein Team hat gewonnen!</Text>}
+                  {s.ergebnis.eigenText && (
+                    <Text size="sm" mt={4} data-klasse-eigen-text>
+                      {s.ergebnis.eigenText}
+                    </Text>
+                  )}
                   {s.ergebnis.eigen.falsch > 0 && (
                     <Text size="sm" c="dimmed" mt={4}>
                       Was falsch war, kommt beim Üben bald wieder dran.

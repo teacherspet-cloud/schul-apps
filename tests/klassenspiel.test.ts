@@ -57,11 +57,29 @@ function simuliere(z: KBasis, id: KlassenspielId, schritte: number, faehig: (wer
   for (let k = 0; k < schritte && !z.ende; k++) {
     for (const wer of Object.keys(z.personen)) {
       if (z.ende) break
-      geraetSicht(z, r, wer, t)
-      const a = z.personen[wer].aufgabe!
-      const ok = zufall() < wahrscheinlichkeit(faehig(wer), a.b)
-      antworten(z, r, wer, ok ? a.frage.loesung : '###', (t += 200))
+      let sicht = geraetSicht(z, r, wer, t)
+      const knopf = sicht.find((b) => b.typ === 'knoepfe') as { knoepfe: { aktion: string; wert?: string }[] } | undefined
+      if (knopf && r.zug) {
+        const k0 = knopf.knoepfe[Math.floor(zufall() * knopf.knoepfe.length)]
+        r.zug(z, wer, k0.aktion, k0.wert, t)
+        sicht = geraetSicht(z, r, wer, t)
+      }
+      const a = z.personen[wer].aufgabe
+      if (a && !r.geraetFrage) {
+        if (r.frageZeigen && !r.frageZeigen(z, wer)) continue
+        const ok = zufall() < wahrscheinlichkeit(faehig(wer), a.b)
+        antworten(z, r, wer, ok ? a.frage.loesung : '###', (t += 200))
+      } else {
+        // Geteilte Karten: die eigene richtige Karte nur mit der Wahrscheinlichkeit, sonst eine andere eigene
+        const f = sicht.find((b) => b.typ === 'frage') as { optionen: string[] } | undefined
+        if (!f?.optionen.length) continue
+        const loesung = (z as unknown as { frage: ({ aufgabe: { frage: { loesung: string } } } | null)[] }).frage?.[z.personen[wer].team]?.aufgabe.frage.loesung
+        const ok = zufall() < wahrscheinlichkeit(faehig(wer), 0)
+        const wahl = ok && loesung && f.optionen.includes(loesung) ? loesung : f.optionen.find((o) => o !== loesung) ?? f.optionen[0]
+        antworten(z, r, wer, wahl, (t += 200))
+      }
     }
+    t += 1000
     kTakt(z, r, t)
   }
 }
@@ -119,24 +137,27 @@ describe('Klassenspiele – Teams', () => {
 })
 
 describe('Klassenspiele – Spiele mit 30 Kindern', () => {
-  for (const id of ['expedition', 'boss', 'rennen'] as KlassenspielId[]) {
+  for (const id of ['expedition', 'boss', 'rennen', 'puzzle', 'rekord', 'gebiet', 'turnier', 'wette'] as KlassenspielId[]) {
     it(`${id}: läuft, Sichten ohne Lösung bis zur Antwort, Ergebnis`, () => {
       const z = spiel(id, 30, { teams: 3 })
       const r = KLASSEN_REGELN[id]!
       // Vor der Antwort: Lösung steht nirgends in der Sicht (Schreiben: keine Optionen)
       const sicht = geraetSicht(z, r, 'p1', 0)
-      const a = z.personen.p1.aufgabe!
+      const a = z.personen.p1.aufgabe
       const frage = sicht.find((b) => b.typ === 'frage') as { optionen: string[] } | undefined
-      expect(frage).toBeTruthy()
-      if (a.stufe >= 3) expect(JSON.stringify(sicht)).not.toContain(`"${a.frage.loesung}"`)
+      const wahl = sicht.find((b) => b.typ === 'knoepfe')
+      expect(Boolean(frage || wahl)).toBe(true)
+      if (a && a.stufe >= 3 && frage) expect(JSON.stringify(sicht)).not.toContain(`"${a.frage.loesung}"`)
       simuliere(z, id, 60, (w) => Number(w.slice(1)) / 15)
       const e = r.ergebnis(z)
       expect(e.text.length).toBeGreaterThan(5)
       expect(JSON.stringify(r.beamer(z, 0))).not.toContain('"loesung"')
-      if (id === 'rennen') {
+      if (id === 'rennen' || id === 'gebiet') {
         expect(z.teams).toHaveLength(3)
         expect(e.teams).toHaveLength(3)
       }
+      // Es wurde wirklich gespielt
+      expect(Object.values(z.personen).reduce((s, p) => s + p.n, 0)).toBeGreaterThan(30)
       // Top 3: nie mehr als drei, nie ein letzter Platz
       expect(top3(z).length).toBeLessThanOrEqual(3)
     })
@@ -182,5 +203,93 @@ describe('Klassenspiele – Kennungen und Einstellungen', () => {
     const a = naechsteAufgabe(z, 'p0', 0)!
     z.personen.p0.zuletzt = [a.item]
     expect(naechsteAufgabe(z, 'p0', 0)!.item).not.toBe(a.item)
+  })
+})
+
+describe('Klassenspiele – Stufe B', () => {
+  it('Team-Puzzle: Karten verteilt, genau ein Gerät hat die richtige', () => {
+    const z = spiel('puzzle', 11) as KBasis & { frage: ({ aufgabe: { frage: { loesung: string; optionen: string[] } }; karten: Record<string, string[]> } | null)[] }
+    expect(z.teams.length).toBeGreaterThanOrEqual(3)
+    for (const f of z.frage) {
+      expect(f).toBeTruthy()
+      const alle = Object.values(f!.karten).flat()
+      expect(alle.sort()).toEqual([...f!.aufgabe.frage.optionen].sort())
+      expect(Object.values(f!.karten).filter((k) => k.includes(f!.aufgabe.frage.loesung))).toHaveLength(1)
+      expect(Object.values(f!.karten).every((k) => k.length >= 1)).toBe(true)
+    }
+  })
+  it('Team-Puzzle: falsch kostet zwei Schritte, richtig bringt einen', () => {
+    const z = spiel('puzzle', 6) as KBasis & { schritte: number[]; frage: ({ aufgabe: { frage: { loesung: string } }; karten: Record<string, string[]> } | null)[] }
+    const r = KLASSEN_REGELN.puzzle!
+    const f = z.frage[0]!
+    const [werR] = Object.entries(f.karten).find(([, k]) => k.includes(f.aufgabe.frage.loesung))!
+    antworten(z, r, werR, f.aufgabe.frage.loesung, 1)
+    expect(z.schritte[0]).toBe(1)
+    const g = z.frage[0]!
+    const [werF, kF] = Object.entries(g.karten).find(([, k]) => k.some((o) => o !== g.aufgabe.frage.loesung))!
+    antworten(z, r, werF, kF.find((o) => o !== g.aufgabe.frage.loesung), 2)
+    expect(z.schritte[0]).toBe(0)
+    // Fremde Karte zählt nicht
+    expect(antworten(z, r, werF, 'gibt es nicht', 3)).toBeNull()
+  })
+  it('Turnier: Runde endet, wenn alle Tische fertig sind; Punkte 6/4/2; neu gesetzt', () => {
+    const z = spiel('turnier', 9) as KBasis & { runde: number; punkte: number[]; tischRunde: { fragen: unknown[] }[] }
+    const r = KLASSEN_REGELN.turnier!
+    expect(z.tische.flat()).toHaveLength(9)
+    expect(z.tischRunde.every((t) => t.fragen.length === 5)).toBe(true)
+    for (let k = 0; k < 5; k++)
+      for (const wer of Object.keys(z.personen)) {
+        geraetSicht(z, r, wer, k)
+        const a = z.personen[wer].aufgabe!
+        antworten(z, r, wer, Number(wer.slice(1)) % 3 === 0 ? a.frage.loesung : '###', k)
+      }
+    expect(z.runde).toBe(2)
+    // 3 Tische × (6 + 4 + 2) bzw. geteilte Plätze – Summe bleibt 36
+    expect(z.punkte.reduce((s, x) => s + x, 0)).toBeCloseTo(36)
+  })
+  it('Tische mit allen gleich schnell: alle bekommen dieselbe Frage', () => {
+    const z = spiel('turnier', 6) as KBasis & { tischRunde: { fragen: { item: string }[] }[] }
+    const r = KLASSEN_REGELN.turnier!
+    const tisch = z.tische[0]
+    const items = tisch.map((wer) => (geraetSicht(z, r, wer, 0), z.personen[wer].aufgabe!.item))
+    expect(new Set(items).size).toBe(1)
+  })
+  it('Gebiet: Sterne wählen, richtig erobert ein Feld mit dieser Sternzahl', () => {
+    const z = spiel('gebiet', 4) as KBasis & { felder: { sterne: number; team: number | null }[]; wahl: Record<string, number | null> }
+    const r = KLASSEN_REGELN.gebiet!
+    expect(z.felder).toHaveLength(48)
+    expect(r.frageZeigen!(z, 'p0')).toBe(false)
+    expect(r.zug!(z, 'p0', 'sterne', '2', 0)).toBe(true)
+    geraetSicht(z, r, 'p0', 0)
+    const a = z.personen.p0.aufgabe!
+    antworten(z, r, 'p0', a.frage.loesung, 1)
+    const erobert = z.felder.filter((f) => f.team === z.personen.p0.team)
+    expect(erobert).toHaveLength(1)
+    expect(erobert[0].sterne).toBe(2)
+    expect(z.wahl.p0).toBeNull()
+  })
+  it('Wett-Quiz: Einsatz zählt ±, private Rückmeldung je Einsatz', () => {
+    const z = spiel('wette', 2) as KBasis & { konto: Record<string, number> }
+    const r = KLASSEN_REGELN.wette!
+    expect(r.zug!(z, 'p0', 'einsatz', '3', 0)).toBe(true)
+    geraetSicht(z, r, 'p0', 0)
+    antworten(z, r, 'p0', z.personen.p0.aufgabe!.frage.loesung, 1)
+    expect(z.konto.p0).toBe(3)
+    r.zug!(z, 'p0', 'einsatz', '2', 2)
+    geraetSicht(z, r, 'p0', 2)
+    antworten(z, r, 'p0', '###', 3)
+    expect(z.konto.p0).toBe(1)
+    expect(r.eigenText!(z, 'p0')).toContain('Einsatz 3: 1 von 1')
+    // Ohne Einsatz keine Antwort
+    expect(antworten(z, r, 'p0', 'x', 4)).toBeNull()
+  })
+  it('Rekord: Wert je Kind und Minute × Quote, Sieg nur über dem bisherigen Rekord', () => {
+    const z = spiel('rekord', 2, { dauer: 3 })
+    const r = KLASSEN_REGELN.rekord!
+    z.rekordBisher = { wert: 999_999, text: '' }
+    simuliere(z, 'rekord', 10, () => 2)
+    const e = r.ergebnis(z)
+    expect(e.sieg).toBe(false)
+    expect(e.klassenwert).toBeGreaterThan(0)
   })
 })

@@ -644,7 +644,7 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                 </Text>
               )}
               <BeamerBloecke bloecke={s.bloecke} />
-              {s.teams.length > 0 && s.phase === 'spiel' && s.spiel !== 'rennen' && <TeamKarten teams={s.teams} gross={false} />}
+              {s.teams.length > 0 && s.phase === 'spiel' && !['rennen', 'gebiet'].includes(s.spiel) && <TeamKarten teams={s.teams} gross={false} />}
               {s.phase === 'spiel' && (
                 <Text c="dimmed" ta="center">
                   {online} von {s.personen.length} verbunden · Wer später kommt: Code {code}

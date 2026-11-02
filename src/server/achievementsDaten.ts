@@ -273,6 +273,29 @@ export function achievementZusammen(
   }
 }
 
+/**
+ * Klassenspiele (02.11.2026): eigene Zähler – zusätzlich zu `achievementZusammen` (Runden und Medaille „Zusammen").
+ */
+export function achievementKlasse(
+  n: NutzerInfo,
+  e: { boss: boolean; gipfel: boolean; rekord: boolean; tischSiege: number; einschaetzung: boolean }
+): void {
+  if (!zaehlt(n)) return
+  try {
+    const d = achDatenLesen(n.id)
+    const z = d.zaehler
+    z.klassenRunden = (z.klassenRunden ?? 0) + 1
+    if (e.boss) z.klassenBoss = (z.klassenBoss ?? 0) + 1
+    if (e.gipfel) z.klassenGipfel = (z.klassenGipfel ?? 0) + 1
+    if (e.rekord) z.klassenRekorde = (z.klassenRekorde ?? 0) + 1
+    if (e.tischSiege > 0) z.klassenTische = (z.klassenTische ?? 0) + e.tischSiege
+    if (e.einschaetzung) z.klassenEinschaetzung = (z.klassenEinschaetzung ?? 0) + 1
+    achDatenSchreiben(n.id, d)
+  } catch {
+    // Achievements dürfen das Spielen nie stören
+  }
+}
+
 /** Medaillen, Titel und Titelwahl einer Person (Lehrkraftansicht, Spielraum) – nur lesen */
 export function auszeichnungenVon(nutzerId: string): { ausz: AuszStand; titelWahl: TitelWahl } {
   try {

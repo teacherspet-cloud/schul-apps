@@ -98,7 +98,7 @@ export const KLASSENSPIELE: KlassenspielInfo[] = [
     id: 'wette',
     name: 'Wett-Quiz',
     art: 'einzeln',
-    teams: 'waehlbar',
+    teams: 'keine',
     kurz: 'Setze 1–3 Punkte darauf, wie sicher du bist.',
     regel: 'Vor jeder Frage setzt du 1, 2 oder 3 Punkte. Richtig: Einsatz dazu. Falsch: Einsatz weg. Am Ende siehst du, wie gut du dich einschätzt.',
     min: 1
