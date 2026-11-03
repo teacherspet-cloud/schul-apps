@@ -149,7 +149,8 @@ export function StufenDiagramm({ u, hoehe = 140 }: { u: Uebersicht; hoehe?: numb
   const beschreibung = `Verteilung der Wörter auf die Stufen: ${u.faecher.map((n, i) => `${FACH_NAMEN[i]} ${prozent(n / gesamt)}`).join(', ')}`
   return (
     <figure style={{ margin: 0 }} data-stufen-diagramm aria-label={beschreibung}>
-      <div style={{ display: 'flex', gap: 6 }}>
+      {/* Oben Platz für die Prozentzahl über der höchsten Säule (03.11.2026) */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
         {/* y-Achse */}
         <div style={{ position: 'relative', width: 34, height: hoehe, flexShrink: 0 }} aria-hidden>
           {striche.map((s) => (
@@ -173,18 +174,32 @@ export function StufenDiagramm({ u, hoehe = 140 }: { u: Uebersicht; hoehe?: numb
               }}
             />
           ))}
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${u.faecher.length}, 1fr)`, gap: 6, height: hoehe, alignItems: 'end', position: 'relative' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${u.faecher.length}, 1fr)`, gap: 6, height: hoehe, alignItems: 'stretch', position: 'relative' }}>
             {u.faecher.map((n, i) => {
               const h = (anteile[i] / max) * hoehe
+              // Säule und Zahl fest von der Nulllinie aus (03.11.2026, Befund der Lehrkraft: die Säulen ragten unter die
+              // x-Achse über die Stufennamen – Zahl + Säule waren zusammen höher als die Fläche)
               return (
                 <Tooltip key={i} label={`${FACH_NAMEN[i]}: ${n} ${n === 1 ? 'Wort' : 'Wörter'} (${prozent(anteile[i])})`}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }} data-stufe-saeule={i}>
+                  <div style={{ position: 'relative', height: '100%', minHeight: 0 }} data-stufe-saeule={i}>
                     {n > 0 && (
-                      <Text size="10px" fw={600} mb={2} style={{ lineHeight: '12px' }}>
+                      <Text size="10px" fw={600} ta="center" style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(3, h) + 2, lineHeight: '12px' }}>
                         {prozent(anteile[i])}
                       </Text>
                     )}
-                    <div style={{ width: '100%', maxWidth: 34, height: Math.max(n ? 3 : 0, h), background: farben[i], borderRadius: '4px 4px 0 0' }} />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: '100%',
+                        maxWidth: 34,
+                        height: Math.min(hoehe, Math.max(n ? 3 : 0, h)),
+                        background: farben[i],
+                        borderRadius: '4px 4px 0 0'
+                      }}
+                    />
                   </div>
                 </Tooltip>
               )
@@ -193,7 +208,7 @@ export function StufenDiagramm({ u, hoehe = 140 }: { u: Uebersicht; hoehe?: numb
         </div>
       </div>
       {/* x-Achse */}
-      <div style={{ display: 'grid', gridTemplateColumns: `34px repeat(${u.faecher.length}, 1fr)`, columnGap: 6, marginTop: 4 }} aria-hidden>
+      <div style={{ display: 'grid', gridTemplateColumns: `34px repeat(${u.faecher.length}, 1fr)`, columnGap: 6, marginTop: 4 }} aria-hidden data-stufen-achse>
         <span />
         {STUFEN.map((s) => (
           <Text key={s.name} size="10px" c="dimmed" ta="center" style={{ lineHeight: '12px', hyphens: 'manual', overflowWrap: 'anywhere' }}>

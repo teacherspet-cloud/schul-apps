@@ -29,6 +29,7 @@ import { useEffect, useState } from 'react'
 import { oeffneProgramm, openDocument, openModule } from '../shared/navigation'
 import { oeffneReihe, ReiheKarte } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import { oeffneFreigabe } from '../modules/freigaben/FreigegebeneBlaetterModule'
+import { kursInKlasse } from '../modules/meineklassen/zurKlasse'
 import { abgabeTeile, FortschrittsBalken } from '../shared/components/FortschrittsBalken'
 import { begrenzt, demnaechst, kursKopf, kurzfassung, tagKurz, type DemnaechstEintrag, type StartAbzeichen, type StartKurs } from '@shared/startseiteKurse'
 import { kursReiterDocId } from '../modules/lernen/kurs/auftragsZiel'
@@ -283,7 +284,9 @@ export function Schnellzugriff(): React.JSX.Element {
    * und Grammatik stehen im Kurs. Die Anzahl-Wahl gilt für die Kurszeilen und „Demnächst" (12.10.2026: die nächsten 5,
    * erhöhbar; vorher fest 5 bzw. am PC 10 Kurse).
    */
-  const kursZeilen = kurse.map((k) => <KursZeile key={k.id} k={k} />)
+  // In die Klasse beim Fach (03.11.2026, Wunsch der Lehrkraft) – ohne „Meine Klassen" wie bisher nach Sprachenlernen
+  const mk = ids.includes('meineklassen')
+  const kursZeilen = kurse.map((k) => <KursZeile key={k.id} k={k} mk={mk} />)
   const maxKurse = nTermine
   const kursRest = maxKurse ? Math.max(0, kursZeilen.length - maxKurse) : 0
   const bald = demnaechst(kurse, reihen ?? [], jetzt, karten.tests ? tests ?? [] : [])
@@ -436,7 +439,7 @@ export function Schnellzugriff(): React.JSX.Element {
           titel={vokabeln ? 'Termine & Vokabeltraining' : 'Termine'}
           symbol={<IconCalendarEvent size={18} />}
           farbe="orange"
-          alle={vokabeln ? () => oeffneProgramm('sprachenlernen') : ids.includes('laufendereihen') ? () => oeffneProgramm('laufendereihen') : undefined}
+          alle={vokabeln ? () => (mk ? void openDocument('meineklassen', 'uebersicht') : oeffneProgramm('sprachenlernen')) : ids.includes('laufendereihen') ? () => oeffneProgramm('laufendereihen') : undefined}
           daten="termine"
           kurz={kurzTermine}
           // Ohne `zeilen`: die Anzahl gilt hier für Kurse und „Demnächst" (oben gekürzt)
@@ -474,11 +477,12 @@ const ABZEICHEN_FARBE: Record<StartAbzeichen['art'], string> = { test: 'orange',
 /** Ein Teil der Kurszeile, der mit „…" kürzen darf (wie stark: flexShrink) */
 const KUERZEN = { flexGrow: 0, flexBasis: 'auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } as const
 
-function KursZeile({ k }: { k: StartKurs }): React.JSX.Element {
+function KursZeile({ k, mk }: { k: StartKurs; mk: boolean }): React.JSX.Element {
   const a = k.abzeichen
-  const oeffnen = (): void => void openDocument('sprachenlernen', k.id)
+  const oeffnen = (): void => (mk ? kursInKlasse(k.gruppeId, k.id) : void openDocument('sprachenlernen', k.id))
   const zumAbzeichen = (): void => {
     if (!a.reiter) return oeffnen()
+    if (mk) return kursInKlasse(k.gruppeId, k.id, a)
     void openDocument('sprachenlernen', kursReiterDocId(k.id, a.reiter)).then(() =>
       zumHinweis({ kurs: k.id, hinweis: a.hinweis ?? a.art, reiter: a.reiter as KursReiter, ids: a.ids })
     )

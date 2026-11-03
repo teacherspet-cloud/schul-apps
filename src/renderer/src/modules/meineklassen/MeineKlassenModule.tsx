@@ -101,6 +101,7 @@ import { VokabelBalken } from '../../shared/components/VokabelBalken'
 import { IservVorschlaege } from './IservVorschlaege'
 import { IservAbzeichen, IservErkennung, IservKursMenue, type IservAngabe, type IservUebersicht } from './IservKurse'
 import { useEntwurfBedarf } from './kursBedarf'
+import { KLASSE_REITER } from './zurKlasse'
 import { HandlungsbedarfFenster, useBedarfFenster, type Bedarf } from './Handlungsbedarf'
 // Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
 import GeplantKarte from './GeplantKarte'
@@ -376,13 +377,17 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
    * „Öffnen" eines Auftrags aus „Meine Klassen" (09.10.2026): docId = Lerngruppe → diese Klasse mit dem Fach. Unbekanntes
    * führt still zur Übersicht.
    */
-  useDokumentOeffner('meineklassen', async (gruppeId) => {
+  useDokumentOeffner('meineklassen', async (kennung) => {
+    // „<gruppe>#<reiter>" (03.11.2026): Sprung von der Startseite gleich in den passenden Reiter
+    const [gruppeId, reiter] = kennung.split(KLASSE_REITER)
     try {
       const d = await holen<{ klassen: KlasseKurz[] }>('/server/klassen')
       setKlassen(d.klassen)
       const k = d.klassen.find((x) => x.faecher.some((f) => f.id === gruppeId) || x.gruppen.includes(gruppeId))
       setze(
-        k ? { klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null } : { klasse: null, gruppe: null }
+        k
+          ? { klasse: k.schluessel, gruppe: k.faecher.some((f) => f.id === gruppeId) ? gruppeId : k.faecher[0]?.id ?? null, ...(reiter ? { reiter } : {}) }
+          : { klasse: null, gruppe: null }
       )
     } catch {
       setze({ klasse: null, gruppe: null })

@@ -309,6 +309,16 @@ try {
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-fach-kopf-kompakt]')), 'Kennzahlen-Kasten steht in der Reihe mit Karteikasten und Units')
   // Lernstand der Sprachklasse wie im Überblick der Kursseite (09.10.2026): Karteikasten-Säulen und Units je Band
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-stufen-diagramm]')), 'Sprachklasse: „Lernstand im Karteikasten"')
+  // Säulen bleiben über der x-Achse (03.11.2026, Befund: sie ragten über die Stufennamen)
+  {
+    const m = await p.locator('[data-sprach-lernstand] [data-stufen-diagramm]').evaluate((el) => {
+      const achse = el.querySelector('[data-stufen-achse]').getBoundingClientRect().top
+      const saeulen = [...el.querySelectorAll('[data-stufe-saeule] > *')].map((x) => x.getBoundingClientRect())
+      return { achse, unten: Math.max(...saeulen.map((r) => r.bottom)), oben: Math.min(...saeulen.map((r) => r.top)), kopf: el.getBoundingClientRect().top }
+    })
+    pruefe(m.unten <= m.achse + 0.5 && m.oben >= m.kopf - 0.5, `Säulen innerhalb des Diagramms (${JSON.stringify(m)})`)
+    await p.locator('[data-sprach-lernstand] [data-stufen-diagramm]').screenshot({ path: join(out, '4d-stufen-diagramm.png') })
+  }
   pruefe(await da(p.locator('[data-sprach-lernstand] [data-kurs-units] [data-band-gruppe]').first()), 'Sprachklasse: „Units" je Band (mit Cover/Kachel)')
   // Entfernen im Kasten „Units" (25.10.2026): der Abschnitt verschwindet ohne Neuladen der Seite
   {

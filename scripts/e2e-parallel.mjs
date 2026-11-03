@@ -135,5 +135,12 @@ const fehler = ergebnisse.filter((e) => !e.gut)
 console.log(`\n${ergebnisse.length - fehler.length}/${ergebnisse.length} grün in ${Math.round((Date.now() - start) / 60000)} min${fehler.length ? ` – fehlgeschlagen: ${fehler.map((e) => e.t).join(', ')}` : ''}`)
 console.log(`Bilder und Daten: ${basis}`)
 // Testdaten der Server wegräumen (Bilder der Tests bleiben zum Nachsehen)
-for (let n = 0; n < anzahl; n++) rmSync(join(basis, `s${n}`), { recursive: true, force: true })
+// Aufräumen darf an einer Windows-Sperre scheitern (03.11.2026) – das Ergebnis steht schon fest
+for (let n = 0; n < anzahl; n++) {
+  try {
+    rmSync(join(basis, `s${n}`), { recursive: true, force: true, maxRetries: 5, retryDelay: 300 })
+  } catch {
+    /* Ordner bleibt im Temp-Ordner */
+  }
+}
 process.exit(fehler.length ? 1 : 0)
