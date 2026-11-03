@@ -191,6 +191,9 @@ try {
     pruefe(fx < 3, `[${name}] Eingabefeld bleibt an seiner Stelle im Blatt (dx ${fx.toFixed(1)})`)
     // Zoom-Knöpfe in der Werkzeugleiste, „Einreichen" frei
     pruefe((await s.locator('[data-werkzeuge] [data-zoom-knoepfe]').count()) === 1, `[${name}] Zoom-Knöpfe in der Werkzeugleiste`)
+    // Leiste steht am Blattende, nicht schwebend (03.11.2026)
+    pruefe((await s.locator('[data-blatt-leiste="einreichen"]').evaluate((e) => getComputedStyle(e).position)) !== 'sticky', `[${name}] Einreichen-Leiste schwebt nicht über dem Blatt`)
+    await s.locator('[data-blatt-einreichen]').scrollIntoViewIfNeeded()
     const frei = await s.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find((x) => /Einreichen/.test(x.textContent || ''))
       if (!b) return 'kein Knopf'

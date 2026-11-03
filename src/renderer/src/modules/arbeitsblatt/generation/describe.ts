@@ -8,7 +8,11 @@ function describeAnswer(a: Answer): string {
     case 'gapText':
       return `Lückentext: ${a.gapText}`
     case 'matching':
-      return `Zuordnen: ${a.left.map((l, i) => `${l} → ${a.right[a.pairs[i]] ?? '?'}`).join('; ')} (rechts insgesamt: ${a.right.join(', ')})`
+      // Mit den Buchstaben wie auf dem Blatt (03.11.2026, Befund 9c: ohne sie zählte die KI selbst ab und verwechselte
+      // die Absatzbuchstaben A–E mit den Überschriften a–f)
+      return `Zuordnen (eingetragen wird der Buchstabe rechts): ${a.left
+        .map((l, i) => `${l} → ${a.pairs[i] >= 0 ? `${String.fromCharCode(97 + a.pairs[i])}) ` : ''}${a.right[a.pairs[i]] ?? '?'}`)
+        .join('; ')} (rechts insgesamt: ${a.right.map((r, i) => `${String.fromCharCode(97 + i)}) ${r}`).join(', ')})`
     case 'multipleChoice':
       return `Multiple Choice: ${a.options.map((o, i) => (a.correct.includes(i) ? `[richtig] ${o}` : o)).join(' | ')}`
     case 'trueFalse':

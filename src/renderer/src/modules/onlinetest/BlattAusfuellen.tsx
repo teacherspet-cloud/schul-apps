@@ -1045,6 +1045,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
             {genutzt ? `${genutzt}× eingereicht` : 'noch nicht eingereicht'}
             {d.runden > 1 ? ` · ${d.runden}× möglich` : ''}
             {!d.offen ? ' · abgeschlossen' : ''}
+            {/* Speicherhinweis oben (03.11.2026): die Leiste unten steht jetzt erst am Blattende */}
+            {schreibbar ? ' · ✓ wird automatisch gespeichert' : ''}
           </Text>
         </div>
         <Group gap={6}>
@@ -1347,7 +1349,14 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
        * Einreichungen verbraucht, bleibt die Leiste als Hinweis: Weiterarbeiten geht, Einreichen nicht mehr.
        */}
       {schreibbar && gemessen && (offen || !lehrkraftSicht) && (
-        <Paper withBorder p="sm" radius="md" style={{ position: 'sticky', bottom: 8, zIndex: 5 }} data-blatt-leiste={offen ? (Number.isFinite(bis) ? 'pruefen' : 'einreichen') : 'verbraucht'}>
+        // Am Blattende (03.11.2026, Entscheidung der Lehrkraft): die Leiste schwebte dauerhaft über dem Blatt – jetzt fest
+        // darunter; nur „Aufgabe N prüfen" (schrittweise) bleibt mitlaufend, weil es der nächste Schritt mitten im Blatt ist
+        <Paper
+          withBorder
+          p="sm"
+          radius="md"
+          style={offen && Number.isFinite(bis) && d.einstellungen.aufgabenFeedback ? { position: 'sticky', bottom: 8, zIndex: 5 } : undefined}
+          data-blatt-leiste={offen ? (Number.isFinite(bis) ? 'pruefen' : 'einreichen') : 'verbraucht'}>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
               {offen ? 'Wird automatisch gespeichert.' : `Alle ${d.runden} Einreichungen sind verbraucht – du kannst weiterarbeiten, es wird gespeichert.`}

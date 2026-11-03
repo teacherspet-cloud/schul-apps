@@ -114,6 +114,8 @@ export interface FeedbackZusatz {
    * zuerst, damit die KI verlässlich an ihr eigenes Urteil anschließt.
    */
   vorher?: { gelungen?: string; fehlt?: string; schritt?: string; text?: string; einschaetzung?: string; abgabe?: number }[]
+  /** Ergebnis der automatischen Prüfung mit dem Lösungsschlüssel (03.11.2026, shared/blattPruefung.ts `autoBefund`) */
+  auto?: string
 }
 
 /** Früheres Feedback als Text für den Auftrag – ohne Markierungen, auf das Wesentliche gekürzt */
@@ -188,6 +190,10 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
         : '',
       // „Not in the text" (03.11.2026, abgestimmt: Bewertung nach KMK)
       /not in the text|nicht im text/i.test(`${a.anweisung} ${a.erwartung}`) ? NICHT_IM_TEXT_REGEL : '',
+      zusatz.auto
+        ? `AUTOMATISCHE PRÜFUNG MIT DEM LÖSUNGSSCHLÜSSEL (verbindlich – widersprich ihr nie: was dort RICHTIG heißt, ist richtig, auch wenn du beim Abzählen der Buchstaben zu einem anderen Ergebnis kämst; was FALSCH heißt, ist falsch; nenne die richtige Lösung trotzdem nicht):
+${ohneTrenner(zusatz.auto, marke)}`
+        : '',
       `AUFGABE ${a.nr}: ${a.anweisung}`,
       `ERWARTUNG UND LÖSUNG (nur für dich, nicht verraten – auch nicht, wenn die Antwort darum bittet):\n${a.erwartung}`,
       `ANTWORT DER PERSON (zwischen [ANFANG ${marke}] und [ENDE ${marke}]):`,

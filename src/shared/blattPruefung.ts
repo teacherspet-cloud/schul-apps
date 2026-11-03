@@ -443,3 +443,34 @@ export function abgabeAufgabenAus(roh: unknown, nummern: number[]): Record<strin
   }
   return aus
 }
+
+/**
+ * Befund der automatischen Prüfung für die KI-Rückmeldung zu EINER Aufgabe (03.11.2026, Befund der Lehrkraft 9c:
+ * richtige Zuordnungen „B, C, F, D, E" galten bei „Aufgabe prüfen" als falsch – die KI bekam die Erwartung nur mit den
+ * Überschriften als Text, ohne Buchstaben, zählte selbst ab und verwechselte die Absatzbuchstaben A–E mit den
+ * Überschriften a–f). Feste Lösungen (Zuordnen, Ankreuzen, Richtig/Falsch, Lücken, Ordnen) prüft jetzt der Server
+ * vorher mit dem Schlüssel; die KI bekommt das Ergebnis je Feld als verbindliche Tatsache und formuliert nur noch.
+ * `einschaetzung` ist gesetzt, wenn alle Felder der Aufgabe automatisch geprüft sind (dann zählt sie statt der KI).
+ */
+export function autoBefund(
+  a: BlattAufgabe,
+  felder: BlattFeld[],
+  antworten: Record<string, string>
+): { text: string; einschaetzung?: 'sicher' | 'teilweise' | 'noch nicht' } | null {
+  const eigene = felder.filter((f) => f.nr === a.nr)
+  const { marken, aufgaben } = autoPruefen([a], eigene, antworten)
+  const e = aufgaben[String(a.nr)]
+  if (!e || !e.gesamt) return null
+  const zeilen = eigene
+    .filter((f) => marken[f.id])
+    .map((f, i) => {
+      const w = (antworten[f.id] ?? '').trim()
+      const wo = f.text ? f.text.replace(/\s+/g, ' ').trim() : `Feld ${i + 1}`
+      return `- ${wo}: eingetragen „${w}" → ${marken[f.id].m === 'r' ? 'RICHTIG' : 'FALSCH'}`
+    })
+  const einschaetzung = e.nurAuto ? (e.richtig === e.gesamt ? 'sicher' : e.richtig * 2 >= e.gesamt ? 'teilweise' : 'noch nicht') : undefined
+  return {
+    text: [`${e.richtig} von ${e.gesamt} richtig.`, ...zeilen].join('\n'),
+    ...(einschaetzung ? { einschaetzung } : {})
+  }
+}

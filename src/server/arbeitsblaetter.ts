@@ -81,6 +81,7 @@ import {
   abgabeAufgabenAnfrage,
   abgabeAufgabenAus,
   autoHinweis,
+  autoBefund,
   autoPruefen,
   abgabeKriseAus,
   bezugAus,
@@ -875,6 +876,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             const material = await materialVon(z)
             // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten
             const gs = schreibformFuer(z, aufgabe, felder, antworten, ich, material)
+            const auto = autoBefund(aufgabe, felder, antworten)
             const zusatz = {
               zeichen: zeichenFuer(fachId, einst),
               ...(nurZeichenflaeche ? { nurZeichenflaeche } : {}),
@@ -882,13 +884,17 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               ...(befund ? { abschrift: befund } : {}),
               ...(gs ? { schreibform: gs.text } : {}),
               // Früheres Feedback zu dieser Aufgabe (26.10.2026): die KI schließt an ihr eigenes Urteil an
-              ...(liste.length ? { vorher: liste.slice(-3) as NonNullable<FeedbackZusatz['vorher']> } : {})
+              ...(liste.length ? { vorher: liste.slice(-3) as NonNullable<FeedbackZusatz['vorher']> } : {}),
+              // Feste Lösungen vorher mit dem Schlüssel geprüft (03.11.2026) – die KI bekommt das Ergebnis als Tatsache
+              ...(auto ? { auto: auto.text } : {})
             }
             const antwort = await mitNamensliste(
               { namen: namenFuerKi(z, ich), sprache: e.sprache, material: `${material} ${aufgabe.anweisung ?? ''} ${aufgabe.erwartung ?? ''}` },
               () => imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)]))
             )
-            const roh = aufgabenFeedbackAus(antwort)
+            const roh0 = aufgabenFeedbackAus(antwort)
+            // Alle Felder automatisch geprüft: die Einschätzung folgt dem Schlüssel, nicht der KI (03.11.2026)
+            const roh = auto?.einschaetzung ? { ...roh0, einschaetzung: auto.einschaetzung } : roh0
             const fb0 = befund ? { ...roh, einschaetzung: deckeln(roh.einschaetzung, befund) } : roh
             // Gezählter Verstoß gegen den Operator (Geschichte, 12.10.2026): höchstens „teilweise"
             const fb1 = gs?.fehler.length && fb0.einschaetzung === 'sicher' ? { ...fb0, einschaetzung: 'teilweise' as const } : fb0
