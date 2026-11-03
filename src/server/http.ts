@@ -833,6 +833,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             // Rechtliches vollständig (26.10.2026, wie die Anmeldeseite): sonst zeigt der Schülerbereich keine Verweise
             // auf Datenschutzerklärung, Elternfassung und Impressum – dort stünden noch Platzhalter
             rechtliches: rechtlichesBereit(),
+            // Anmeldung über IServ (03.11.2026): QR-Codes führen dann zur IServ-Anmeldung, Gäste ohne Konto gibt es nicht
+            ...(sitzung.nutzer.rolle !== 'schueler' && iservBereit() ? { iservAnmeldung: true } : {}),
             // Sitzung der Oberfläche (09.10.2026, renderer/shared/sitzung.ts): neue Anmeldung = Übersichten und
             // eingeklappte Kästen wie vorgegeben. Nur ein Fingerabdruck der Kennung, nicht die Kennung selbst.
             sitzung: sitzungsAnzeige(sitzung.kennung),

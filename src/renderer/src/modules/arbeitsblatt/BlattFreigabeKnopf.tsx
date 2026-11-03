@@ -13,7 +13,7 @@ import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, Select, Stac
 import { IconQrcode, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { BlattAufgabe } from '@shared/blattFreigabe'
-import { appFreigegeben, aufServer } from '../../shared/plattform'
+import { appFreigegeben, aufServer, qrHakenText } from '../../shared/plattform'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
@@ -345,7 +345,7 @@ export function BlattFreigabeDialog({
           </Text>
         )}
         <Checkbox
-          label="Auch Gäste per QR-Code und Namen (ohne Konto)"
+          label={qrHakenText()}
           checked={gaeste}
           onChange={(e) => setGaeste(e.currentTarget.checked)}
           data-blatt-gaeste

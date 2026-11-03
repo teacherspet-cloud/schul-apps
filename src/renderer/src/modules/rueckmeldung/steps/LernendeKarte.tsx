@@ -16,7 +16,7 @@ import { IconDownload, IconQrcode, IconSend } from '@tabler/icons-react'
 import { Zugang } from '../../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
 import type { Abgabe, Bogen, Rueckmeldung } from '../model/types'
-import { aufServer } from '../../../shared/plattform'
+import { aufServer, qrHakenText } from '../../../shared/plattform'
 import { holen, senden } from '../../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
@@ -207,7 +207,7 @@ export default function LernendeKarte({
       <NurExperte geaendert={gaeste && 'Gäste'}>
         <Checkbox
           mb="md"
-          label="Auch Gäste per QR-Code und Namen (ohne Konto)"
+          label={qrHakenText()}
           description="Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstaben ein. Lernende mit Konto kommen über denselben Code direkt hinein."
           checked={gaeste}
           onChange={(e) => setGaeste(e.currentTarget.checked)}

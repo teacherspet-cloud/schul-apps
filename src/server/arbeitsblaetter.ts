@@ -1061,7 +1061,13 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     }
     if (req.method === 'POST' && teile[0] === 'freigeben') {
       const k0 = (await k.koerper()) as Record<string, unknown>
-      const mitGaesten = k0.gaeste === true && !iservBereit()
+      /*
+       * QR-Code auch mit IServ (03.11.2026, Befund der Lehrkraft: „QR-Code angeklickt, trotzdem Fehler: QR-Code wählen"):
+       * Der Haken wurde mit IServ still verworfen – es entstand kein Code. Jetzt immer ein Code; Gäste OHNE Konto bleiben
+       * mit IServ gesperrt (Beitritt: „Bitte mit IServ anmelden"), Lernende mit Konto kommen über den Code dazu – wie bei
+       * den Unterrichtsreihen.
+       */
+      const mitGaesten = k0.gaeste === true
       const gruppeId = String(k0.lerngruppeId ?? '')
       const g = gruppeId ? lerngruppe(gruppeId) : null
       if (gruppeId && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)

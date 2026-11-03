@@ -96,7 +96,13 @@ export interface ServerIch {
    * `rechtlichesBereit`)? Bei `false` zeigt der Schülerbereich keine Verweise darauf; fehlt die Angabe (älterer Server), schon.
    */
   rechtliches?: boolean
+  /** Anmeldung über IServ eingerichtet (03.11.2026): QR-Codes nur mit IServ-Konto, keine Gäste ohne Konto */
+  iservAnmeldung?: boolean
 }
+
+/** Beschriftung des QR-Code-Hakens beim Freigeben – mit IServ ohne „Gäste ohne Konto" (03.11.2026) */
+export const qrHakenText = (): string =>
+  serverIch()?.iservAnmeldung ? 'Auch per QR-Code (Anmeldung mit IServ – z. B. für Lernende anderer Gruppen)' : 'Auch Gäste per QR-Code und Namen (ohne Konto)'
 
 /** Verweise auf Datenschutzerklärung, Elternfassung und Impressum zeigen? (26.10.2026, siehe `ServerIch.rechtliches`) */
 export const rechtlichesSichtbar = (): boolean => serverIch()?.rechtliches !== false
