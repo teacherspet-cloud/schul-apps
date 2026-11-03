@@ -112,6 +112,8 @@ export function Werkzeugleiste(p: {
   nurZeichnen?: boolean
   vorgaben?: Vorgaben
   setVorgabe?: (art: VorgabeArt, patch: Partial<Stil>) => void
+  /** Rechts in der Leiste (03.11.2026: Zoom-Knöpfe des Blatts) */
+  rechts?: React.ReactNode
 }): React.JSX.Element {
   // Optionen eines Werkzeugs: Rechtsklick oder langes Drücken (Touch) auf den Knopf
   const [optionen, setOptionen] = useState<{ art: VorgabeArt; x: number; y: number } | null>(null)
@@ -265,10 +267,11 @@ export function Werkzeugleiste(p: {
             </ActionIcon>
           </Tooltip>
         )}
-        <Text size="xs" c="dimmed" ml={4}>
+        <Text size="xs" c="dimmed" ml={4} className="werkzeug-hinweis" truncate="end" style={{ flex: '1 1 0', minWidth: 60 }} title={hinweis[p.werkzeug]}>
           {hinweis[p.werkzeug]}
           {p.setVorgabe && MIT_VORGABE.has(p.werkzeug) ? ' · Optionen: Rechtsklick bzw. lange drücken' : ''}
         </Text>
+        {p.rechts && <div style={{ marginLeft: 'auto' }}>{p.rechts}</div>}
       </Group>
       {optionen && p.setVorgabe && (
         <KontextMenue x={optionen.x} y={optionen.y} titel={VORGABE_TITEL[optionen.art]} schliessen={() => setOptionen(null)}>

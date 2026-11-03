@@ -169,6 +169,11 @@ export function useZweiFingerZoom(opts: {
   setFaktor: (f: number) => void
   min?: number
   max?: number
+  /**
+   * Eigene Vorschau während der Geste statt CSS-`zoom` am Inhalt (03.11.2026, Schülerblatt): `zNeu` ist der Zoom unter
+   * den Fingern, `zFest` der zuletzt übernommene. Am Ende der Geste kommt `setFaktor` – der Aufrufer setzt dann neu.
+   */
+  vorschau?: (innen: HTMLElement, zNeu: number, zFest: number) => void
 }): void {
   const aktuell = useRef(opts)
   aktuell.current = opts
@@ -204,8 +209,11 @@ export function useZweiFingerZoom(opts: {
       const zNeu = basis * faktor
       const ix = (m.x - vorher.left) / zAlt
       const iy = (m.y - vorher.top) / zAlt
-      innen.style.zoom = String(zNeu)
-      rahmenZoomAngleichen(innen, zNeu)
+      if (aktuell.current.vorschau) aktuell.current.vorschau(innen, zNeu, basis * aktuell.current.faktor)
+      else {
+        innen.style.zoom = String(zNeu)
+        rahmenZoomAngleichen(innen, zNeu)
+      }
       letzter = faktor
       const nachher = innen.getBoundingClientRect()
       el.scrollLeft += nachher.left - (m.x - ix * zNeu)
@@ -350,6 +358,8 @@ export function useBlattAnsicht(opts: {
   obergrenze?: number
   /** Eigener Zustand statt des Programm-Zooms (Druckvorschau) */
   lokal?: [BlattZoom, (teil: Partial<BlattZoom>) => void]
+  /** Vorschau während der Zwei-Finger-Geste (siehe useZweiFingerZoom) – ohne: CSS-`zoom` am Inhalt */
+  vorschau?: (innen: HTMLElement, zNeu: number, zFest: number) => void
   /**
    * Fläche gerade da? (25.10.2026, ZoomFlaeche `aktiv`): Die Hörer hängen sich an `flaeche.current` – war sie beim
    * ersten Lauf noch nicht gerendert (Schülerblatt erst in der Listenansicht), müssen sie beim Umschalten nachziehen.
@@ -495,7 +505,8 @@ export function useBlattAnsicht(opts: {
     faktor: zoom,
     setFaktor: (f) => aktuell.current.setzen({ einpassen: false, z: f }),
     min: ZOOM_KLEINST,
-    max: ZOOM_GROESST
+    max: ZOOM_GROESST,
+    vorschau: opts.vorschau
   })
 
   // Doppelseite nur anbieten, wenn zwei Seiten noch lesbar nebeneinander passen (oder sie schon an ist)

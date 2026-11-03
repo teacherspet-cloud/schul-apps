@@ -574,7 +574,8 @@ try {
   const zb = await zf.boundingBox()
   const cdp = await hm.newCDPSession(h)
   const mx = zb.x + zb.width / 2
-  const my = zb.y + Math.min(200, zb.height / 2)
+  // Oben im Blatt – nicht unter der unteren Einreichen-Leiste (03.11.2026)
+  const my = zb.y + Math.min(100, zb.height / 2)
   const zwei = (d) => [
     { x: mx - d, y: my, id: 1, radiusX: 6, radiusY: 6, force: 1 },
     { x: mx + d, y: my, id: 2, radiusX: 6, radiusY: 6, force: 1 }
@@ -584,7 +585,7 @@ try {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await cdp.detach()
   await h.waitForTimeout(400)
-  const zoomWert = await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))
+  const zoomWert = await zf.evaluate((el) => Number(el.dataset.blattZoom || 1))
   pruefe(zoomWert > 1.3 && (await zf.getAttribute('data-gezoomt')) !== null, `Zwei Finger auseinander: Blatt vergrößert (Zoom ${zoomWert.toFixed(2)}), Fläche rollt seitwärts`)
   // Noch einmal mit zwei Fingern oben auf dem Blatt (26.10.2026, Befund „zoomt an den Hintergrund"): nach „Breite einpassen" wieder vergrößern;
   // der Inhalt des Blattrahmens zieht mit (rahmenZoomAngleichen – Chromium gibt den Zoom weiter, WebKit bekommt ihn gesetzt)
@@ -604,7 +605,7 @@ try {
   await cdp2.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   await cdp2.detach()
   await h.waitForTimeout(400)
-  const zoomWert2 = await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))
+  const zoomWert2 = await zf.evaluate((el) => Number(el.dataset.blattZoom || 1))
   pruefe(zoomWert2 > 1.3, `Zwei Finger auf dem Blatt: wieder vergrößert (Zoom ${zoomWert2.toFixed(2)})`)
   const rahmenInnen = await h.evaluate(() => {
     const f = document.querySelector('.zoom-flaeche.blatt-zoom iframe')
@@ -620,7 +621,7 @@ try {
   // Zurück auf 100 % über den Prozent-Knopf
   await h.locator('[data-zoom-wert]').first().click()
   await h.waitForTimeout(300)
-  pruefe((await zf.evaluate((el) => Number(el.firstElementChild?.style.zoom || 1))) === 1, 'Prozent-Knopf setzt den Zoom zurück')
+  pruefe((await zf.evaluate((el) => Number(el.dataset.blattZoom || 1))) === 1, 'Prozent-Knopf setzt den Zoom zurück')
   await hm.close()
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)

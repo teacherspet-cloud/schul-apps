@@ -994,3 +994,19 @@ html[data-touch] [data-grammatik-auswahl] [data-bereich] {
 .mm-ebene > :first-child {
   flex: 1 0 auto;
 }
+
+/* Zoom-Knöpfe in einer Leiste (03.11.2026, Schülerblatt: Werkzeugleiste) – nicht schwebend über „Einreichen" */
+.zoom-in-leiste .zoom-knoepfe {
+  position: static;
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+  gap: 2px;
+}
+/* Schmale Geräte (03.11.2026): ohne Hinweistext, damit Werkzeuge und Zoom in die Leiste passen und sie das Blatt nicht verdeckt */
+@media (max-width: 700px) {
+  [data-werkzeuge] .werkzeug-hinweis {
+    display: none;
+  }
+}

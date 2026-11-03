@@ -59,7 +59,7 @@ import { KiMarke } from './KiMarke'
 import { BildNachweisListe } from '../../shared/components/BildNachweis'
 import { blattBildNachweise } from './testBildNachweise'
 import { useTouch } from '../../shared/touch/touchModus'
-import { ZoomFlaeche } from '../../shared/touch/zoom'
+import { useBlattAnsicht, type BlattZoom } from '../../shared/touch/zoom'
 import { StiftDiagnose, stiftDiagnoseAktiv } from './StiftDiagnose'
 import { loesungenJeAufgabe } from './loesungJeAufgabe'
 import { stiftAutomatikEinrichten, type TintenApi } from './stiftAutomatik'
@@ -543,7 +543,6 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const ordnerBlatt = useBlaettern()
   const imOrdner = Boolean(ordnerBlatt)
   // Zwei-Finger-Zoom und Zoom-Knöpfe am Handy/iPad (25.10.2026, Wunsch der Lehrkraft) – shared/touch/zoom.tsx
-  const touch = useTouch()
   const [tinte, setTinte] = useState<Record<string, string>>(d.tinte)
   const [gemessen, setGemessen] = useState<{ felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; bilder: BildLage[]; hoehe: number } | null>(null)
   // Bild bildschirmfüllend mit Werkzeugen (25.10.2026): Nummer des geöffneten Bilds
@@ -671,6 +670,34 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   // Bildnachweise der Schlussseite (23.10.2026, Bildnachweise) – für den kleinen Link am Fuß
   const blattNachweise = useMemo(() => blattBildNachweise(d.html), [d.html])
   const massstab = Math.min(1.25, breite / dokBreite)
+  /*
+   * Zoom (03.11.2026, Befund der Lehrkraft auf allen Wegen – iPad zwei Finger und Knöpfe, iPad-App, PC: „zoomt nicht",
+   * „Markierungen, Texte und Zeichnungen verschoben"): vorher CSS-`zoom` um das Blatt (nur mit Touch), im Rahmen auf
+   * WebKit noch einmal nachgezogen – Blatt und Stift-Ebene konnten so auseinanderlaufen. Jetzt EIN Maßstab für beides:
+   * `eff` = Einpassen × Zoom, dieselbe `scale()` für Rahmen und Ebene. Knöpfe in der Werkzeugleiste (sie verdeckten
+   * „Einreichen"), Strg + Rad/Plus/Minus am PC, zwei Finger mit Vorschau per transform, übernommen beim Loslassen.
+   */
+  const zoomFlaeche = useRef<HTMLDivElement>(null)
+  const zoomInhalt = useRef<HTMLDivElement>(null)
+  const [zoomZustand, setZoomZustand] = useState<BlattZoom>({ einpassen: true, z: 1, doppelseite: false })
+  const { zoom, knoepfe: zoomKnoepfe } = useBlattAnsicht({
+    flaeche: zoomFlaeche,
+    inhalt: zoomInhalt,
+    breitePx: 1,
+    minEinpassen: 1,
+    obergrenze: 1,
+    lokal: [zoomZustand, (teil) => setZoomZustand((z) => ({ ...z, ...teil }))],
+    aktiv: ansicht === 'blatt',
+    vorschau: (innen, zNeu, zFest) => {
+      innen.style.transformOrigin = '0 0'
+      innen.style.transform = `scale(${zNeu / zFest})`
+    }
+  })
+  // Nach der Geste: Vorschau weg, der neue Maßstab gilt
+  useLayoutEffect(() => {
+    if (zoomInhalt.current) zoomInhalt.current.style.transform = ''
+  }, [zoom])
+  const eff = massstab * zoom
 
   const messe = useCallback((): void => {
     const doc = iframe.current?.contentDocument
@@ -1150,7 +1177,14 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           setMarkerFarbe={setMarkerFarbe}
           vorgaben={vorgaben}
           setVorgabe={setVorgabe}
+          rechts={<div className="zoom-in-leiste">{zoomKnoepfe}</div>}
         />
+      )}
+      {/* Ohne Werkzeugleiste (eingereicht/gesperrt, nur Ansehen): die Zoom-Knöpfe in einer eigenen, mitlaufenden Zeile */}
+      {ansicht === 'blatt' && !(schreibbar && werkzeugeDa) && (
+        <Group justify="flex-end" className="zoom-in-leiste" style={{ position: 'sticky', top: 8, zIndex: 30 }}>
+          {zoomKnoepfe}
+        </Group>
       )}
       {/* Stift-Einträge gehen als Seitenbild an die KI – Namen in Bildern erkennt der Namensfilter nicht (22.10.2026) */}
       {ansicht === 'blatt' && schreibbar && werkzeugeDa && (d.feedback || d.einstellungen.aufgabenFeedback) && (
@@ -1170,22 +1204,24 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         </Group>
       )}
       <div ref={messRahmen} style={{ width: '100%' }}>
-      <ZoomFlaeche aktiv={touch && ansicht === 'blatt'} className="blatt-zoom">
+      <div ref={zoomFlaeche} className="zoom-flaeche blatt-zoom" style={{ overflowX: zoom > 1 ? 'auto' : undefined, touchAction: 'pan-x pan-y' }} data-gezoomt={zoom > 1 || undefined} data-blatt-zoom={zoom.toFixed(2)}>
       <div
         ref={rahmen}
         style={ansicht === 'blatt' ? { width: '100%' } : { width: dokBreite, position: 'absolute', left: -20000, top: 0, visibility: 'hidden' }}
         aria-hidden={ansicht !== 'blatt'}
       >
         <div
+          ref={zoomInhalt}
           style={{
-            width: (dokBreite + (spalte ? SPALTE : 0)) * massstab,
-            height: (gemessen?.hoehe ?? 1123) * massstab,
+            width: (dokBreite + (spalte ? SPALTE : 0)) * eff,
+            height: (gemessen?.hoehe ?? 1123) * eff,
             position: 'relative',
             overflow: 'hidden',
             margin: '0 auto'
           }}
+          data-blatt-massstab={eff.toFixed(3)}
         >
-          <div style={{ width: dokBreite, transform: `scale(${massstab})`, transformOrigin: 'top left', position: 'absolute', left: 0, top: 0 }}>
+          <div style={{ width: dokBreite, transform: `scale(${eff})`, transformOrigin: 'top left', position: 'absolute', left: 0, top: 0 }}>
             <iframe
               ref={iframe}
               title={d.titel}
@@ -1268,7 +1304,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           </div>
         </div>
       </div>
-      </ZoomFlaeche>
+      </div>
       </div>
 
       {ansicht === 'liste' && gemessen && (
@@ -1293,7 +1329,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
             // Nach dem Umschalten zur Aufgabe rollen (Lage im Blatt × Maßstab)
             setTimeout(() => {
               const r = rahmen.current?.getBoundingClientRect()
-              if (r) seiteRollenUm(r.top + a.y * massstab - 80)
+              if (r) seiteRollenUm(r.top + a.y * eff - 80)
             }, 120)
           }}
         />
