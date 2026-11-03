@@ -202,6 +202,9 @@ export function BlattFreigabeDialog({
   const [feedback, setFeedback] = useState(true)
   const [aufgabenFeedback, setAufgabenFeedback] = useState(true)
   const [runden, setRunden] = useState(2)
+  // Rückmeldungen je Aufgabe (03.11.2026, Befund der Lehrkraft: „von 2 auf 4 erhöht, trotzdem nur 2× KI je Aufgabe" –
+  // das Feld daneben waren die Einreichungen, die Zahl je Aufgabe stand fest auf 2)
+  const [aufgabenRunden, setAufgabenRunden] = useState(2)
   const [stift, setStift] = useState(true)
   const [grossKlein, setGrossKlein] = useState(true)
   // Korrekturrand (05.10.2026): Vorgabe an – digital steht dort das KI-Feedback, gedruckt bleibt er leer
@@ -269,7 +272,7 @@ export function BlattFreigabeDialog({
           // Schrittweise braucht das Urteil je Aufgabe
           aufgabenFeedback: schrittweise || merkAmEnde || (feedback && aufgabenFeedback),
           runden,
-          aufgabenRunden: 2,
+          aufgabenRunden,
           stift,
           // Groß-/Kleinschreibung automatisch (27.10.2026): Vorgabe an, nur das Abschalten wird gespeichert
           ...(grossKlein ? {} : { grossKlein: false }),
@@ -365,6 +368,18 @@ export function BlattFreigabeDialog({
             />
             <ZahlFeld label="Einreichungen je Person" min={1} max={5} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={170} />
           </Group>
+        )}
+        {(schrittweise || merkAmEnde || (feedback && aufgabenFeedback)) && (
+          <ZahlFeld
+            label="KI-Rückmeldungen je Aufgabe („Aufgabe prüfen“)"
+            min={1}
+            max={5}
+            value={aufgabenRunden}
+            onChange={(v) => setAufgabenRunden(Number(v) || 2)}
+            w={300}
+            ml="lg"
+            data-blatt-aufgabenrunden
+          />
         )}
         {/* Hinweis nur, wenn Handschrift wirklich an die KI geht: bei Rückmeldung oder Aufgaben-Feedback (26.10.2026) */}
         <Checkbox

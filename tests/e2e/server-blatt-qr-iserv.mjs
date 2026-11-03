@@ -68,6 +68,9 @@ try {
   const haken = dlg.locator('[data-blatt-gaeste]')
   pruefe(/IServ/.test(await dlg.innerText()), 'Mit IServ: Haken nennt die Anmeldung mit IServ')
   await haken.check()
+  // KI-Rückmeldungen je Aufgabe schon beim Freigeben wählbar (03.11.2026)
+  pruefe(await dlg.locator('[data-blatt-aufgabenrunden]').isVisible(), 'Freigeben: Feld „KI-Rückmeldungen je Aufgabe"')
+  await dlg.locator('[data-blatt-aufgabenrunden]').fill('3')
   await dlg.locator('[data-blatt-freigeben]').click()
   let fr = null
   for (let i = 0; i < 40 && !fr; i++) {
@@ -77,6 +80,8 @@ try {
   pruefe(Boolean(fr), 'Nur per QR-Code freigegeben – ohne Lerngruppe, ohne Fehlermeldung')
   pruefe(!(await p.getByText('Bitte eine Lerngruppe').count()), 'Keine Meldung „Bitte eine Lerngruppe wählen …"')
   await p.screenshot({ path: join(out, '1-qr.png') })
+  const e0 = (await (await lk.request.get(`${A}/server/blaetter/${fr?.id}/einstellungen`, { headers: KOPF })).json()).einstellungen
+  pruefe(e0?.aufgabenRunden === 3, `Beim Freigeben gewählt: ${e0?.aufgabenRunden} Rückmeldungen je Aufgabe`)
   const code = fr?.code
   pruefe(Boolean(code), `QR-Code erzeugt (${code})`)
   // Tom (Konto) tritt über den Code bei; ein Gast ohne Konto wird an IServ verwiesen
