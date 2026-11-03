@@ -302,6 +302,11 @@ export function verknuepfteFreigabeAnlegen(e: {
   return id
 }
 
+/** Einreichungen der verknüpften Rückmeldung nachziehen (03.11.2026, Einstellungen einer Blatt-Freigabe ändern) */
+export function verknuepfteFreigabeRunden(id: string, runden: number): void {
+  db().prepare("UPDATE feedback_freigaben SET runden = ? WHERE id = ? AND art != ''").run(runden, id)
+}
+
 export function verknuepfteFreigabeStatus(id: string, status: 'offen' | 'beendet'): void {
   db().prepare("UPDATE feedback_freigaben SET status = ? WHERE id = ? AND art != ''").run(status, id)
 }

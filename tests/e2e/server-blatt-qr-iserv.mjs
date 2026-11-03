@@ -84,6 +84,26 @@ try {
   pruefe(bei.status() === 200, `Lernender mit Konto tritt per Code bei (${bei.status()})`)
   const sl = await (await sm.request.get(`${A}/s/api/blaetter`, { headers: KOPF })).json()
   pruefe((sl.blaetter ?? []).length === 1, 'Tom sieht das Blatt unter „Arbeitsblätter"')
+  // Einstellungen der Freigabe nachträglich ändern (03.11.2026): Rückmeldungen je Aufgabe 2 → 4
+  // Erst das QR-Code-Fenster nach der Freigabe schließen
+  for (let i = 0; i < 3 && (await p.getByRole('dialog').count()); i++) {
+    await p.keyboard.press('Escape')
+    await p.waitForTimeout(300)
+  }
+  await p.locator('[data-freigabe-oeffnen]').first().click()
+  await p.locator('[data-freigabe-detail]').waitFor({ timeout: 15000 })
+  await p.locator('[data-freigabe-detail] [data-freigabe-einstellungen]').first().click()
+  await p.locator('[data-freigabe-einstellungen-fenster]').waitFor({ timeout: 10000 })
+  const feld = p.locator('[data-einst-aufgabenrunden]')
+  await feld.fill('4')
+  await p.locator('[data-einst-runden]').fill('3')
+  await p.screenshot({ path: join(out, '2-einstellungen.png') })
+  await p.locator('[data-einst-speichern]').click()
+  await p.locator('[data-freigabe-einstellungen-fenster]').waitFor({ state: 'detached', timeout: 10000 })
+  const einst = (await (await lk.request.get(`${A}/server/blaetter/${fr.id}/einstellungen`, { headers: KOPF })).json()).einstellungen
+  pruefe(einst?.aufgabenRunden === 4 && einst?.runden === 3, `Einstellungen geändert: Rückmeldungen je Aufgabe ${einst?.aufgabenRunden}, Einreichungen ${einst?.runden}`)
+  const sb = await (await sm.request.get(`${A}/s/api/blatt?id=${fr.id}`, { headers: KOPF })).json()
+  pruefe(sb?.runden === 3 || sb?.einstellungen?.aufgabenRunden === 4 || JSON.stringify(sb).includes('"aufgabenRunden":4'), 'Lernende sehen die neuen Einstellungen')
   const gast = await edge.newContext()
   const g = await gast.request.post(`${A}/s/api/blatt/gast`, { headers: KOPF, data: { code, name: 'Anna K.' } })
   pruefe(g.status() === 403, `Gast ohne Konto: „Bitte mit IServ anmelden" (${g.status()})`)

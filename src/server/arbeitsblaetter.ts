@@ -48,7 +48,7 @@ import { spurEintragen, spurVon, type SpurQuelle } from './bewertungSpur'
 import { MITARBEIT_NOTEN, type MitarbeitNote, type Strenge } from '../shared/blattAuswertung'
 import { iservBereit } from './anmeldung'
 import { mitNamensliste, registerVergessen } from './namensschutz'
-import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
+import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeRunden, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { PULS_MS } from '../main/services/lanServer'
 import { materialAusBlatt, pdfOhneSkripte, seitenMitTinte } from './druck'
 import { injektionsVerdacht, LERNENDEN_FEHLER } from '../shared/kiSchutz'
@@ -1304,6 +1304,44 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       const name = typeof k0.themenbereich === 'string' ? k0.themenbereich.trim().slice(0, 160) : ''
       db().prepare('UPDATE blatt_freigaben SET themenbereich = ? WHERE id = ?').run(name, z.id)
       return (json(res, 200, { ok: true }), true)
+    }
+    /*
+     * Einstellungen einer Freigabe nachträglich ändern (03.11.2026, Wunsch der Lehrkraft – „Freigegebene Blätter" und
+     * „Meine Klassen"): Einreichungen, KI-Feedback, Rückmeldungen je Aufgabe, Stift, Groß-/Kleinschreibung, schrittweise,
+     * Merkkästen am Ende, Frist. Mehr Runden geben Lernenden sofort wieder Möglichkeiten; weniger nimmt nichts zurück.
+     */
+    if (req.method === 'GET' && teile[1] === 'einstellungen') return (json(res, 200, { einstellungen: einstellungenVon(z) }), true)
+    if (req.method === 'POST' && teile[1] === 'einstellungen') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const alt = einstellungenVon(z)
+      const ja = (x: unknown, vorher: boolean | undefined): boolean => (typeof x === 'boolean' ? x : Boolean(vorher))
+      const zahl = (x: unknown, vorher: number): number => (x === undefined ? vorher : Math.max(1, Math.min(5, Math.round(Number(x) || vorher))))
+      const schrittweise = ja(k0.schrittweise, alt.schrittweise)
+      const merkAmEnde = ja(k0.merkAmEnde, alt.merkAmEnde)
+      const bis = k0.bis === null ? undefined : typeof k0.bis === 'number' && k0.bis > 0 ? k0.bis : alt.bis
+      const neu: BlattEinstellungen = {
+        ...alt,
+        feedback: ja(k0.feedback, alt.feedback),
+        // Schrittweise und Merkkästen am Ende brauchen das Urteil je Aufgabe (wie beim Freigeben)
+        aufgabenFeedback: schrittweise || merkAmEnde || ja(k0.aufgabenFeedback, alt.aufgabenFeedback),
+        runden: zahl(k0.runden, alt.runden),
+        aufgabenRunden: zahl(k0.aufgabenRunden, alt.aufgabenRunden),
+        stift: ja(k0.stift, alt.stift)
+      }
+      if (ja(k0.grossKlein, alt.grossKlein !== false)) delete neu.grossKlein
+      else neu.grossKlein = false
+      if (schrittweise) neu.schrittweise = true
+      else delete neu.schrittweise
+      if (merkAmEnde) neu.merkAmEnde = true
+      else delete neu.merkAmEnde
+      if (bis) neu.bis = bis
+      else delete neu.bis
+      if (bis && ja(k0.fristHart, alt.fristHart)) neu.fristHart = true
+      else delete neu.fristHart
+      db().prepare('UPDATE blatt_freigaben SET einstellungen = ? WHERE id = ?').run(JSON.stringify(neu), z.id)
+      if (neu.runden !== alt.runden) verknuepfteFreigabeRunden(z.rueckmeldung_id, neu.runden)
+      protokolliereServer('arbeitsblatt', 'Einstellungen einer Freigabe geändert', ich.id)
+      return (json(res, 200, { ok: true, einstellungen: neu }), true)
     }
     if (req.method === 'POST' && teile[1] === 'status') {
       const k0 = (await k.koerper()) as Record<string, unknown>

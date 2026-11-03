@@ -4,6 +4,7 @@
  * Stand, je Freigabe die Lernenden; jedes ausgefüllte Blatt lässt sich ansehen – mit Stift,
  * Kästchen, Markierungen und Randkommentaren, wie die Lernenden es sehen – und als PDF sichern.
  */
+import { FreigabeEinstellungenKnopf } from './FreigabeEinstellungen'
 import { useKopfDaten } from '../../shell/kopfDaten'
 import { AppKopf } from '../../shared/components/AppKopf'
 import {
@@ -458,6 +459,9 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
               von Kollegin/Kollege · nur ansehen
             </Badge>
           ) : (
+            <>
+            {/* Einstellungen nachträglich ändern (03.11.2026) */}
+            <FreigabeEinstellungenKnopf id={id} geaendert={laden} />
             <Button
               variant="default"
               onClick={() =>
@@ -466,6 +470,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
             >
               {d.status === 'offen' ? 'Beenden' : 'Wieder öffnen'}
             </Button>
+            </>
           )}
         </Group>
       </Group>

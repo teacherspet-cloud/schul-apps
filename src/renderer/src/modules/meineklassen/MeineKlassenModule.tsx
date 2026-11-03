@@ -15,6 +15,7 @@
  *  - Reiter Vokabeln/Grammatik (09.10.2026): „Vokabeln hinzufügen" / „Grammatik hinzufügen" mit denselben Dialogen wie in
  *    Sprachenlernen, für denselben Kurs der Klasse; in der Grammatik je Eintrag „+ Aufgaben".
  */
+import { FreigabeEinstellungenKnopf } from '../freigaben/FreigabeEinstellungen'
 import { istSprechSprache, SprechenReiter } from '../sprechen/SprechenReiter'
 import { problemWoerterText } from '@shared/problemWoerter'
 import { SchuljahrHinweis } from './SchuljahrHinweis'
@@ -1304,6 +1305,8 @@ function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
           aktionen={
             <>
               <AblegenKnopf quelle={blattQuelle(b.id, b.titel, Boolean(b.quelle))} {...ort} programm="arbeitsblatt" klein />
+              {/* Einstellungen nachträglich ändern (03.11.2026) */}
+              <FreigabeEinstellungenKnopf id={b.id} klein />
               {oeffnenKnopf(b.titel, () => oeffneMitRueckweg('freigaben', b.id))}
             </>
           }
