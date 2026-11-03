@@ -51,6 +51,7 @@ import {
   standVon,
   teileEingeordnet,
   teileVon,
+  ruhendeEinzelFreigaben,
   ueberschriftVon,
   vokabelnDerGruppe,
   zeile,
@@ -660,7 +661,9 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
       const ohneMerkmal = ({ merkmal: _m, ...b }: Bedarf) => b
       return { bedarf: sichtbar.map(ohneMerkmal), bedarfAusgeblendet: ausgeblendet.map(ohneMerkmal), bedarfAlle: bedarf }
     })(),
-    vorschlaege
+    vorschlaege,
+    // Ruhende Einzel-Freigaben der Mitglieder (03.11.2026) – im Reiter „Lernende" wieder aufnehmbar
+    ruhend: istSprachfach(g.fach) ? ruhendeEinzelFreigaben(lehrkraftId, mitglieder) : []
   }
 }
 

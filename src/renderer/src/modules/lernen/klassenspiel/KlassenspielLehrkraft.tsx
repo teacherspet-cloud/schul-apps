@@ -38,6 +38,10 @@ import { useProgrammFarbe } from '../../../shared/components/AppKopf'
 import { BandGruppe } from '../../../shared/components/BandCover'
 import { notifyError } from '../../../shared/util'
 import { useLiveSicht } from '../../../shared/liveSicht'
+
+/** Szenenbilder der Spiele (03.11.2026, Wunsch der Lehrkraft: „motivierend", oben auf der Karte); ohne Bild nur der Text */
+const SZENEN = import.meta.glob<string>('../../../assets/klassenspiele/*.webp', { eager: true, import: 'default' })
+const szene = (id: string): string | undefined => SZENEN[`../../../assets/klassenspiele/${id}.webp`]
 import { holen, senden } from '../../onlinetest/serverApi'
 import { qrDataUrl } from '../../arbeitsblatt/render/qr'
 import { auswahlZahlen, bandSchluessel, testAuswahlGliedern, unitSchluessel, type TestEintragDaten } from '../kurs/testPlanGliederung'
@@ -221,7 +225,20 @@ function StartFenster({ kursId, schliessen, gestartet }: { kursId: string; schli
                         const rekord = d.rekorde[s.id]
                         return (
                           <UnstyledButton key={s.id} disabled={!s.spielbar} onClick={() => setze({ spiel: s.id })} data-klassenspiel-wahl={s.id}>
-                            <Card withBorder radius="md" padding="sm" style={{ opacity: s.spielbar ? 1 : 0.5, borderColor: gewaehlt ? `var(--mantine-color-${farbe}-filled)` : undefined, borderWidth: gewaehlt ? 2 : 1 }}>
+                            <Card withBorder radius="md" padding="sm" h="100%" style={{ opacity: s.spielbar ? 1 : 0.5, borderColor: gewaehlt ? `var(--mantine-color-${farbe}-filled)` : undefined, borderWidth: gewaehlt ? 2 : 1 }}>
+                              {szene(s.id) && (
+                                <Card.Section mb="xs">
+                                  <img
+                                    src={szene(s.id)}
+                                    alt=""
+                                    aria-hidden="true"
+                                    width={640}
+                                    height={360}
+                                    style={{ display: 'block', width: '100%', height: 'auto', aspectRatio: '16 / 9', objectFit: 'cover', filter: s.spielbar ? undefined : 'grayscale(1)' }}
+                                    data-klassenspiel-bild={s.id}
+                                  />
+                                </Card.Section>
+                              )}
                               <Group justify="space-between" wrap="nowrap" gap="xs">
                                 <Text fw={700}>{s.name}</Text>
                                 {!s.spielbar && <Badge size="xs" color="gray">bald</Badge>}

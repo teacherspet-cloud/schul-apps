@@ -156,6 +156,23 @@ export async function leisteAuf(page) {
   }
 }
 
+/**
+ * „Sprachenlernen" in der Leiste öffnen (03.11.2026: standardmäßig ausgeblendet) – fehlt es, wird es unter „Programme
+ * anzeigen" eingeschaltet (Einstellung der Testlehrkraft) und die Seite neu geladen.
+ */
+export async function sprachenlernenOeffnen(page) {
+  const knopf = page.locator('.app-leiste [aria-label="Sprachenlernen"]')
+  await leisteAuf(page)
+  if (!(await knopf.count())) {
+    await page.evaluate(() => window.api.settings.set({ programmeAnzeigen: { sprachenlernen: true } }))
+    await page.reload()
+    await knopf.or(page.locator('.app-leiste [data-leiste-gruppe-kopf]').first()).first().waitFor({ timeout: 15000 })
+    await page.waitForTimeout(500)
+    await leisteAuf(page)
+  }
+  await knopf.click()
+}
+
 export async function leisteApp(page, label) {
   await leisteAuf(page)
   return page.locator(`.app-leiste [aria-label="${label}"]`)

@@ -7,7 +7,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursKaestenAuf, kursReiter } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf, kursReiter, sprachenlernenOeffnen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-sprachenlernen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -129,12 +129,13 @@ try {
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
   await expertenmodus(p)
-  pruefe(await da(p.locator('.app-leiste [aria-label="Sprachenlernen"]')), 'Leiste: „Sprachenlernen"')
+  // Seit 03.11.2026 standardmäßig ausgeblendet („Meine Klassen" deckt die Klassenkurse ab) – über „Programme anzeigen" ein
+  pruefe((await p.locator('.app-leiste [aria-label="Sprachenlernen"]').count()) === 0, 'Leiste: „Sprachenlernen" standardmäßig ausgeblendet')
   pruefe(
     (await p.locator('.app-leiste [aria-label="Vokabeltraining"], .app-leiste [aria-label="Grammatiktraining"]').count()) === 0,
     'Leiste ohne Vokabel- und Grammatiktraining'
   )
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.screenshot({ path: join(out, '1-uebersicht.png') })
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   await kursKaestenAuf(p)
@@ -227,7 +228,7 @@ try {
   )
   await p.reload()
   await p.waitForTimeout(1500)
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   await kursReiter(p, 'lernende')
   await p.locator('[data-lernende-ansicht]').getByText('Grammatik', { exact: true }).click()

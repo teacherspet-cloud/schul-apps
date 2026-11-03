@@ -12,7 +12,7 @@ import { createDecipheriv, createECDH, createHmac, randomBytes } from 'node:cryp
 import { createServer } from 'node:http'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursReiter } from './warten.mjs'
+import { expertenmodus, kursReiter, sprachenlernenOeffnen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-erinnerungen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -156,7 +156,7 @@ try {
   const sp = l.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
   await expertenmodus(l)
-  await l.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(l)
   await l.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursReiter(l, 'einstellungen')
   pruefe(await da(l.locator('[data-kurs-erinnerungen]')), 'Kurseinstellungen: Karte „Erinnerungen"')
@@ -231,7 +231,7 @@ try {
   pruefe(k2.erinnerungenAktiv === 1 && !JSON.stringify(k2).includes('erinnerungenGeraete'), `Lehrkraft bekommt nur die Zahl (${k2.erinnerungenAktiv})`)
   await l.reload()
   await l.waitForTimeout(1500)
-  await l.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(l)
   await l.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursReiter(l, 'einstellungen')
   pruefe(await da(l.locator('[data-kurs-erinnerungen-aktiv="1"]')), 'Lehrkraft: „1 Lernende/r hat Erinnerungen eingeschaltet"')

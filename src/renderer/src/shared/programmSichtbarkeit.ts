@@ -107,6 +107,13 @@ export function programmPasst(faecher: ProgrammFaecher | undefined, eigene: read
   return faecher.some((f) => eigene.includes(f))
 }
 
+/**
+ * Standardmäßig ausgeblendet (03.11.2026, Entscheidung der Lehrkraft): „Sprachenlernen" – „Meine Klassen" deckt die
+ * Kurse fester Lerngruppen ab (eingebettete Kursseite). Unter „Programme anzeigen" wieder einschaltbar (eigene Wahl geht
+ * vor); gilt auch für Admins. Kurse für Einzelne bzw. per QR-Code gibt es weiter nur dort.
+ */
+export const STANDARD_AUSGEBLENDET: readonly string[] = ['sprachenlernen']
+
 /** Weitere Umstände der Regel (10.10.2026) */
 export interface SichtbarkeitsOptionen {
   /**
@@ -133,6 +140,7 @@ export function programmSichtbar(
 ): boolean {
   const wahl = anzeigen?.[id]
   if (typeof wahl === 'boolean') return wahl
+  if (STANDARD_AUSGEBLENDET.includes(id)) return false
   if (opts.admin) return true
   // Fachobleute pflegen die gemeinsamen Lehrwerke (12.10.2026) – Vokabellisten unabhängig von den eigenen Fächern
   if (id === 'vokabelliste' && opts.fachobmann) return true
@@ -167,9 +175,11 @@ export interface StartKarten {
  * Karten der Startseite nach derselben Regel wie die Leiste (Entscheidung der Lehrkraft, 10.10.2026): Eine Karte steht
  * nur da, wenn ihre App sichtbar ist. Ohne Sprachenlernen (keine Sprache unterrichtet) heißt „Termine & Vokabeltraining"
  * nur „Termine" und zeigt nur, was nichts mit Vokabeln zu tun hat (Haltepunkte der laufenden Reihen).
+ * `vokabeln` (03.11.2026): Sprachenlernen ist standardmäßig aus – die Vokabelkarte bleibt, wenn „Meine Klassen" sichtbar
+ * ist und Sprachenlernen nach den Fächern passen würde (useStartKarten in shell/programme.ts).
  */
-export function startKarten(sichtbar: readonly string[]): StartKarten {
-  const hat = (id: string): boolean => sichtbar.includes(id)
+export function startKarten(sichtbar: readonly string[], vokabeln = false): StartKarten {
+  const hat = (id: string): boolean => sichtbar.includes(id) || (id === 'sprachenlernen' && vokabeln)
   return {
     reihen: hat('laufendereihen'),
     tests: hat('onlinetest'),

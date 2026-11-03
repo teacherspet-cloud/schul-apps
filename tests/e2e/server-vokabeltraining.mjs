@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursKaestenAuf } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf, sprachenlernenOeffnen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-vokabeltraining')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -79,7 +79,7 @@ try {
   await p.locator('.app-leiste [aria-label="Onlinetest"]').click()
   await p.waitForTimeout(600)
   pruefe((await p.getByRole('tab', { name: 'Vokabeltraining' }).count()) === 0, 'Onlinetest ohne Reiter „Vokabeltraining"')
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   pruefe(await da(p.locator(`[data-vokabel-zuweisung="${vok.id}"]`)), 'App „Vokabeltraining" mit der Freigabe')
   await p.screenshot({ path: join(out, '1-app.png') })
   // Vokabeln wählen (06.10.2026): Fach (bei mehreren Fremdsprachen) → Lehrwerk → Band

@@ -16,7 +16,41 @@ const STIL =
   'on a plain flat white background, centred, no text, no letters, no words, no watermark. On the tile, clean white and light-grey objects with soft shadows, friendly and simple, ' +
   'matching a set of school app icons (worksheet with a pencil on blue, speech bubbles on green, letter with fountain pen on yellow).'
 
+// Szenenbilder der Klassenspiele (03.11.2026, Wunsch der Lehrkraft: „motivierend", Bild oben auf jeder Karte im
+// Startfenster). Querformat: Motiv in einem breiten Band in der Mitte, oben und unten nur Himmel/Boden – wird auf 16:9
+// zugeschnitten (scripts/klassenspielbilder.mjs).
+const STIL_SZENE =
+  'A vibrant, joyful 3D cartoon illustration in the style of a modern animated family film (soft global lighting, rounded shapes, rich saturated colours, gentle depth of field). ' +
+  'Wide cinematic landscape composition: all important elements sit in a horizontal band through the middle of the image, the top and bottom quarters contain only sky, background or ground so the image can be cropped to 16:9. ' +
+  'Characters are diverse, friendly school children aged 10 to 14 in casual clothes, seen from a distance, energetic and happy, working together. ' +
+  'Full-bleed scene with a colourful background (no white background, no frame, no border). Absolutely no text, no letters, no numbers, no words, no logos, no watermark.'
+
 const MOTIVE = {
+  'klassenspiel-expedition':
+    'Scene: a whole school class climbing a friendly snowy mountain together on a winding trail, roped team, a few small tents as camps along the path, ' +
+    'the first children are just planting a big colourful flag on the sunny summit, the others cheer from below; blue sky with small clouds.',
+  'klassenspiel-boss':
+    'Scene: a big, cute but grumpy purple dragon (not scary, child-friendly) with a glowing shield, facing a group of school children who throw sparkling glowing stars and light bolts at it together; ' +
+    'the dragon looks surprised and a little dizzy; a castle courtyard at sunset with warm light.',
+  'klassenspiel-rennen':
+    'Scene: a tug-of-war on a green meadow – two teams of school children, one in red shirts, one in blue shirts, pulling hard on a thick rope with a ribbon marker in the middle, ' +
+    'laughing and leaning back; in the background a colourful running track with lanes and a finish arch with balloons (no text).',
+  'klassenspiel-puzzle':
+    'Scene: four school children around a table, each holding a giant colourful jigsaw puzzle piece, about to click them together into one glowing complete puzzle in the middle; ' +
+    'light sparkles where the pieces connect; bright classroom with plants, warm and cheerful.',
+  'klassenspiel-rekord':
+    'Scene: a whole school class jumping and cheering together in front of a giant golden trophy and a big glowing upward arrow made of light, confetti falling; ' +
+    'in the background a stadium-like scoreboard showing only bright coloured bars (no numbers, no text).',
+  'klassenspiel-gebiet':
+    'Scene: a large colourful board-game island map seen from slightly above, divided into square fields in four team colours (red, blue, green, yellow) with small golden stars on some fields; ' +
+    'little children figures in team colours plant small flags on fields; sea around the island, sunny.',
+  'klassenspiel-turnier':
+    'Scene: several small round tables in a bright gym hall, at each table three children compete in a friendly quiz duel pressing big round buzzers, ' +
+    'one table celebrates with raised arms; colourful pennants and little trophies on the tables; energetic tournament atmosphere.',
+  'klassenspiel-wette':
+    'Scene: a cheerful game-show stage with spotlights, school children at podiums placing glowing poker-style chips stacked in heights of one, two and three onto their podiums with confident smiles; ' +
+    'confetti and colourful lights, a big friendly question-mark shaped lamp hanging above (only the symbol ?, no letters).',
+
   // 12.10.2026: App „Grammatikformen" (Organisation; Kachelfarbe grape wie Grammatiktraining)
   grammatikformen:
     'Tile colour: grape purple (#cc5de8 to #9c36b5). Motif: a closed white textbook standing upright with three coloured bookmark tabs sticking out of the top, ' +
@@ -122,7 +156,7 @@ try {
   for (const id of ids) {
     for (let n = 1; n <= anzahl; n++) {
       const t0 = Date.now()
-      const dataUrl = await page.evaluate((prompt) => window.api.ai.image(prompt), `${STIL}\n\n${MOTIVE[id]}`)
+      const dataUrl = await page.evaluate((prompt) => window.api.ai.image(prompt), `${id.startsWith('klassenspiel-') ? STIL_SZENE : STIL}\n\n${MOTIVE[id]}`)
       const datei = join(out, `${id}-${n}.png`)
       writeFileSync(datei, Buffer.from(String(dataUrl).split(',')[1] ?? '', 'base64'))
       console.log(`${datei} (${Math.round((Date.now() - t0) / 1000)} s)`)

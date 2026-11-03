@@ -603,7 +603,8 @@ try {
       if ((await kopf.getAttribute('data-offen')) !== 'true') await kopf.click()
     }
     pruefe(await da(a.locator('.app-leiste [aria-label="Vokabeltest"]'), 5000), 'Admin mit Fach Geschichte: Vokabeltest bleibt sichtbar')
-    pruefe(await da(a.locator('.app-leiste [aria-label="Sprachenlernen"]'), 3000), 'Admin mit Fach Geschichte: Sprachenlernen bleibt sichtbar')
+    // Sprachenlernen ist seit 03.11.2026 auch für Admins standardmäßig aus; „Meine Klassen" bleibt
+    pruefe((await a.locator('.app-leiste [aria-label="Sprachenlernen"]').count()) === 0, 'Admin: Sprachenlernen standardmäßig ausgeblendet')
     await a.screenshot({ path: join(out, '8-admin-alles.png') })
     await a.close()
   } finally {

@@ -206,6 +206,24 @@ try {
   const cat = (tomListe2.woerter ?? []).find((w) => w.term === 'cat')
   pruefe(Boolean(cat) && (tomListe2.staende?.[cat.id]?.versuche ?? 0) > 0, 'Klasse gibt „cat" frei: Toms Stand zählt sofort')
 
+  // ---------- Meine Klassen › Lernende (03.11.2026): ruhende Einzel-Freigabe der neuen Klasse wieder aufnehmen
+  {
+    const nd = await (await lk.request.get(`${A}/server/klassen/${neue.id}`, { headers: KOPF })).json()
+    pruefe((nd.ruhend ?? []).some((r) => r.schueler === tom.id && r.kurs === einzeln.id && r.titel === 'Extra für Tom'), `Meine Klassen (${KLASSE}): ruhende Einzel-Freigabe von Tom (${JSON.stringify(nd.ruhend)})`)
+    const q = await seiteAuf(lk)
+    await q.locator('.app-leiste [aria-label="Meine Klassen"]').click()
+    await q.locator(`[data-klasse="${KLASSE}"]`).first().click()
+    await q.getByRole('tab', { name: /^Lernende/ }).click()
+    pruefe(await da(q.locator('[data-klasse-ruhend]')), 'Reiter „Lernende": Kasten „Ruht nach Klassenwechsel"')
+    await q.screenshot({ path: join(out, '1b-ruhend.png') })
+    await q.locator(`[data-klasse-ruhend] [data-ruhend-aufheben="${tom.id}"]`).click()
+    await q.locator('[data-klasse-ruhend]').waitFor({ state: 'detached', timeout: 8000 }).catch(() => undefined)
+    pruefe((await q.locator('[data-klasse-ruhend]').count()) === 0, '„Wieder aufnehmen": Kasten verschwindet')
+    const tomKurseW = await (await tomCtx.request.get(`${A}/s/api/vokabeln`, { headers: KOPF })).json()
+    pruefe(JSON.stringify(tomKurseW).includes(einzeln.id), 'Tom sieht seine Einzel-Freigabe wieder')
+    await q.close()
+  }
+
   // ---------- Meine Klassen: Hinweis und Rückgängig
   const p = await seiteAuf(lk)
   await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()

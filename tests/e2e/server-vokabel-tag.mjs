@@ -6,7 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursKaestenAuf, kursReiter } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf, kursReiter, sprachenlernenOeffnen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-vokabel-tag')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -75,7 +75,7 @@ try {
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
   await expertenmodus(p)
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursKaestenAuf(p, 'vokabeln')
   // Kasten „Abschnitte & Wörter" (10.10.2026, statt „32 Wörter"): Wörterzahl, neu Hinzugekommenes hervorgehoben
@@ -333,7 +333,7 @@ try {
   console.log('  URL vor dem Neuladen:', p.url())
   await p.reload()
   await p.waitForTimeout(1500)
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.locator(`[data-vokabel-zuweisung="${vid}"]`).click()
   await kursKaestenAuf(p, 'lernende')
   pruefe(await da(p.locator('[data-woche="10/0"]')), 'Ben: „10 neu · 0 wiederholt" in 7 Tagen')
@@ -366,7 +366,7 @@ try {
   pruefe(k1.faecher?.length === 7 && k1.faecher.reduce((a, b) => a + b, 0) > 0, `Fächerverteilung für das Symbol (${k1.faecher})`)
   await p.reload()
   await p.waitForTimeout(1500)
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   const karte = p.locator(`[data-vokabel-zuweisung="${vid}"]`)
   await karte.locator('[data-vokabel-umbenennen]').click()
   await p.locator('[data-umbenennen-eingabe]').fill('Englisch 5b – Unit 1')

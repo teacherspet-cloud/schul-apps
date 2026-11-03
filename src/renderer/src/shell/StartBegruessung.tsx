@@ -9,9 +9,8 @@ import { IconAlertTriangle, IconCalendarEvent, IconPlayerPlay, IconSend } from '
 import { useEffect } from 'react'
 import { demnaechst, tagKurz } from '@shared/startseiteKurse'
 import { aufServer } from '../shared/plattform'
-import { startKarten } from '../shared/programmSichtbarkeit'
 import { useKopfDaten } from './kopfDaten'
-import { useSichtbareProgramme } from './programme'
+import { useSichtbareProgramme, useStartKarten } from './programme'
 import { startKastenId } from './StartAnzahl'
 
 /** „Guten Morgen" bis 11 Uhr, „Guten Tag" bis 17 Uhr, sonst „Guten Abend" */
@@ -80,7 +79,7 @@ export default function StartBegruessung({ zusaetze }: { zusaetze?: React.ReactN
   const server = aufServer()
   const { reihen, blaetter, tests, rueck, start } = useKopfDaten()
   const ids = useSichtbareProgramme().map((m) => m.id)
-  const karten = startKarten(ids)
+  const karten = useStartKarten()
   useEffect(() => {
     if (server) void useKopfDaten.getState().laden()
   }, [server])

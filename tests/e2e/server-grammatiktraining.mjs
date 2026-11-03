@@ -7,7 +7,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import { expertenmodus, kursKaestenAuf } from './warten.mjs'
+import { expertenmodus, kursKaestenAuf, sprachenlernenOeffnen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-grammatiktraining')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -63,7 +63,7 @@ try {
     ).json()
   ).id
   const kursCode = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === kurs)?.code
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   await kursKaestenAuf(p)
   pruefe(await da(p.locator('[data-kurs-grammatik]')), 'Kurs mit Grammatik-Tabelle')
@@ -258,7 +258,7 @@ try {
   // ---------- Lehrkraft: Lernstand
   await p.reload()
   await p.waitForTimeout(1500)
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   await kursKaestenAuf(p)
   // Auf den Titel klicken – die Aufgaben-Zelle hat eigene Knöpfe (+ Aufgaben, Bearbeiten)

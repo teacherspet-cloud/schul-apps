@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { sprachenlernenOeffnen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-grammatik-formate')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -128,7 +129,7 @@ try {
   if (await spat.isVisible().catch(() => false)) await spat.click()
   const zu = p.locator('.app-leiste [data-leiste-gruppe-kopf][data-offen="false"]').filter({ visible: true })
   for (let i = 0; i < 10 && (await zu.count()); i++) await zu.first().click()
-  await p.locator('.app-leiste [aria-label="Sprachenlernen"]').click()
+  await sprachenlernenOeffnen(p)
   await p.locator(`[data-vokabel-zuweisung="${kurs}"]`).click()
   const reiter = p.locator('[data-kurs-reiter="grammatik"]')
   await reiter.waitFor({ timeout: 15000 })

@@ -36,8 +36,7 @@ import { kursReiterDocId } from '../modules/lernen/kurs/auftragsZiel'
 import { zumHinweis } from '../modules/lernen/kurs/kursFokus'
 import type { KursReiter } from '../modules/lernen/kurs/kursDaten'
 import { AnzahlWahl, startKastenId, useStartAnzahl, useStartOffen } from './StartAnzahl'
-import { useSichtbareProgramme } from './programme'
-import { startKarten } from '../shared/programmSichtbarkeit'
+import { useSichtbareProgramme, useStartKarten } from './programme'
 import { useKopfDaten, type RueckmeldungKurz } from './kopfDaten'
 import { VokabelBalken } from '../shared/components/VokabelBalken'
 import { TestZumTermin, testVorhanden } from './TestZumTermin'
@@ -168,7 +167,7 @@ export function Schnellzugriff(): React.JSX.Element {
   // Nur Karten sichtbarer Apps – dieselbe Regel wie die Leiste (10.10.2026)
   const sichtbar = useSichtbareProgramme()
   const ids = sichtbar.map((m) => m.id)
-  const karten = startKarten(ids)
+  const karten = useStartKarten()
   const vokabeln = karten.termine === 'voll'
   useEffect(() => {
     void useKopfDaten.getState().laden(true)

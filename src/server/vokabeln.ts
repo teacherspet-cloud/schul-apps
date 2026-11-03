@@ -672,6 +672,24 @@ function ruhendeVon(z: Zeile): NutzerInfo[] {
   return alleNutzer().filter((n) => n.rolle === 'schueler' && nur.includes(n.benutzer) && ruht('vok', z.id, n.id))
 }
 
+/**
+ * Ruhende Einzel-Freigaben dieser Lehrkraft für die genannten Lernenden (03.11.2026, „Meine Klassen" › Lernende): Nach einem
+ * Klassenwechsel ruhen Freigaben für Einzelne (Kurse ohne Lerngruppe, mitnahme.ts) – hier je Person und Kurs, damit die
+ * Lehrkraft sie in der neuen Klasse wieder aufnehmen kann, ohne nach Sprachenlernen zu wechseln.
+ */
+export function ruhendeEinzelFreigaben(lehrkraftId: string, lernende: NutzerInfo[]): { schueler: string; name: string; kurs: string; titel: string }[] {
+  if (!lernende.length) return []
+  const kurse = db()
+    .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = '' AND reihe = ''")
+    .all(lehrkraftId) as unknown as Zeile[]
+  return kurse.flatMap((z) => {
+    const nur = json_(z.schueler, [] as string[])
+    return lernende
+      .filter((n) => nur.includes(n.benutzer) && ruht('vok', z.id, n.id))
+      .map((n) => ({ schueler: n.id, name: n.name || n.benutzer, kurs: z.id, titel: z.ueberschrift || z.titel || ueberschriftVon(z) }))
+  })
+}
+
 // ---------------------------------------------------------------- Lernende einer Klasse zuordnen (08.10.2026)
 
 /** Wer aus dem Training in eine Lerngruppe kann: eingetragene Gäste (Anmeldecode) und Schülerkonten, nie Vorschaukonten */

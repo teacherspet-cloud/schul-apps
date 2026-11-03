@@ -12,8 +12,7 @@ import type { LaufendeReihe } from '../modules/unterrichtsreihe/LaufendeReihenMo
 import type { Freigabe } from '../modules/freigaben/FreigegebeneBlaetterModule'
 import { demnaechst, kopfZahlen, type KopfZahl, type StartseiteDaten } from '@shared/startseiteKurse'
 import { appFreigegeben, aufServer } from '../shared/plattform'
-import { startKarten } from '../shared/programmSichtbarkeit'
-import { useSichtbareProgramme } from './programme'
+import { useSichtbareProgramme, useStartKarten } from './programme'
 
 export interface TestKurz {
   id: string
@@ -112,7 +111,7 @@ export function useKopfZahlen(): KopfZahl[] {
   const { tests, start, reihen, blaetter } = useKopfDaten()
   const ids = useSichtbareProgramme().map((m) => m.id)
   if (!aufServer()) return []
-  const karten = startKarten(ids)
+  const karten = useStartKarten()
   const jetzt = Date.now()
   const t = tests ?? []
   const kurse = karten.termine === 'voll' ? (start?.kurse ?? []) : []

@@ -144,6 +144,8 @@ interface KlasseDetail {
   fach: string
   titel: string
   sprachfach: boolean
+  /** Ruhende Einzel-Freigaben der Mitglieder nach einem Klassenwechsel (03.11.2026) */
+  ruhend?: { schueler: string; name: string; kurs: string; titel: string }[]
   /** Deutsch (13.10.2026): Grammatik ohne Vokabeln – fehlt bei älteren Servern (dann wie Sprachfach) */
   vokabelfach?: boolean
   ablageMuster: string
@@ -1170,6 +1172,31 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
         <Tabs.Panel value="lernende" pt="sm">
           {/* Erste IServ-Anmeldung, mehrdeutig: mit dem bisherigen Gastkonto zusammenführen? (09.10.2026) */}
           <IservVorschlaege gruppeId={d.id} geaendert={laden} />
+          {/* Wiederholer/Klassenwechsel (03.11.2026, wie in Sprachenlernen › Lernende): ruhende Einzel-Freigaben wieder aufnehmen */}
+          {(d.ruhend ?? []).length > 0 && (
+            <Alert color="gray" title="Ruht nach Klassenwechsel" mb="sm" data-klasse-ruhend>
+              <Text size="sm" mb={6}>
+                Freigaben nur für einzelne Lernende ruhen nach dem Wechsel – in der neuen Klasse gelten deren Freigaben. Der Lernstand bleibt erhalten.
+              </Text>
+              <Stack gap={4}>
+                {(d.ruhend ?? []).map((r) => (
+                  <Group key={`${r.kurs}-${r.schueler}`} gap="xs">
+                    <Text size="sm">
+                      {r.name} · „{r.titel}“
+                    </Text>
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      onClick={() => void senden(`/server/vokabeln/${r.kurs}/ruhend-aufheben`, { schueler: r.schueler }).then(laden, (e: unknown) => notifyError(e))}
+                      data-ruhend-aufheben={r.schueler}
+                    >
+                      Wieder aufnehmen
+                    </Button>
+                  </Group>
+                ))}
+              </Stack>
+            </Alert>
+          )}
           <LernendeTabelle gruppeId={d.id} titel={d.titel || d.name} lernende={d.lernende} neuLaden={laden} />
         </Tabs.Panel>
       </Tabs>

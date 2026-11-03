@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { siehtLehrwerkPflege } from '@shared/fachobleute'
 import { modules, type SchulModule } from '../modules/registry'
 import { useAppSettings } from '../shared/settingsStore'
-import { sichtbareProgramme } from '../shared/programmSichtbarkeit'
+import { programmPasst, sichtbareProgramme, SPRACH_FAECHER, startKarten, type StartKarten } from '../shared/programmSichtbarkeit'
 import { appFreigegeben, serverIch } from '../shared/plattform'
 
 /**
@@ -23,4 +23,18 @@ export function useSichtbareProgramme(): SchulModule[] {
     () => sichtbareProgramme(modules.filter((m) => appFreigegeben(m.id)), eigene, anzeigen, { admin, fachobmann }),
     [eigene, anzeigen, admin, fachobmann]
   )
+}
+
+/**
+ * Karten der Startseite (03.11.2026): wie `startKarten`, dazu die Vokabelkarte auch ohne sichtbares Sprachenlernen – wenn
+ * „Meine Klassen" sichtbar ist, Sprachenlernen nicht ausdrücklich ausgeschaltet wurde und eine Sprache unterrichtet wird
+ * (Admins: immer).
+ */
+export function useStartKarten(): StartKarten {
+  const ids = useSichtbareProgramme().map((m) => m.id)
+  const eigene = useAppSettings((s) => s.settings.eigeneFaecher)
+  const wahl = useAppSettings((s) => s.settings.programmeAnzeigen?.sprachenlernen)
+  const admin = serverIch()?.rolle === 'admin'
+  const vokabeln = ids.includes('meineklassen') && wahl !== false && appFreigegeben('sprachenlernen') && (admin || programmPasst(SPRACH_FAECHER, eigene))
+  return startKarten(ids, vokabeln)
 }

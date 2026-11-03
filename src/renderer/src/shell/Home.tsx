@@ -1,6 +1,5 @@
 import { Schnellzugriff, SchnellzugriffTitel, StartKasten } from './Schnellzugriff'
-import { useSichtbareProgramme } from './programme'
-import { startKarten } from '../shared/programmSichtbarkeit'
+import { useStartKarten } from './programme'
 import { appFreigegeben, aufServer, nurPcNetz } from '../shared/plattform'
 import { Alert, Badge, Button, Card, CloseButton, Container, Group, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceFloppy, IconHistory, IconHome, IconSearch } from '@tabler/icons-react'
@@ -82,7 +81,7 @@ const START_INFO = {
  */
 export default function Home(): React.JSX.Element {
   // App-Freigaben (23.10.2026): Karten „Auf einen Blick“ nur zu sichtbaren Apps
-  const sichtbareIds = useSichtbareProgramme().map((m) => m.id)
+  const startKartenJetzt = useStartKarten()
   /*
    * Kopf (10.10.2026): Logo, „Schul-Apps", Schulname, Datum und Info-Chips stehen seit der Entscheidung der Lehrkraft im
    * Rahmen über ALLEN Seiten (shell/RahmenKopf.tsx). Seit 12.10.2026 darunter wieder ein Kopf-Kasten wie in den Apps
@@ -323,7 +322,7 @@ export default function Home(): React.JSX.Element {
 
         {/* Server (03.10.2026): das Wichtigste auf einen Blick – Reihen, Tests, Freigaben, Termine */}
         {/* App-Freigaben (23.10.2026): ohne eine einzige Karte auch keine Überschrift „Auf einen Blick“ */}
-        {aufServer() && Object.values(startKarten(sichtbareIds)).some(Boolean) && (
+        {aufServer() && Object.values(startKartenJetzt).some(Boolean) && (
           <>
             <SchnellzugriffTitel />
             <Schnellzugriff />
