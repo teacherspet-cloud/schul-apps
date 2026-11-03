@@ -805,6 +805,8 @@ export interface TableBlock extends BaseBlock {
    * 'none' = ausdrücklich untereinander. Fehlt der Wert, entscheidet bei Bildern die Rolle.
    */
   side?: 'left' | 'right' | 'none'
+  /** Seite von Hand gewählt (03.11.2026) – gilt dann auch für große Tabellen (didactics/tabelleDaneben.ts) */
+  seiteVonHand?: boolean
   /**
    * Von Hand gezogene Maße (27.09.2026, render/tabelleMasse.ts): Spaltenbreiten in Prozent
    * der Tabellenbreite (Summe 100), Mindesthöhen der Zeilen in mm (0 = nach Inhalt), Höhe der

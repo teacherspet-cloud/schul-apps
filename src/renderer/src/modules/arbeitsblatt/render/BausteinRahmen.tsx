@@ -483,7 +483,13 @@ export function BausteinRahmen({
                   <Menu.Item
                     key={o.text}
                     fw={block.side === o.wert ? 700 : undefined}
-                    onClick={() => onUpdate((d) => (d.type === 'image' || d.type === 'table' ? (d.side = o.wert) : undefined))}
+                    onClick={() =>
+                      onUpdate((d) => {
+                        if (d.type === 'image') d.side = o.wert
+                        // Von Hand gewählt (03.11.2026): gilt auch für große Tabellen (didactics/tabelleDaneben.ts)
+                        if (d.type === 'table') (d.side = o.wert), (d.seiteVonHand = true)
+                      })
+                    }
                   >
                     {o.text}
                   </Menu.Item>

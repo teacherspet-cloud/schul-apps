@@ -25,7 +25,7 @@ export function imageRules(meta: WorksheetMeta): string {
      */
     'ANORDNUNG – setze sie in blockSide (gilt für Bilder UND Tabellen):',
     '- "left" oder "right": Der Baustein steht seitlich, der FOLGENDE Baustein (Aufgabe, Text, Merkkasten) steht daneben und läuft darunter in voller Breite weiter. Sinnvoll bei einem Bild oder einer Tabelle, auf die sich die Aufgabe bezieht – besonders neben Schreiblinien.',
-    '- "none": untereinander. Richtig für breite Tabellen (ab vier Spalten), Bildreihen und alles, was ausgewertet wird und Fläche braucht.',
+    '- "none": untereinander. Richtig für breite Tabellen (ab vier Spalten), Tabellen mit ganzen Sätzen in den Zellen (Faktenboxen), Bildreihen und alles, was ausgewertet wird und Fläche braucht. Neben der Aufgabe sind nur gut 6 cm Platz – daneben passt nur eine kurze Stichwort-Tabelle.',
     '- "auto": Die App entscheidet. Im Zweifel "auto".',
     '',
     'PLATZ AUF DEM BLATT – setze ihn in imageRole:',

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { tabelleZuGrossDaneben } from '../didactics/tabelleDaneben'
 import { nurZeichenauftrag } from './zeichenauftrag'
 import { lueckentextOhneDoppelte } from '@shared/luecken'
 import { stufeAus } from '../../../shared/verstehen/stufen'
@@ -399,7 +400,10 @@ function convertBlockRoh(b: any, rng: Rng, images: { index: number; dataUrl: str
         title: text(b.title),
         headers: strings(b.headers),
         rows: (Array.isArray(b.rows) ? b.rows : []).map((r: any) => (Array.isArray(r) ? r.map(text) : [])),
-        ...(seite(b.blockSide) ? { side: seite(b.blockSide) } : {})
+        // Daneben nur, wenn die Tabelle schmal genug bleibt (03.11.2026, didactics/tabelleDaneben.ts)
+        ...(seite(b.blockSide) && !tabelleZuGrossDaneben({ title: text(b.title), headers: strings(b.headers), rows: (Array.isArray(b.rows) ? b.rows : []).map((r: any) => (Array.isArray(r) ? r.map(text) : [])) })
+          ? { side: seite(b.blockSide) }
+          : {})
       }
     case 'workspace':
       return {

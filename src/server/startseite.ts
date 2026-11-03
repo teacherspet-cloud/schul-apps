@@ -90,7 +90,7 @@ export function startseiteDaten(lehrkraftId: string, jetzt = Date.now()): Starts
 }
 
 /** Test zum Termin (28.10.2026): verknüpfter Test und die gewählten Abschnitte bzw. Grammatik des Termins */
-function testZumTermin(kursId: string): Pick<StartKurs, 'testMaterial' | 'testInhalt'> {
+export function testZumTermin(kursId: string): Pick<StartKurs, 'testMaterial' | 'testInhalt'> {
   const z = vokZeile(kursId)
   if (!z) return {}
   const t = testAbschnitteFuerLehrkraft(z)

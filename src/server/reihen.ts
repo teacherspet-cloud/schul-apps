@@ -1844,6 +1844,17 @@ export function bedarfFuer(
   return { bedarf, lernende }
 }
 
+/** Klassenkarten in „Meine Klassen" (03.11.2026): offene Haltepunkte der laufenden Reihen einer Lerngruppe mit Tag */
+export function haltepunkteDerGruppe(lehrkraftId: string, lerngruppeId: string): { zid: string; titel: string; tag: string | null }[] {
+  const alle = db()
+    .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND status = 'offen' AND COALESCE(vorschau, 0) = 0")
+    .all(lehrkraftId, lerngruppeId) as unknown as ZuweisungZeile[]
+  return alle.flatMap((z) => {
+    const r = reiheVon(z.reihe_id)
+    return r ? haltepunktTermine(r, json_(z.halte_frei, [] as string[])).map((h) => ({ zid: z.id, ...h })) : []
+  })
+}
+
 /** „Meine Klassen" (06.10.2026): laufende Reihen einer Lerngruppe mit Fortschritt je Person und Handlungsbedarf */
 export function reihenDerGruppe(
   lehrkraftId: string,

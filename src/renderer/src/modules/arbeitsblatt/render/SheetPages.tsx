@@ -1,4 +1,5 @@
 import { hilfenZuordnung } from '../didactics/aufgabenVerweise'
+import { tabelleZuGrossDaneben } from '../didactics/tabelleDaneben'
 import { inhaltsForm, querBausteine, SEITE_MM } from '../model/seitenformat'
 import { quellenAnhang } from './quellenAnhang'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -262,6 +263,9 @@ export function seiteVon(b: WsBlock): 'left' | 'right' | undefined {
     if (b.side) return b.side
     return b.role === 'illustration' || b.role === 'motivation' ? 'right' : undefined
   }
+  // Große Tabellen nicht daneben (03.11.2026, „Midterm elections"): sonst schmale lange Spalte und leeres Blatt – auch
+  // für bestehende Blätter; von Hand gewählt gilt
+  if (b.side && !b.seiteVonHand && tabelleZuGrossDaneben(b)) return undefined
   return b.side
 }
 

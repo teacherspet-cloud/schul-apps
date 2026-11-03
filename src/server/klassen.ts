@@ -37,7 +37,10 @@ import {
   type Lerngruppe
 } from './onlinetest'
 import { onlinetestBaldBedarf } from '../shared/onlinetestTermin'
-import { reihenDerGruppe } from './reihen'
+import { haltepunkteDerGruppe, reihenDerGruppe } from './reihen'
+import { testZumTermin } from './startseite'
+import { haltepunktText, terminInhaltKurz } from '../shared/startseiteKurse'
+import { tagVon } from '../shared/schulkalender'
 import { alleVerknuepfungen } from './kontoVerknuepfung'
 import {
   db as vokDb,
@@ -667,6 +670,56 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now(), leicht =
   }
 }
 
+/** Nächster Termin einer Fach-Lerngruppe auf der Klassenkarte (03.11.2026) */
+export interface KartenTermin {
+  /** „JJJJ-MM-TT" */
+  tag: string
+  art: 'test' | 'onlinetest' | 'halt'
+  /** „Vokabeltest – Unit 1 – Station 2, 3" bzw. Name des Onlinetests bzw. „Haltepunkt „…"" */
+  text: string
+  /** Kurs (Vokabeltest), Onlinetest bzw. Zuweisung der Reihe */
+  ziel: string
+}
+
+/**
+ * Vorrang der offenen Punkte auf der Klassenkarte (03.11.2026, abgestimmt: wie die Startseite – Test bald > Abgaben >
+ * nicht geübt > Problemwörter/Weiteres; „Lernende eintragen" zuletzt)
+ */
+export function todoRang(b: Pick<Bedarf, 'art' | 'hinweis'>): number {
+  if (b.art === 'termin' || b.hinweis === 'termin' || b.hinweis === 'geplant') return 0
+  if (b.art === 'blatt' || b.art === 'reihe') return 1
+  if (b.art === 'entscheiden') return 2
+  if (b.art === 'inaktiv' || b.hinweis === 'inaktiv') return 3
+  if (b.hinweis === 'leer') return 9
+  return 4
+}
+
+/** Zusätze je Fach für die Klassenkarte: nächster Termin, erste laufende Reihe, höchstens zwei offene Punkte */
+function klassenKarteFach(
+  g: Lerngruppe,
+  lehrkraftId: string,
+  d: ReturnType<typeof detail>,
+  jetzt = Date.now()
+): { termin: KartenTermin | null; reihe: { zid: string; titel: string; schnitt: number; weitere: number } | null; todo: Omit<Bedarf, 'merkmal'>[]; todoGesamt: number } {
+  const heute = tagVon(jetzt)
+  const termine: KartenTermin[] = []
+  for (const t of d.vokabeln)
+    if (t.status === 'offen' && t.testTermin && tagVon(t.testTermin) >= heute)
+      termine.push({ tag: tagVon(t.testTermin), art: 'test', text: ['Vokabeltest', terminInhaltKurz(testZumTermin(t.id).testInhalt)].filter(Boolean).join(' – '), ziel: t.id })
+  for (const o of angekuendigteDerGruppe(g.id, jetzt))
+    if (!o.verborgen && o.termin >= heute) termine.push({ tag: o.termin, art: 'onlinetest', text: o.titel, ziel: o.id })
+  for (const h of haltepunkteDerGruppe(lehrkraftId, g.id)) if (h.tag && h.tag >= heute) termine.push({ tag: h.tag, art: 'halt', text: haltepunktText(h.titel, ''), ziel: h.zid })
+  termine.sort((a, b) => a.tag.localeCompare(b.tag) || (a.art === 'halt' ? 1 : 0) - (b.art === 'halt' ? 1 : 0))
+  const offen = d.reihen.filter((r) => r.status === 'offen' && !r.geplantAb)
+  const todo = [...d.bedarf].sort((a, b) => todoRang(a) - todoRang(b))
+  return {
+    termin: termine[0] ?? null,
+    reihe: offen[0] ? { zid: offen[0].zid, titel: offen[0].titel, schnitt: offen[0].schnitt, weitere: offen.length - 1 } : null,
+    todo: todo.slice(0, 2),
+    todoGesamt: todo.length
+  }
+}
+
 /**
  * Handlungsbedarf je Person (12.10.2026, Förder- und Fordermaterial, server/foerdern.ts): die Arten der Kurs-Hinweise
  * („inaktiv", „schwach", „foerdern") mit den Kennungen der Betroffenen – derselbe Weg wie die Suche (auch Ausgeblendetes).
@@ -829,6 +882,11 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
             reihen: number
             blaetter: number
             iserv: ReturnType<typeof iservAngabe>
+            /** Klassenkarte (03.11.2026): nächster Termin, laufende Reihe, die wichtigsten offenen Punkte */
+            termin: KartenTermin | null
+            reihe: { zid: string; titel: string; schnitt: number; weitere: number } | null
+            todo: Omit<Bedarf, 'merkmal'>[]
+            todoGesamt: number
           }[]
           iserv: ReturnType<typeof iservAngabe>
         }
@@ -873,7 +931,8 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
           tests: d.tests.length,
           reihen: d.reihen.filter((r) => r.status === 'offen').length,
           blaetter: d.blaetter.filter((b) => b.status === 'offen').length,
-          iserv
+          iserv,
+          ...klassenKarteFach(g, ich.id, d)
         })
       }
       return (
