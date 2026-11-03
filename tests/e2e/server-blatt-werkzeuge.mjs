@@ -573,9 +573,13 @@ try {
   await h.waitForTimeout(800)
   const zb = await zf.boundingBox()
   const cdp = await hm.newCDPSession(h)
-  const mx = zb.x + zb.width / 2
-  // Oben im Blatt – nicht unter der unteren Einreichen-Leiste (03.11.2026)
-  const my = zb.y + Math.min(100, zb.height / 2)
+  // Fingermitte auf einem Eingabefeld (03.11.2026): nach dem Zoom soll dieselbe Stelle unter den Fingern liegen
+  const feldH = h.locator('[data-feld]').first()
+  await feldH.scrollIntoViewIfNeeded()
+  await h.waitForTimeout(300)
+  const fb0 = await feldH.boundingBox()
+  const mx = fb0.x + Math.min(40, fb0.width / 2)
+  const my = fb0.y + fb0.height / 2
   const zwei = (d) => [
     { x: mx - d, y: my, id: 1, radiusX: 6, radiusY: 6, force: 1 },
     { x: mx + d, y: my, id: 2, radiusX: 6, radiusY: 6, force: 1 }
@@ -586,6 +590,14 @@ try {
   await cdp.detach()
   await h.waitForTimeout(400)
   const zoomWert = await zf.evaluate((el) => Number(el.dataset.blattZoom || 1))
+  {
+    await h.waitForTimeout(300)
+    const fb1 = await feldH.boundingBox()
+    const w = fb1.width / fb0.width
+    const dx = Math.abs(fb1.x + (mx - fb0.x) * w - mx)
+    const dy = Math.abs(fb1.y + (my - fb0.y) * w - my)
+    pruefe(dx < 15 && dy < 15, `Zwei Finger: die Stelle unter den Fingern bleibt dort (Faktor ${w.toFixed(2)}, Abweichung ${dx.toFixed(0)}/${dy.toFixed(0)} px)`)
+  }
   pruefe(zoomWert > 1.3 && (await zf.getAttribute('data-gezoomt')) !== null, `Zwei Finger auseinander: Blatt vergrößert (Zoom ${zoomWert.toFixed(2)}), Fläche rollt seitwärts`)
   // Noch einmal mit zwei Fingern oben auf dem Blatt (26.10.2026, Befund „zoomt an den Hintergrund"): nach „Breite einpassen" wieder vergrößern;
   // der Inhalt des Blattrahmens zieht mit (rahmenZoomAngleichen – Chromium gibt den Zoom weiter, WebKit bekommt ihn gesetzt)
@@ -595,7 +607,8 @@ try {
   const rahmenBox = await h.locator('.zoom-flaeche.blatt-zoom iframe').first().boundingBox()
   const cdp2 = await hm.newCDPSession(h)
   const rx = rahmenBox.x + rahmenBox.width * 0.5
-  const ry = rahmenBox.y + rahmenBox.height * 0.08
+  // Sichtbarer Teil des Rahmens (03.11.2026: nach dem ersten Zoom steht die Fingerstelle im Bild, nicht der Blattanfang)
+  const ry = Math.min(rahmenBox.y + rahmenBox.height - 50, Math.max(rahmenBox.y, 0) + 400)
   const zweiImRahmen = (d) => [
     { x: rx - d, y: ry, id: 1, radiusX: 6, radiusY: 6, force: 1 },
     { x: rx + d, y: ry, id: 2, radiusX: 6, radiusY: 6, force: 1 }

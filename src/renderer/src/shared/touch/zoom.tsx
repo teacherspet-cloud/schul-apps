@@ -121,13 +121,25 @@ function tasteGedrueckt(e: KeyboardEvent): void {
 
 // ---------- Hilfen
 
-/** Nächster Vorfahr, der senkrecht rollt (ScrollArea-Fenster) */
+/**
+ * Nächster Vorfahr, der senkrecht rollt (ScrollArea-Fenster) – sonst die Seite selbst (03.11.2026, Befund der Lehrkraft
+ * „das Material zoomt nicht an die Stelle, auf die die Finger zeigen"): Im Schülerblatt rollt das Dokument; ohne diesen
+ * Rückfall blieb die Stelle senkrecht nicht unter den Fingern bzw. dem Mauszeiger, das Blatt wuchs nach unten weg.
+ */
 function senkrechtRollend(el: HTMLElement | null): HTMLElement | null {
   for (let e = el?.parentElement ?? null; e; e = e.parentElement) {
     const oy = getComputedStyle(e).overflowY
     if ((oy === 'auto' || oy === 'scroll') && e.scrollHeight > e.clientHeight) return e
   }
-  return null
+  return (document.scrollingElement as HTMLElement | null) ?? null
+}
+
+/** Rollpunkt für einen Zoom-Anker: Stelle `ix/iy` (Inhalt bei Zoom 1) soll nach dem Zoom unter `mx/my` stehen */
+export interface ZoomAnker {
+  ix: number
+  iy: number
+  mx: number
+  my: number
 }
 
 /**
@@ -170,10 +182,12 @@ export function useZweiFingerZoom(opts: {
   min?: number
   max?: number
   /**
-   * Eigene Vorschau während der Geste statt CSS-`zoom` am Inhalt (03.11.2026, Schülerblatt): `zNeu` ist der Zoom unter
-   * den Fingern, `zFest` der zuletzt übernommene. Am Ende der Geste kommt `setFaktor` – der Aufrufer setzt dann neu.
+   * Vorschau per transform statt CSS-`zoom` (03.11.2026, Schülerblatt – Blatt und Stift-Ebene haben EINEN Maßstab):
+   * während der Geste wächst der Inhalt um den Punkt unter den Fingern und wandert mit ihnen; beim Loslassen
+   * übernimmt `uebernehmen` den Zoom und rollt die Stelle (`ZoomAnker`) unter die Finger.
    */
-  vorschau?: (innen: HTMLElement, zNeu: number, zFest: number) => void
+  vorschau?: boolean
+  uebernehmen?: (faktor: number, anker: ZoomAnker) => void
 }): void {
   const aktuell = useRef(opts)
   aktuell.current = opts
@@ -182,7 +196,7 @@ export function useZweiFingerZoom(opts: {
     const el = opts.flaeche.current
     if (!opts.aktiv || !el) return
     // art: erst offen, dann einmal entschieden – Zoom oder Rollen (gestenLogik.ts zweiFingerArt, 02.11.2026)
-    let start: { abstand: number; faktor: number; mitte: Punkt; letzteMitte: Punkt; art: 'zoom' | 'rollen' | null } | null = null
+    let start: { abstand: number; faktor: number; mitte: Punkt; letzteMitte: Punkt; art: 'zoom' | 'rollen' | null; r0: DOMRect | null; m0: Punkt } | null = null
     let letzter = opts.faktor
 
     /*
@@ -209,11 +223,8 @@ export function useZweiFingerZoom(opts: {
       const zNeu = basis * faktor
       const ix = (m.x - vorher.left) / zAlt
       const iy = (m.y - vorher.top) / zAlt
-      if (aktuell.current.vorschau) aktuell.current.vorschau(innen, zNeu, basis * aktuell.current.faktor)
-      else {
-        innen.style.zoom = String(zNeu)
-        rahmenZoomAngleichen(innen, zNeu)
-      }
+      innen.style.zoom = String(zNeu)
+      rahmenZoomAngleichen(innen, zNeu)
       letzter = faktor
       const nachher = innen.getBoundingClientRect()
       el.scrollLeft += nachher.left - (m.x - ix * zNeu)
@@ -226,7 +237,7 @@ export function useZweiFingerZoom(opts: {
       const [a, b] = punkte(e.touches, ab)
       letzter = aktuell.current.faktor
       const m0 = mitte(e.touches, ab)
-      start = { abstand: abstand(a, b), faktor: letzter, mitte: m0, letzteMitte: m0, art: null }
+      start = { abstand: abstand(a, b), faktor: letzter, mitte: m0, letzteMitte: m0, art: null, r0: aktuell.current.inhalt.current?.getBoundingClientRect() ?? null, m0 }
       /*
        * Der erste Finger lag schon – für das Blatt sah das wie „langes Drücken zum Verschieben"
        * eines Bausteins aus (BausteinRahmen). Ein pointercancel beendet solche angefangenen
@@ -244,7 +255,12 @@ export function useZweiFingerZoom(opts: {
       if (!start.art) {
         start.art = zweiFingerArt(start.abstand, d, start.mitte, m)
         // Zoom beginnt erst hier: Ausgangsabstand neu setzen, damit das Blatt nicht um die Schwelle springt
-        if (start.art === 'zoom') start.abstand = d
+        if (start.art === 'zoom') {
+          start.abstand = d
+          // Bezugspunkt der Vorschau: die Stelle unter den Fingern beim Beginn des Zoomens
+          start.m0 = m
+          start.r0 = aktuell.current.inhalt.current?.getBoundingClientRect() ?? null
+        }
       }
       if (start.art === 'rollen') {
         // Rollen mit zwei Fingern: die Fläche folgt den Fingern (die Seite selbst soll nicht zoomen)
@@ -254,15 +270,29 @@ export function useZweiFingerZoom(opts: {
       } else if (start.art === 'zoom') {
         const { min, max } = aktuell.current
         const f = pinchZoom(start.faktor, start.abstand, d, min, max)
-        if (Math.abs(f - letzter) >= 0.01) anwenden(f, m)
+        const innen = aktuell.current.inhalt.current
+        if (aktuell.current.vorschau && innen && start.r0) {
+          // Wachsen um den Punkt unter den Fingern, Mitwandern mit dem Mittelpunkt (Verschieben während des Zoomens)
+          const s = f / start.faktor
+          innen.style.transformOrigin = `${start.m0.x - start.r0.left}px ${start.m0.y - start.r0.top}px`
+          innen.style.transform = `translate(${m.x - start.m0.x}px, ${m.y - start.m0.y}px) scale(${s})`
+          letzter = f
+        } else if (Math.abs(f - letzter) >= 0.01) anwenden(f, m)
       }
       start.letzteMitte = m
     }
     const ende = (e: TouchEvent): void => {
       if (!start || e.touches.length >= 2) return
       const gezoomt = start.art === 'zoom'
+      const s0 = start
       start = null
-      if (gezoomt) aktuell.current.setFaktor(letzter)
+      if (!gezoomt) return
+      const { vorschau, uebernehmen, basis } = aktuell.current
+      if (vorschau && uebernehmen && s0.r0) {
+        // Stelle unter den Fingern beim Beginn (Inhalt bei Zoom 1) → nach dem Übernehmen unter die letzte Fingermitte
+        const z0 = basis * s0.faktor
+        uebernehmen(letzter, { ix: (s0.m0.x - s0.r0.left) / z0, iy: (s0.m0.y - s0.r0.top) / z0, mx: s0.letzteMitte.x, my: s0.letzteMitte.y })
+      } else aktuell.current.setFaktor(letzter)
     }
     /*
      * Bewegen und Loslassen am DOKUMENT: Touch-Ereignisse gehen immer an das Element, auf dem der
@@ -358,8 +388,8 @@ export function useBlattAnsicht(opts: {
   obergrenze?: number
   /** Eigener Zustand statt des Programm-Zooms (Druckvorschau) */
   lokal?: [BlattZoom, (teil: Partial<BlattZoom>) => void]
-  /** Vorschau während der Zwei-Finger-Geste (siehe useZweiFingerZoom) – ohne: CSS-`zoom` am Inhalt */
-  vorschau?: (innen: HTMLElement, zNeu: number, zFest: number) => void
+  /** Vorschau per transform während der Zwei-Finger-Geste (siehe useZweiFingerZoom) – ohne: CSS-`zoom` am Inhalt */
+  vorschau?: boolean
   /**
    * Fläche gerade da? (25.10.2026, ZoomFlaeche `aktiv`): Die Hörer hängen sich an `flaeche.current` – war sie beim
    * ersten Lauf noch nicht gerendert (Schülerblatt erst in der Listenansicht), müssen sie beim Umschalten nachziehen.
@@ -398,7 +428,7 @@ export function useBlattAnsicht(opts: {
   }, [opts.flaeche, randPx, opts.aktiv])
 
   // Zoomen um einen festen Punkt (Mauszeiger, Knopf): nach dem Zeichnen zurückrollen
-  const anker = useRef<{ ix: number; iy: number; mx: number; my: number } | null>(null)
+  const anker = useRef<ZoomAnker | null>(null)
   const aktuell = useRef({ zoom, setzen })
   aktuell.current = { zoom, setzen }
   const zoomAuf = (neu: number, m?: Punkt): void => {
@@ -416,6 +446,8 @@ export function useBlattAnsicht(opts: {
     const innen = opts.inhalt.current
     const el = opts.flaeche.current
     anker.current = null
+    // Vorschau der Geste weg – ab jetzt gilt der übernommene Zoom
+    if (opts.vorschau && innen) innen.style.transform = ''
     if (!a || !innen || !el) return
     const r = innen.getBoundingClientRect()
     el.scrollLeft += r.left + a.ix * zoom - a.mx
@@ -506,7 +538,16 @@ export function useBlattAnsicht(opts: {
     setFaktor: (f) => aktuell.current.setzen({ einpassen: false, z: f }),
     min: ZOOM_KLEINST,
     max: ZOOM_GROESST,
-    vorschau: opts.vorschau
+    vorschau: opts.vorschau,
+    uebernehmen: (f, a) => {
+      // Kaum verändert: kein neuer Zoom (kein Neuzeichnen) – nur die Vorschau zurücknehmen
+      if (Math.abs(zoomBegrenzen(f, ZOOM_KLEINST, ZOOM_GROESST) - aktuell.current.zoom) < 1e-3) {
+        if (opts.inhalt.current) opts.inhalt.current.style.transform = ''
+        return
+      }
+      anker.current = a
+      aktuell.current.setzen({ einpassen: false, z: zoomBegrenzen(f, ZOOM_KLEINST, ZOOM_GROESST) })
+    }
   })
 
   // Doppelseite nur anbieten, wenn zwei Seiten noch lesbar nebeneinander passen (oder sie schon an ist)

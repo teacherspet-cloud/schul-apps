@@ -199,6 +199,31 @@ try {
       return b.contains(oben) ? 'frei' : 'verdeckt'
     })
     pruefe(frei === 'frei', `[${name}] „Einreichen" erreichbar (${frei})`)
+    // Zoom an die Stelle unter dem Zeiger (03.11.2026): Strg + Mausrad über einem Feld – es bleibt unter dem Zeiger
+    if (name !== 'ipad-webkit') {
+      await s.locator('[data-zoom-einpassen]').first().click()
+      await s.waitForTimeout(500)
+      const ziel = s.locator('[data-feld]').nth(2)
+      await ziel.scrollIntoViewIfNeeded()
+      await s.waitForTimeout(300)
+      const b0 = await ziel.boundingBox()
+      const zx = b0.x + 20
+      const zy = b0.y + b0.height / 2
+      await s.mouse.move(zx, zy)
+      await s.keyboard.down('Control')
+      for (let i = 0; i < 3; i++) {
+        await s.mouse.wheel(0, -120)
+        await s.waitForTimeout(150)
+      }
+      await s.keyboard.up('Control')
+      await s.waitForTimeout(700)
+      const b1 = await ziel.boundingBox()
+      const wuchs = b1.width / b0.width
+      // Der Punkt (20 px vom linken Feldrand, Feldmitte) liegt nach dem Zoom bei 20 × Faktor
+      const dx = Math.abs(b1.x + 20 * wuchs - zx)
+      const dy = Math.abs(b1.y + (b1.height / 2) - zy)
+      pruefe(wuchs > 1.2 && dx < 12 && dy < 12, `[${name}] Strg + Mausrad zoomt an die Stelle unter dem Zeiger (Faktor ${wuchs.toFixed(2)}, Abweichung ${dx.toFixed(0)}/${dy.toFixed(0)} px)`)
+    }
     await ctx.close()
   }
 

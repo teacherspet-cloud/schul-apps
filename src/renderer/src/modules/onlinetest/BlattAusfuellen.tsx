@@ -688,10 +688,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     obergrenze: 1,
     lokal: [zoomZustand, (teil) => setZoomZustand((z) => ({ ...z, ...teil }))],
     aktiv: ansicht === 'blatt',
-    vorschau: (innen, zNeu, zFest) => {
-      innen.style.transformOrigin = '0 0'
-      innen.style.transform = `scale(${zNeu / zFest})`
-    }
+    vorschau: true
   })
   // Nach der Geste: Vorschau weg, der neue Maßstab gilt
   useLayoutEffect(() => {
