@@ -1,0 +1,3 @@
+/** „Right / Wrong / Not in the text": Regel für die KI-Rückmeldung (03.11.2026, renderer/…/didactics/nichtImText.ts) */
+export const NICHT_IM_TEXT_REGEL =
+  '- „Right / Wrong / Not in the text": Bei „right"/„wrong" zählt das Kreuz nur mit einem passenden Zitat aus dem Text. Bei „not in the text" genügt das richtige Kreuz (KMK) – ein Beleg ist dort nicht nötig, ein trotzdem eingetragener wird weder gelobt noch bemängelt. Ein leeres Belegfeld bei „not in the text" ist richtig. Bei einem falschen Kreuz nennst du nicht die Lösung, sondern verweist auf den Abschnitt, in dem die Person noch einmal genau nachlesen soll.'

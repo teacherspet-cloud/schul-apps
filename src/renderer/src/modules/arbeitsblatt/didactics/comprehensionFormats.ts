@@ -109,8 +109,8 @@ export const COMPREHENSION_FORMATS: ComprehensionFormat[] = [
     grades: [8, 13],
     answerKind: 'tableFill',
     construction:
-      'Drei Spalten zum Ankreuzen, dazu eine Spalte für den Textbeleg. Für die Items, deren Lösung „nicht im Text" ist, gibt es KEINE Belegzeile – zu einer Aussage, die nicht im Text steht, kann es kein Zitat geben.',
-    stem: 'Arbeitsanweisung: „Tick the correct box. For right and wrong, give one piece of evidence by quoting from the text." Die Aussagen zu „not in the text" sind plausibel und thematisch passend – sonst sind sie schon ohne Text als Fremdkörper erkennbar.',
+      'Drei Spalten zum Ankreuzen, dazu eine Spalte „Evidence (only for right/wrong)". JEDE Zeile hat eine leere Belegzelle – auch die Items, deren Lösung „nicht im Text" ist (eine fehlende Belegzeile oder ein Strich darin verriete die Lösung).',
+    stem: 'Arbeitsanweisung: „Tick the correct box. For right or wrong, give one piece of evidence by quoting from the text. If the statement is not in the text, leave the evidence box empty." Die Aussagen zu „not in the text" sind plausibel und thematisch passend – sonst sind sie schon ohne Text als Fremdkörper erkennbar.',
     scoring:
       'zwei Punkte je Item. Bei richtig/falsch ist das Zitat Bedingung (ohne Zitat 0 Punkte); bei „nicht im Text" genügt das Ankreuzen für die vollen zwei Punkte (KMK 2012, Bewertungsvorschlag S. 124).'
   },

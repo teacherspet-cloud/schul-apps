@@ -160,7 +160,7 @@ export function itemWordingRules(meta: WorksheetMeta): string {
           '- Richtig/Falsch-Aufgaben NUR mit Textbeleg: Zu jeder Aussage gehört ein kurzes WÖRTLICHES Zitat aus dem Text, das die Entscheidung stützt. Auslassungen werden mit […] gekennzeichnet.',
           '- Eine bloße Zeilenangabe ist KEIN Beleg – verlange immer den Wortlaut.',
           '- Punkte gibt es nur für die richtige Kombination aus Ankreuzen UND zutreffendem Zitat; für eines von beiden gibt es nichts.',
-          '- Ausnahme: Items, deren Lösung „nicht im Text" lautet. Zu ihnen kann es kein Zitat geben; sie bekommen die vollen Punkte allein für das Ankreuzen.'
+          '- Ausnahme: Items, deren Lösung „nicht im Text" lautet. Zu ihnen kann es kein Zitat geben; sie bekommen die vollen Punkte allein für das Ankreuzen. Trotzdem hat JEDE Zeile eine leere Belegzelle (nie weglassen, nie „—" oder „n/a" vorgeben – das verriete die Lösung), und die Anweisung sagt: „If the statement is not in the text, leave the evidence box empty."'
         ].join('\n')
       : '',
     meta.instructionsInGerman

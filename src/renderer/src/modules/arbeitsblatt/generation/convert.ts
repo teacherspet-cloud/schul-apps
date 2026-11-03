@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { nichtImTextBereinigen } from '../didactics/nichtImText'
 import { tabelleZuGrossDaneben } from '../didactics/tabelleDaneben'
 import { nurZeichenauftrag } from './zeichenauftrag'
 import { lueckentextOhneDoppelte } from '@shared/luecken'
@@ -349,9 +350,13 @@ function convertBlockRoh(b: any, rng: Rng, images: { index: number; dataUrl: str
           .filter((g: { items: unknown[] }) => g.items.length)
       }
     case 'task': {
-      const answer = convertAnswer(b.answer, rng)
+      const antwort0 = convertAnswer(b.answer, rng)
       // Zeichenfläche: nur der Zeichenauftrag – kein angehängtes „… und erkläre …" (zeichenauftrag.ts)
-      const anweisung = satzbau(text(b.instruction))
+      const anweisung0 = satzbau(text(b.instruction))
+      // „Not in the text" (03.11.2026, didactics/nichtImText.ts): Belegzelle in jeder Zeile, klare Anweisung
+      const nit = antwort0?.kind === 'tableFill' ? nichtImTextBereinigen(antwort0, anweisung0) : null
+      const answer = nit ? nit.answer : antwort0
+      const anweisung = nit ? nit.anweisung : anweisung0
       return {
         ...base,
         type,

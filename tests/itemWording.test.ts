@@ -330,7 +330,9 @@ describe('Richtig/Falsch braucht beim Lesen einen Beleg', () => {
     // KMK 2012, S. 124: „Pas dans le texte: pro richtige Antwort zwei Punkte, keine Textbelegstelle."
     const f = COMPREHENSION_FORMATS.find((x) => x.id === 'true-false-not-in-text')!
     expect(f.scoring).toMatch(/nicht im Text.*Ankreuzen/s)
-    expect(f.construction).toMatch(/KEINE Belegzeile/)
+    // Seit 03.11.2026: jede Zeile mit leerer Belegzelle (eine fehlende Belegzeile verriete die Lösung)
+    expect(f.construction).toMatch(/JEDE Zeile hat eine leere Belegzelle/)
+    expect(f.stem).toMatch(/leave the evidence box empty/)
   })
 
   it('sagt es der KI – mit der Ausnahme und ohne Zeilenangabe', () => {

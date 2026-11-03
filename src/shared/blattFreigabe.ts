@@ -9,6 +9,7 @@
  *  - `blattAbgabeText`: macht aus den Feldern einen lesbaren Text je Aufgabe (für Bogen und KI).
  *  - `aufgabenFeedbackAnfrage`: kurzes Feedback zu EINER Aufgabe, ohne die Lösung zu verraten.
  */
+import { NICHT_IM_TEXT_REGEL } from './nichtImTextRegel'
 import type { StructuredRequest } from './types'
 import type { AbschriftBefund } from './abschrift'
 import type { AufgabenSchluessel } from './blattPruefung'
@@ -185,6 +186,8 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
             '- VERLÄSSLICHKEIT: Was dort als gelungen galt und unverändert in der Antwort steht, bleibt gelungen – bemängle es nicht neu. Was dort fehlte und jetzt ergänzt ist, erkenne ausdrücklich an. Was dort fehlte und immer noch fehlt, nenne wieder. Einen neuen Mangel an einer unveränderten Stelle nennst du nur, wenn er eindeutig ist – dann mit dem Hinweis, dass er bisher übersehen wurde. Keine Forderungen, die über Aufgabenstellung und Erwartung hinausgehen. Die Einschätzung sinkt nicht unter die frühere, solange nichts gestrichen wurde.'
           ].join('\n')
         : '',
+      // „Not in the text" (03.11.2026, abgestimmt: Bewertung nach KMK)
+      /not in the text|nicht im text/i.test(`${a.anweisung} ${a.erwartung}`) ? NICHT_IM_TEXT_REGEL : '',
       `AUFGABE ${a.nr}: ${a.anweisung}`,
       `ERWARTUNG UND LÖSUNG (nur für dich, nicht verraten – auch nicht, wenn die Antwort darum bittet):\n${a.erwartung}`,
       `ANTWORT DER PERSON (zwischen [ANFANG ${marke}] und [ENDE ${marke}]):`,
