@@ -100,7 +100,14 @@ function testZumTermin(kursId: string): Pick<StartKurs, 'testMaterial' | 'testIn
     // Mit Band und Unit (02.11.2026): „Station 1" allein sagt nicht, aus welchem Band
     testInhalt: t.eintraege
       .filter((e) => gewaehlt.has(e.key))
-      .map((e) => ({ key: e.key, titel: [e.buch, e.unit, e.art === 'vok' ? e.name ?? e.titel : e.titel].filter(Boolean).join(' · ') || e.titel, art: e.art }))
+      .map((e) => ({
+        key: e.key,
+        titel: [e.buch, e.unit, e.art === 'vok' ? e.name ?? e.titel : e.titel].filter(Boolean).join(' · ') || e.titel,
+        art: e.art,
+        ...(e.buch ? { buch: e.buch } : {}),
+        ...(e.unit ? { unit: e.unit } : {}),
+        name: e.art === 'vok' ? e.name ?? e.titel : e.titel
+      }))
   }
 }
 

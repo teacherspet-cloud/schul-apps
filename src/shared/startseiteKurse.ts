@@ -63,7 +63,7 @@ export interface StartKurs {
   testTermin: number | null
   /** Test zum Termin (28.10.2026): verknüpfter Test und die Abschnitte bzw. Grammatik des Termins */
   testMaterial?: TestMaterial | null
-  testInhalt?: { key: string; titel: string; art: 'vok' | 'gram' }[]
+  testInhalt?: TerminInhalt[]
   abzeichen: StartAbzeichen
 }
 
@@ -234,6 +234,48 @@ export interface DemnaechstEintrag {
 }
 
 export const vokabeltestText = (gruppe: string, einheit: string): string => (einheit ? `Vokabeltest ${gruppe} – ${einheit}` : `Vokabeltest ${gruppe}`)
+
+/** Ein gewählter Abschnitt bzw. eine Grammatik des Testtermins (Band, Unit und Name getrennt für die Kurzform) */
+export interface TerminInhalt {
+  key: string
+  /** „Green Line 1 · Unit 1 · Station 3" */
+  titel: string
+  art: 'vok' | 'gram'
+  buch?: string
+  unit?: string
+  /** Vokabeln: „Station 3"; Grammatik: Name der Form */
+  name?: string
+}
+
+/** „Station 2", „Station 3" → „Station 2, 3"; sonst mit Komma aneinander */
+function namenZusammen(namen: string[]): string {
+  const teile = namen.map((n) => /^(.*\S)\s+(\S+)$/.exec(n.trim()))
+  const kopf = teile[0]?.[1]
+  if (namen.length > 1 && kopf && teile.every((t) => t && t[1] === kopf)) return `${kopf} ${teile.map((t) => t![2]).join(', ')}`
+  return namen.join(', ')
+}
+
+/**
+ * Kurzform des Testinhalts für „Demnächst" (03.11.2026, Befund der Lehrkraft: dort stand nur „Unit 1" statt der
+ * eingetragenen Abschnitte): „Unit 1 – Station 3", „Unit 1 – Station 2, 3", mehrere Units mit „; ", Band nur bei mehreren
+ * Bänden. Grammatik dahinter: eine Form mit Namen, mehrere als Anzahl. Ohne Auswahl: ''.
+ */
+export function terminInhaltKurz(inhalt: TerminInhalt[] | undefined): string {
+  const vok = (inhalt ?? []).filter((t) => t.art === 'vok')
+  const gram = (inhalt ?? []).filter((t) => t.art === 'gram')
+  const mehrBaende = new Set(vok.map((t) => t.buch ?? '')).size > 1
+  const gruppen = new Map<string, string[]>()
+  for (const t of vok) {
+    const unit = [mehrBaende ? t.buch : '', t.unit].filter(Boolean).join(' · ')
+    const name = (t.unit ? t.name ?? '' : t.name || t.titel).trim()
+    const liste = gruppen.get(unit) ?? []
+    if (name && name !== t.unit && !liste.includes(name)) liste.push(name)
+    gruppen.set(unit, liste)
+  }
+  const teile = [...gruppen].map(([unit, namen]) => [unit, namen.length ? namenZusammen(namen) : ''].filter(Boolean).join(' – '))
+  const g = gram.length === 1 ? (gram[0].name || gram[0].titel.split(' · ').pop() || '').trim() : gram.length > 1 ? `${gram.length} Grammatikthemen` : ''
+  return [teile.filter(Boolean).join('; '), g].filter(Boolean).join(' + ')
+}
 export const haltepunktText = (titel: string, gruppe: string): string => `Haltepunkt „${titel}"${gruppe ? ` (${gruppe})` : ''}`
 
 /**
@@ -254,7 +296,7 @@ export function haltepunktTermine(r: Pick<Reihe, 'schritte' | 'stunden' | 'stund
  * sofern der Termin für die Lernenden nicht ausgeblendet ist.
  */
 export function demnaechst(
-  kurse: Pick<StartKurs, 'id' | 'gruppe' | 'einheit' | 'testTermin'>[],
+  kurse: (Pick<StartKurs, 'id' | 'gruppe' | 'einheit' | 'testTermin'> & Partial<Pick<StartKurs, 'testInhalt'>>)[],
   reihen: { zid: string; gruppe: string; halteTermine?: { titel: string; tag: string | null }[] }[],
   jetzt = Date.now(),
   onlinetests: { id: string; titel: string; status: string; termin?: string | null; terminVerborgen?: boolean }[] = []
@@ -265,7 +307,7 @@ export function demnaechst(
       t.status === 'wartend' && t.termin && !t.terminVerborgen ? [{ tag: t.termin, art: 'onlinetest' as const, text: t.titel, ziel: t.id }] : []
     ),
     ...kurse.flatMap((k) =>
-      k.testTermin ? [{ tag: tagVon(k.testTermin), art: 'test' as const, text: vokabeltestText(k.gruppe, k.einheit), ziel: k.id }] : []
+      k.testTermin ? [{ tag: tagVon(k.testTermin), art: 'test' as const, text: vokabeltestText(k.gruppe, terminInhaltKurz(k.testInhalt) || k.einheit), ziel: k.id }] : []
     ),
     ...reihen.flatMap((r) => (r.halteTermine ?? []).map((h) => ({ tag: h.tag, art: 'halt' as const, text: haltepunktText(h.titel, r.gruppe), ziel: r.zid })))
   ]

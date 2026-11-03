@@ -21,6 +21,7 @@ import {
   kursKopf,
   kurzfassung,
   tagKurz,
+  terminInhaltKurz,
   testBaldText,
   type Gliederung
 } from '../src/shared/startseiteKurse'
@@ -372,5 +373,27 @@ describe('Server: GET /server/startseite', () => {
     }
     expect(await rufe(lk)).toBe(200)
     expect(await rufe(schueler[0])).toBe(403)
+  })
+})
+
+describe('Demnächst nennt die eingetragenen Abschnitte (03.11.2026)', () => {
+  const v = (unit: string, name: string, buch = 'Green Line 1') => ({ key: `${unit}${name}${buch}`, titel: `${buch} · ${unit} · ${name}`, art: 'vok' as const, buch, unit, name })
+  it('eine und mehrere Stationen einer Unit', () => {
+    expect(terminInhaltKurz([v('Unit 1', 'Station 3')])).toBe('Unit 1 – Station 3')
+    expect(terminInhaltKurz([v('Unit 1', 'Station 2'), v('Unit 1', 'Station 3')])).toBe('Unit 1 – Station 2, 3')
+  })
+  it('mehrere Units, Bände nur bei mehreren, Grammatik dahinter', () => {
+    expect(terminInhaltKurz([v('Unit 1', 'Station 3'), v('Unit 2', 'Station 1')])).toBe('Unit 1 – Station 3; Unit 2 – Station 1')
+    expect(terminInhaltKurz([v('Unit 6', 'Station 2', 'Green Line 5'), v('Unit 1', 'Station 1', 'Green Line 6')])).toBe('Green Line 5 · Unit 6 – Station 2; Green Line 6 · Unit 1 – Station 1')
+    expect(terminInhaltKurz([v('Unit 1', 'Station 3'), { key: 'gram:x', titel: 'Simple past', art: 'gram', name: 'Simple past' }])).toBe('Unit 1 – Station 3 + Simple past')
+    expect(terminInhaltKurz([{ key: 'a', titel: 'Wortliste Herbst', art: 'vok', name: 'Wortliste Herbst' }])).toBe('Wortliste Herbst')
+    expect(terminInhaltKurz(undefined)).toBe('')
+  })
+  it('steht in der Zeile unter „Demnächst"', () => {
+    const jetzt = Date.parse('2026-11-02T10:00:00Z')
+    const d = demnaechst([{ id: 'k', gruppe: '10b', einheit: 'Unit 1', testTermin: Date.parse('2026-11-03T10:00:00Z'), testInhalt: [v('Unit 1', 'Station 2'), v('Unit 1', 'Station 3')] }], [], jetzt)
+    expect(d[0].text).toBe('Vokabeltest 10b – Unit 1 – Station 2, 3')
+    const ohne = demnaechst([{ id: 'k', gruppe: '10b', einheit: 'Unit 1', testTermin: Date.parse('2026-11-03T10:00:00Z') }], [], jetzt)
+    expect(ohne[0].text).toBe('Vokabeltest 10b – Unit 1')
   })
 })
