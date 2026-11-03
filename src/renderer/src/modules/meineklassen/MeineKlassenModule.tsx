@@ -97,10 +97,11 @@ import { SprachLernstand } from './SprachLernstand'
 import type { AbschnittStatistik } from '@shared/kursAbschnitte'
 import { type AuszeichnungLehrkraft } from './LernendeAuszeichnung'
 import { LernendeTabelle, type VokabelStandZeile } from './LernendeTabelle'
-import { VokabelBalken } from '../../shared/components/VokabelBalken'
 import { IservVorschlaege } from './IservVorschlaege'
 import { IservAbzeichen, IservErkennung, IservKursMenue, type IservAngabe, type IservUebersicht } from './IservKurse'
-import { useEntwurfBedarf } from './kursBedarf'
+import { kursEintragOeffnen, useEntwurfBedarf } from './kursBedarf'
+import { istLeereKlasse, KlassenKarte, LeereKlassen, type KartenAktionen, type KartenTermin, type KarteKlasse } from './KlassenKarte'
+import { oeffneReihe } from '../unterrichtsreihe/LaufendeReihenModule'
 import { KLASSE_REITER } from './zurKlasse'
 import { HandlungsbedarfFenster, useBedarfFenster, type Bedarf } from './Handlungsbedarf'
 // Freischaltungen planen (09.10.2026): Zeitleiste „Geplant“ und Kennzeichen „geplant ab …“
@@ -121,6 +122,11 @@ interface FachKurz {
   blaetter: number
   /** Aus IServ erkannt (10.10.2026) */
   iserv?: IservAngabe | null
+  /** Klassenkarte (03.11.2026): nächster Termin, laufende Reihe, die wichtigsten offenen Punkte */
+  termin?: KartenTermin | null
+  reihe?: { zid: string; titel: string; schnitt: number; weitere: number } | null
+  todo?: Bedarf[]
+  todoGesamt?: number
 }
 interface KlasseKurz {
   schluessel: string
@@ -397,6 +403,21 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
   })
   if (!active) return null
   const sichtbar = klassen ?? []
+  // Klicks auf den Klassenkarten (03.11.2026): Klasse/Fach/Reiter bzw. die Stelle eines offenen Punkts
+  const zurKlasse = (k: KarteKlasse, gruppe?: string, reiter?: string): void =>
+    setze({ klasse: k.schluessel, gruppe: gruppe ?? k.faecher[0]?.id ?? null, reiter: reiter ?? 'reihen' })
+  const kartenAktionen: KartenAktionen = {
+    klasse: zurKlasse,
+    punkt: (k, f, b) => {
+      zurKlasse(k, f.id)
+      if (kursEintragOeffnen(b, (r) => setze({ reiter: r }))) return
+      if (b.ziel) oeffneMitRueckweg(b.ziel.modul, b.ziel.id)
+    },
+    termin: (k, f, t) =>
+      t.art === 'test' ? zurKlasse(k, f.id, 'vokabeln') : t.art === 'onlinetest' ? oeffneMitRueckweg('onlinetest', t.ziel) : oeffneReihe(t.ziel),
+    reihe: (zid) => oeffneReihe(zid),
+    allePunkte: (k, f) => (zurKlasse(k, f.id), useBedarfFenster.getState().oeffne(f.id))
+  }
   const gewaehlt = klassen?.find((k) => k.schluessel === klasse)
   /** Klasse einer Lerngruppe öffnen (aus der Suche bzw. den Details) */
   const zurGruppe = (gruppeId: string, reiter?: string): void => {
@@ -451,93 +472,21 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
             Lerngruppen entstehen hier über „Lerngruppe anlegen“ (von Hand) oder „Aus IServ übernehmen“. Danach stehen sie hier mit ihrem Lernstand.
           </Alert>
         ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} data-klassen-liste>
-            {sichtbar.map((k) => (
-              <KlassenKarte key={k.schluessel} k={k} waehlen={() => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })} />
-            ))}
-          </SimpleGrid>
+          <div data-klassen-liste>
+            {/* Klassenkarten (03.11.2026, abgestimmt): Termin, Aktivität, Reihe, offene Punkte je Fach; Leere klein am Ende */}
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
+              {sichtbar
+                .filter((k) => !istLeereKlasse(k))
+                .map((k) => (
+                  <KlassenKarte key={k.schluessel} k={k} a={kartenAktionen} />
+                ))}
+            </SimpleGrid>
+            <LeereKlassen klassen={sichtbar.filter(istLeereKlasse)} a={kartenAktionen} />
+          </div>
         )}
         {!klasse && klassen && <IservErkennung key={JSON.stringify(iservDaten.iservKuerzel ?? {})} d={iservDaten} geaendert={laden} />}
       </Container>
     </DauerhaftMerken>
-  )
-}
-
-/** Karte je Klasse – einheitlich aufgebaut, auch ohne Fach oder Material (Befund: Text rutschte sonst nach oben) */
-function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): React.JSX.Element {
-  return (
-    <UnstyledButton
-      onClick={waehlen}
-      className="vorlage-karte"
-      style={{ padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 168 }}
-      data-klasse={k.name}
-    >
-      <Group justify="space-between" wrap="nowrap" mb={8}>
-        <Text fw={800} size="lg" truncate>
-          {/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}
-        </Text>
-        {k.bedarf > 0 ? (
-          <BedarfZahl n={k.bedarf} />
-        ) : (
-          <Badge color="teal" variant="light" leftSection={<IconCheck size={12} />}>
-            alles ruhig
-          </Badge>
-        )}
-      </Group>
-      <Group gap="lg" mb={8} align="center">
-        <Kennzahl wert={String(k.lernende)} text="Lernende" />
-        <Kennzahl wert={String(k.faecher.length)} text={k.faecher.length === 1 ? 'Fach' : 'Fächer'} />
-        {k.vorschlaege > 0 && <Kennzahl wert={String(k.vorschlaege)} text={k.vorschlaege === 1 ? 'Vorschlag' : 'Vorschläge'} />}
-        {k.iserv && <IservAbzeichen a={k.iserv} />}
-      </Group>
-      <Stack gap={4} mih={44} justify="center">
-        {k.faecher.length === 0 ? (
-          <Text size="sm" c="dimmed">
-            Noch kein Fach – in der Klasse mit „+ Fach hinzufügen“ anlegen.
-          </Text>
-        ) : (
-          k.faecher.map((f) => (
-            <Group key={f.id} gap={6} wrap="nowrap" data-klasse-fach={f.fach}>
-              <Badge variant="light" style={{ flexShrink: 0 }}>
-                {fachSchreibweise(f.fach)}
-              </Badge>
-              {f.vokabeln ? (
-                <VokabelBalken a={f.vokabeln} breite={60} schnitt titel="Vokabeln" rechts={<></>} />
-              ) : (
-                f.vokabelnSicher !== null && (
-                  <Tooltip label={`Vokabeln ${prozent(f.vokabelnSicher)} sicher`}>
-                    <Progress value={f.vokabelnSicher * 100} size="sm" radius="xl" color={ampel(f.vokabelnSicher)} w={60} />
-                  </Tooltip>
-                )
-              )}
-              <Text size="xs" c="dimmed" truncate>
-                {[
-                  f.testSchnitt !== null && `Ø ${note(f.testSchnitt)}`,
-                  f.reihen && `${f.reihen} Reihe${f.reihen === 1 ? '' : 'n'}`,
-                  f.blaetter && `${f.blaetter} Bl.`
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
-              {f.bedarf > 0 && <BedarfZahl n={f.bedarf} size="xs" />}
-            </Group>
-          ))
-        )}
-      </Stack>
-    </UnstyledButton>
-  )
-}
-
-function Kennzahl({ wert, text }: { wert: string; text: string }): React.JSX.Element {
-  return (
-    <div>
-      <Text fw={800} size="lg" lh={1.1}>
-        {wert}
-      </Text>
-      <Text size="xs" c="dimmed">
-        {text}
-      </Text>
-    </div>
   )
 }
 

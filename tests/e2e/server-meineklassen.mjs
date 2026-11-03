@@ -239,15 +239,10 @@ try {
   pruefe(await da(p.locator('[data-lerngruppe-anlegen-knoepfe] [data-iserv-gruppen]')), '„Aus IServ übernehmen" in der Übersicht von „Meine Klassen"')
   const karten = await p.locator('[data-klasse]').evaluateAll((e) => e.map((x) => x.getAttribute('data-klasse')))
   pruefe(JSON.stringify(karten) === JSON.stringify([K5, K7, K10]), `Karten je Klasse in der App (${karten.join(' · ')})`)
-  // Gleiche Ausrichtung: Karten gleich hoch, Inhalt der Karte ohne Fach nicht nach oben gerutscht
-  const lage = await p.locator('[data-klasse]').evaluateAll((e) =>
-    e.map((x) => {
-      const r = x.getBoundingClientRect()
-      const k = x.firstElementChild.getBoundingClientRect()
-      return { h: Math.round(r.height), oben: Math.round(k.top - r.top) }
-    })
-  )
-  pruefe(new Set(lage.map((l) => l.h)).size === 1 && lage.every((l) => l.oben >= 14), `Karten gleich hoch, Inhalt ausgerichtet (${JSON.stringify(lage)})`)
+  // Klassenkarten (03.11.2026, abgestimmt): Kopfstreifen in den Fachfarben je Fach; Klassen ohne Lernende/Fach klein am Ende
+  pruefe((await p.locator(`[data-klassen-karte="${K5}"] [data-karte-streifen] > div`).count()) === 2, `${K5}: Kopfstreifen geteilt je Fach (Englisch, Geschichte)`)
+  pruefe((await p.locator(`[data-klassen-karte="${K5}"] [data-klasse-fach]`).count()) === 2, `${K5}: eine Zeile je Fach`)
+  pruefe((await p.locator(`[data-leere-klassen] [data-klasse="${K7}"]`).count()) === 1, `${K7} (ohne Fach) klein unter „Noch einzurichten"`)
   await p.screenshot({ path: join(out, '1-uebersicht.png') })
 
   // Klasse ohne Fach: nur „+ Fach hinzufügen"
