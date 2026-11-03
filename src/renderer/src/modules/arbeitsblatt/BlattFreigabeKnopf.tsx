@@ -7,6 +7,7 @@
  * Server – nur für die KI, nie an die Lernenden. Dazu die verknüpfte Rückmeldung (Aufgaben +
  * Lösungsblatt als Erwartungshorizont), in der alle Abgaben landen.
  */
+import { NurExperte } from '../../shared/components/NurExperte'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { hilfenZuordnung } from './didactics/aufgabenVerweise'
 import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, Select, Stack, Text, TextInput } from '@mantine/core'
@@ -201,10 +202,15 @@ export function BlattFreigabeDialog({
   const [gaeste, setGaeste] = useState(false)
   const [feedback, setFeedback] = useState(true)
   const [aufgabenFeedback, setAufgabenFeedback] = useState(true)
-  const [runden, setRunden] = useState(2)
+  /*
+   * Einreichungen (03.11.2026, abgestimmt): mit „Feedback je Aufgabe" genügt EINE Einreichung als Abschluss (Rückmeldung
+   * gibt es unterwegs je Aufgabe; eine zweite nach dem Lösungsblatt lädt eher zum Abschreiben ein), ohne es zwei. Von
+   * Hand gewählt gilt die Wahl; das Feld steht nur im Expertenmodus.
+   */
+  const [rundenWahl, setRundenWahl] = useState<number | null>(null)
   // Rückmeldungen je Aufgabe (03.11.2026, Befund der Lehrkraft: „von 2 auf 4 erhöht, trotzdem nur 2× KI je Aufgabe" –
   // das Feld daneben waren die Einreichungen, die Zahl je Aufgabe stand fest auf 2)
-  const [aufgabenRunden, setAufgabenRunden] = useState(2)
+  const [aufgabenRunden, setAufgabenRunden] = useState(3)
   const [stift, setStift] = useState(true)
   const [grossKlein, setGrossKlein] = useState(true)
   // Korrekturrand (05.10.2026): Vorgabe an – digital steht dort das KI-Feedback, gedruckt bleibt er leer
@@ -214,6 +220,8 @@ export function BlattFreigabeDialog({
   // Schrittweise Freischaltung und Merkkästen am Ende (05.10.2026)
   const [schrittweise, setSchrittweise] = useState(false)
   const [merkAmEnde, setMerkAmEnde] = useState(false)
+  const mitAufgabenFeedback = schrittweise || merkAmEnde || (feedback && aufgabenFeedback)
+  const runden = rundenWahl ?? (mitAufgabenFeedback ? 1 : 2)
   const [laeuft, setLaeuft] = useState(false)
   const [liste, setListe] = useState<Freigegeben[]>([])
   const [qr, setQr] = useState<{ titel: string; code: string; link: string } | null>(null)
@@ -366,16 +374,27 @@ export function BlattFreigabeDialog({
               checked={aufgabenFeedback}
               onChange={(e) => setAufgabenFeedback(e.currentTarget.checked)}
             />
-            <ZahlFeld label="Einreichungen je Person" min={1} max={5} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={170} />
+            <NurExperte>
+              <ZahlFeld
+                label="Einreichungen je Person"
+                description="Überarbeiten nach dem Gesamt-Feedback"
+                min={1}
+                max={5}
+                value={runden}
+                onChange={(v) => setRundenWahl(Number(v) || 1)}
+                w={200}
+                data-blatt-runden
+              />
+            </NurExperte>
           </Group>
         )}
-        {(schrittweise || merkAmEnde || (feedback && aufgabenFeedback)) && (
+        {mitAufgabenFeedback && (
           <ZahlFeld
             label="KI-Rückmeldungen je Aufgabe („Aufgabe prüfen“)"
             min={1}
             max={5}
             value={aufgabenRunden}
-            onChange={(v) => setAufgabenRunden(Number(v) || 2)}
+            onChange={(v) => setAufgabenRunden(Number(v) || 3)}
             w={300}
             ml="lg"
             data-blatt-aufgabenrunden

@@ -1626,7 +1626,8 @@ export function reihenBlattAnlegen(e: {
     feedback: true,
     aufgabenFeedback: true,
     runden: Math.max(1, Math.min(5, e.runden)),
-    aufgabenRunden: 2,
+    // Voreinstellung 3 Rückmeldungen je Aufgabe (03.11.2026, abgestimmt)
+    aufgabenRunden: 3,
     stift: e.stift,
     ...(e.schrittweise ? { schrittweise: true } : {}),
     ...(e.merkAmEnde ? { merkAmEnde: true } : {})
