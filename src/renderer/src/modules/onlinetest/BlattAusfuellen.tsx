@@ -32,7 +32,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconDownload, IconEye, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
+import { IconArrowLeft, IconDownload, IconEye, IconHelp, IconLayoutSidebarRight, IconMessageCircle, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBlaettern } from '../lernen/regal/blaettern'
 import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
@@ -45,6 +45,8 @@ import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattO
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 // Stift-Ebene in eigener Datei – mit Tastaturbedienung (23.10.2026, Barrierefreiheit)
 import { TintenSeite } from './tintenSeite'
+import { NotizFaehnchen, NotizStreifen } from './BlattNotizrand'
+import { istRandObjekt, NOTIZRAND_SCHLUESSEL, RAND_BREITE, randTinteSchluessel } from '@shared/blattNotizrand'
 import { BildVollbild, type BildLage } from './BildVollbild'
 import { BILD_SEITE, bildTinteSchluessel, blattBilder } from '@shared/blattBilder'
 import type { FormArt } from '@shared/blattObjekte'
@@ -669,7 +671,15 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const dokBreite = /class="ws-page ws-page-quer"/.test(d.html) ? QUER_BREITE : BREITE
   // Bildnachweise der Schlussseite (23.10.2026, Bildnachweise) – für den kleinen Link am Fuß
   const blattNachweise = useMemo(() => blattBildNachweise(d.html), [d.html])
-  const massstab = Math.min(1.25, breite / dokBreite)
+  /*
+   * Notizrand (03.11.2026, abgestimmt): Streifen rechts neben jeder Seite, ein/aus je Person und Blatt; das Blatt bleibt
+   * unverändert, die Fläche passt sich nur etwas kleiner ein. Notizen ausgeblendet → Fähnchen (BlattNotizrand.tsx).
+   */
+  const notizrandAn = antworten[NOTIZRAND_SCHLUESSEL] === '1'
+  const RAND_ABSTAND = 12
+  const randExtra = notizrandAn ? RAND_BREITE + RAND_ABSTAND : 0
+  const randNotizenDa = objekte.some(istRandObjekt) || Object.keys(tinte).some((k) => k.startsWith('rand:'))
+  const massstab = Math.min(1.25, breite / (dokBreite + randExtra))
   /*
    * Zoom (03.11.2026, Befund der Lehrkraft auf allen Wegen – iPad zwei Finger und Knöpfe, iPad-App, PC: „zoomt nicht",
    * „Markierungen, Texte und Zeichnungen verschoben"): vorher CSS-`zoom` um das Blatt (nur mit Touch), im Rahmen auf
@@ -695,6 +705,21 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     if (zoomInhalt.current) zoomInhalt.current.style.transform = ''
   }, [zoom])
   const eff = massstab * zoom
+  const notizrandSchalter = (
+    <Tooltip label={notizrandAn ? 'Notizrand ausblenden' : 'Notizrand neben dem Blatt einblenden'}>
+      <ActionIcon
+        variant={notizrandAn ? 'light' : 'subtle'}
+        radius="xl"
+        size="lg"
+        aria-label="Notizrand"
+        aria-pressed={notizrandAn}
+        onClick={() => setze(NOTIZRAND_SCHLUESSEL, notizrandAn ? '' : '1')}
+        data-notizrand-schalter
+      >
+        <IconLayoutSidebarRight size={20} />
+      </ActionIcon>
+    </Tooltip>
+  )
 
   const messe = useCallback((): void => {
     const doc = iframe.current?.contentDocument
@@ -1176,12 +1201,18 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           setMarkerFarbe={setMarkerFarbe}
           vorgaben={vorgaben}
           setVorgabe={setVorgabe}
-          rechts={<div className="zoom-in-leiste">{zoomKnoepfe}</div>}
+          rechts={
+            <Group gap={4} wrap="nowrap" className="zoom-in-leiste">
+              {notizrandSchalter}
+              {zoomKnoepfe}
+            </Group>
+          }
         />
       )}
       {/* Ohne Werkzeugleiste (eingereicht/gesperrt, nur Ansehen): die Zoom-Knöpfe in einer eigenen, mitlaufenden Zeile */}
       {ansicht === 'blatt' && !(schreibbar && werkzeugeDa) && (
         <Group justify="flex-end" className="zoom-in-leiste" style={{ position: 'sticky', top: 8, zIndex: 30 }}>
+          {(schreibbar || randNotizenDa) && notizrandSchalter}
           {zoomKnoepfe}
         </Group>
       )}
@@ -1212,7 +1243,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         <div
           ref={zoomInhalt}
           style={{
-            width: (dokBreite + (spalte ? SPALTE : 0)) * eff,
+            width: (dokBreite + (spalte ? SPALTE : 0) + randExtra) * eff,
             height: (gemessen?.hoehe ?? 1123) * eff,
             position: 'relative',
             overflow: 'hidden',
@@ -1270,6 +1301,41 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 bildMarkiert={(b, i) => Boolean(tinte[bildTinteSchluessel(b.id)]) || objekte.some((o) => o.s === BILD_SEITE + i)}
               />
             )}
+            {gemessen &&
+              gemessen.seiten.map((s, i) =>
+                notizrandAn ? (
+                  <NotizStreifen
+                    key={`rand-${i}`}
+                    i={i}
+                    seite={s}
+                    x={dokBreite + RAND_ABSTAND}
+                    tinte={tinte[randTinteSchluessel(i)]}
+                    setTinte={(k, url) => {
+                      stand.current.tinteGeaendert = true
+                      setTinte((t) => ({ ...t, [k]: url }))
+                    }}
+                    objekte={objekte}
+                    setObjekte={setObjekte}
+                    werkzeug={schreibbar && werkzeugeDa ? werkzeug : 'tastatur'}
+                    stiftFarbe={stiftFarbe}
+                    markerFarbe={markerFarbe}
+                    vorgaben={vorgaben}
+                    form={form}
+                    gesperrt={!schreibbar}
+                    anmelden={tinteAnmelden}
+                  />
+                ) : (
+                  <NotizFaehnchen
+                    key={`fahne-${i}`}
+                    i={i}
+                    seite={s}
+                    x={s.x + s.w}
+                    tinte={tinte[randTinteSchluessel(i)]}
+                    objekte={objekte}
+                    einblenden={() => setze(NOTIZRAND_SCHLUESSEL, '1')}
+                  />
+                )
+              )}
             {bildOffen !== null && gemessen?.bilder[bildOffen] && (
               <BildVollbild
                 bild={gemessen.bilder[bildOffen]}

@@ -221,7 +221,8 @@ export function objekteAus(roh: unknown): BlattObjekt[] {
     if (!t) return []
     if (t === 'form' && !FORM_ARTEN.has(x.f as FormArt)) return []
     const s = Math.round(Number(x.s))
-    if (!Number.isInteger(s) || s < 0 || s > 40) return []
+    // Seiten 0–19, Bilder 20–39 (blattBilder.ts), Notizrand 41–60 (blattNotizrand.ts, 03.11.2026)
+    if (!Number.isInteger(s) || s < 0 || s > 60) return []
     return [
       {
         id: String(x.id ?? '').slice(0, 20) || Math.random().toString(36).slice(2, 10),

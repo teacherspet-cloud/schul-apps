@@ -18,6 +18,7 @@
  *  Lernende:   GET /s/api/blaetter · GET /s/api/blatt?id= · POST /s/api/blatt/speichern|aufgabe|abgeben
  *  Gäste:      GET /s/api/blatt/zugang?code= · POST /s/api/blatt/gast   (Seite /s/w/<CODE>)
  */
+import { istRandObjekt, NOTIZRAND_SCHLUESSEL, RAND_TINTE_MUSTER } from '../shared/blattNotizrand'
 import { mitlehrkraftDarfSehen } from './ueberthemen'
 import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { BILD_TINTE_MUSTER } from '../shared/blattBilder'
@@ -285,6 +286,8 @@ function bereinigeAntworten(roh: unknown): Record<string, string> {
   // Eingabeverhalten und Zuordnung Feld → Aufgabe (Plausibilität, 05.10.2026) – nur Zahlen
   if (typeof r[PLAUS_SCHLUESSEL] === 'string') aus[PLAUS_SCHLUESSEL] = JSON.stringify(eingabenAus(r[PLAUS_SCHLUESSEL]))
   if (typeof r[ZUORDNUNG_SCHLUESSEL] === 'string') aus[ZUORDNUNG_SCHLUESSEL] = JSON.stringify(zuordnungAus(r[ZUORDNUNG_SCHLUESSEL]))
+  // Notizrand an/aus (03.11.2026)
+  if (r[NOTIZRAND_SCHLUESSEL] === '1') aus[NOTIZRAND_SCHLUESSEL] = '1'
   return aus
 }
 
@@ -302,7 +305,8 @@ function linienAus(roh: unknown): Record<string, number> {
 
 /** Was außer den Stiftbildern auf die Seitenbilder gehört */
 const blattExtra = (antworten: Record<string, string>): { objekte: BlattObjekt[]; zusatz: Record<string, number> } => ({
-  objekte: objekteAus(antworten[OBJEKTE_SCHLUESSEL] ?? '[]'),
+  // Der Notizrand gehört der Person (03.11.2026): nicht auf die Seitenbilder und nicht an die KI
+  objekte: objekteAus(antworten[OBJEKTE_SCHLUESSEL] ?? '[]').filter((o) => !istRandObjekt(o)),
   zusatz: linienAus(antworten.linien ?? '{}')
 })
 
@@ -317,7 +321,8 @@ function bereinigeTinte(roh: unknown, seiten = 16): Record<string, string> {
   let summe = 0
   // Seiten „0", „1", … und Bilder „bild:b0", … (Vollbild mit Werkzeugen, 25.10.2026, shared/blattBilder.ts)
   for (const [k, v] of Object.entries(roh as Record<string, unknown>).slice(0, 40)) {
-    const seite = /^\d{1,2}$/.test(k) ? Number(k) : BILD_TINTE_MUSTER.test(k) ? -1 : null
+    // Notizrand „rand:0", … (03.11.2026, shared/blattNotizrand.ts)
+    const seite = /^\d{1,2}$/.test(k) ? Number(k) : BILD_TINTE_MUSTER.test(k) ? -1 : RAND_TINTE_MUSTER.test(k) ? Number(k.slice(5)) : null
     if (seite === null || seite >= seiten || typeof v !== 'string' || !v.startsWith('data:image/png;base64,') || v.length >= 1_200_000) continue
     if (summe + v.length > TINTE_GESAMT) break
     summe += v.length

@@ -227,6 +227,59 @@ try {
       const dy = Math.abs(b1.y + (b1.height / 2) - zy)
       pruefe(wuchs > 1.2 && dx < 12 && dy < 12, `[${name}] Strg + Mausrad zoomt an die Stelle unter dem Zeiger (Faktor ${wuchs.toFixed(2)}, Abweichung ${dx.toFixed(0)}/${dy.toFixed(0)} px)`)
     }
+    // ---------- Notizrand (03.11.2026, abgestimmt): nur in Edge am PC
+    if (name === 'pc-edge') {
+      await s.locator('[data-zoom-einpassen]').first().click()
+      await s.waitForTimeout(400)
+      const innen = () => s.evaluate(() => {
+        const e = document.querySelector('iframe').contentDocument.querySelector('.ws-task-num')
+        return e ? Math.round(e.getBoundingClientRect().left) + '/' + Math.round(e.getBoundingClientRect().top) : ''
+      })
+      const vorRand = await innen()
+      await s.locator('[data-notizrand-schalter]').click()
+      await s.waitForTimeout(600)
+      pruefe(await s.locator('[data-notizrand="0"]').isVisible(), '[Notizrand] Streifen neben der ersten Seite')
+      pruefe((await innen()) === vorRand, `[Notizrand] Blatt im Rahmen unverändert gesetzt (${vorRand} → ${await innen()})`)
+      // Mit dem Stift in den Rand schreiben
+      await s.locator('[data-werkzeug="stift"]').first().click()
+      const r = await s.locator('[data-notizrand="0"]').boundingBox()
+      // Sichtbarer Teil des Streifens (unter der mitlaufenden Werkzeugleiste)
+      const sy = Math.max(r.y + 40, 300)
+      await s.mouse.move(r.x + 30, sy)
+      await s.mouse.down()
+      await s.mouse.move(r.x + 140, sy + 15, { steps: 8 })
+      await s.mouse.up()
+      await s.waitForTimeout(3500)
+      await s.screenshot({ path: join(out, `${name}-3-notizrand.png`) })
+      // Ausblenden: Fähnchen, Vorschau, wieder einblenden
+      await s.locator('[data-notizrand-schalter]').click()
+      await s.waitForTimeout(800)
+      pruefe((await s.locator('[data-notizrand]').count()) === 0, '[Notizrand] ausgeblendet')
+      const fahne = s.locator('[data-notiz-faehnchen]').first()
+      pruefe(await fahne.isVisible().catch(() => false), '[Notizrand] Fähnchen zeigt die ausgeblendete Notiz')
+      if (await fahne.isVisible().catch(() => false)) {
+        await fahne.click()
+        await s.waitForTimeout(400)
+        await s.screenshot({ path: join(out, `${name}-4-faehnchen.png`) })
+        await s.locator('[data-notizrand-einblenden]').click()
+        await s.waitForTimeout(600)
+        pruefe(await s.locator('[data-notizrand="0"]').isVisible(), '[Notizrand] „Notizrand einblenden" aus dem Fähnchen')
+      }
+      await s.waitForTimeout(3000)
+      await s.reload()
+      await s.locator('[data-feld]').first().waitFor({ timeout: 30000 })
+      await s.waitForTimeout(1500)
+      pruefe(await s.locator('[data-notizrand="0"]').isVisible().catch(() => false), '[Notizrand] nach dem Neuladen weiter eingeblendet')
+      const tinte = await s.evaluate(() => {
+        const c = document.querySelector('canvas[data-tinte="41"]')
+        if (!c) return 0
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+        let n = 0
+        for (let k = 3; k < d.length; k += 16) if (d[k] > 30) n++
+        return n
+      })
+      pruefe(tinte > 20, `[Notizrand] Stift-Notiz im Rand gespeichert (${tinte} Punkte)`)
+    }
     await ctx.close()
   }
 
