@@ -386,10 +386,14 @@ export function grammatikBankRoute(): (k: Anfrage) => Promise<boolean> {
 // Fünfter Lauf: -ly/Steigerung, Formwörter (-self, probably), Fehlformen, Kurzform-Endungen, deutsche Wortformen
 // Sechster Lauf: Grundwortschatz (Alltagswörter) gilt als bekannt
 // Siebter Lauf (30.10.2026): Green Line 6 Unit 1, Formwörter Passiv/Nominalstil; Trailer zählen nicht mehr als Einführung
-const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-7-2026-10-30'
+// Achter Lauf (04.11.2026): Green Line 1 Unit 2 und Unit 3; „has" gilt ab dem simple present als bekannt
+const WORTSCHATZ_WARTUNG = 'grammatik-bank-wortschatz-8-2026-11-04'
 /** Stellen (Band, Unit), deren Formen nach dem Wortschatz ihrer Station geprüft werden – wo die Aufgaben dafür erzeugt sind */
 const WORTSCHATZ_STELLEN: [string, string][] = [
   ['Green Line 1', 'Unit 1'],
+  // Green Line 1 Unit 2 und Unit 3 (04.11.2026): Genitiv, simple present, Objektpronomen, Fragen/Verneinung, Fragewörter
+  ['Green Line 1', 'Unit 2'],
+  ['Green Line 1', 'Unit 3'],
   ['Green Line 2', 'Unit 4'],
   // Wiederholungen in Green Line 5 Unit 1: Passiv (eingeführt Green Line 3 Unit 3), indirekte Rede (Green Line 4 Unit 1)
   ['Green Line 3', 'Unit 3'],
@@ -541,7 +545,10 @@ const EINSPIELEN: [string, string][] = [
   // Nachtrag (29.10.2026, Auftrag der Lehrkraft): Felder, denen nach der Schlussdurchsicht eine Aufgabe fehlte
   ['grammatik-bank-greenline5-unit1-nachtrag-2026-10-29', 'greenline5-unit1-nachtrag-2026-10-29.json'],
   // Green Line 6 Unit 1 (30.10.2026): Zeitenüberblick, Passiv in Berichten, Nominalstil, Zukunft mit Präsensformen – gleicher Ablauf
-  ['grammatik-bank-greenline6-unit1-2026-10-30', 'greenline6-unit1-2026-10-30.json']
+  ['grammatik-bank-greenline6-unit1-2026-10-30', 'greenline6-unit1-2026-10-30.json'],
+  // Green Line 1 Unit 2 und Unit 3 (04.11.2026): gleicher Ablauf, Vorgaben der Lehrkraft (has erlaubt, Genitiv ohne Namen auf -s,
+  // keine Subjektfragen, Fragewörter ohne which/whose/what kind of)
+  ['grammatik-bank-greenline1-unit2-3-2026-11-04', 'greenline1-unit2-3-2026-11-04.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
@@ -698,7 +705,7 @@ export const WORTSCHATZ_PRUEFEN = 'Wortschatz ('
  * Selbsttest (shared/grammatikSelbsttest.ts) und „Satzanfang verrät die Lösung" (Frage der Lehrkraft).
  */
 // 29.10.2026: „Möglichkeiten verraten die Lösung" (Befund der Lehrkraft: „Wähle alle Wortgruppen mit an")
-const MAENGEL_WARTUNGEN = ['grammatik-bank-maengel-2026-10-28', 'grammatik-bank-selbsttest-2026-10-28', 'grammatik-bank-verraten-2026-10-29', 'grammatik-bank-ursachen-2026-10-29']
+const MAENGEL_WARTUNGEN = ['grammatik-bank-maengel-2026-10-28', 'grammatik-bank-selbsttest-2026-10-28', 'grammatik-bank-verraten-2026-10-29', 'grammatik-bank-ursachen-2026-10-29', 'grammatik-bank-wortkasten-2026-11-04']
 
 /**
  * Einmal (28.10.2026, nach der Prüfung der ganzen Bank): jede Aufgabe nach den Regeln richten (shared/

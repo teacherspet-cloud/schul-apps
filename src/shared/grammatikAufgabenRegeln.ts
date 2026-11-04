@@ -168,6 +168,9 @@ export function aufgabeMangel(a: GrammatikAufgabe): string {
     if (l.length && l.every((x) => wortzahl(x) > 2)) return 'Fehler lässt sich nicht durch ein Wort beheben'
   }
   if (a.art === 'umformen' && l.length && enthalten(l, a.satz)) return 'Lösung gleich Ausgangssatz'
+  // Anweisung verweist auf einen Wortkasten, den es nicht gibt (04.11.2026, Prüfung Green Line 1 Unit 3: „Nutze jedes Wort aus
+  // dem Kasten“ ohne Wortkasten – die Lernenden suchen ihn vergeblich)
+  if (/kasten/i.test(a.anweisung ?? '') && !a.wortkasten?.length) return 'Anweisung nennt einen Wortkasten, der fehlt'
   // Neue Formate (28.10.2026)
   const produktion = ['luecke', 'umformen', 'lueckentext', 'verbinden', 'frage', 'satzbau']
   if ((a.uebung === 'erkennen') && produktion.includes(a.art)) return 'Erkennen verlangt Auswahl, nicht Tippen'

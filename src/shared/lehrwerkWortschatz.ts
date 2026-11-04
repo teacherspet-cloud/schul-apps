@@ -180,6 +180,9 @@ export function mitUnregelmaessigenFormen(
   kennungen: readonly string[]
 ): Set<string> {
   const aus = new Set(bekannt)
+  // „has" als 3. Person von have, sobald das simple present eingeführt ist (04.11.2026, Entscheidung der Lehrkraft für
+  // Green Line 1 Unit 2/3: „She has a cat." gehört dazu wie goes/does – die Vokabelliste führt nur „to have")
+  if (bekannt.has('have') && kennungen.some((k) => k.startsWith('en.verb.present_simple'))) aus.add('has')
   const past = kennungen.some((k) => k.startsWith('en.verb.past_simple'))
   const pp = kennungen.some((k) => /^en\.verb\.(present_perfect|past_perfect|passive)/.test(k))
   if (!past && !pp) return aus

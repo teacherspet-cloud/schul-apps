@@ -589,7 +589,9 @@ ok = false auch bei Wörtern außerhalb dieses Wortschatzes, die sich nicht durc
     bericht.gestrichen += regel.gestrichen.length
     for (const g of regel.gestrichen) if (bericht.gruende.length < 20 && !bericht.gruende.includes(g.grund)) bericht.gruende.push(g.grund)
   }
-  const nachRegel = regel.gestrichen.length ? { ...paket, aufgaben: regel.aufgaben } : paket
+  // Immer die gerichteten Aufgaben (04.11.2026, Blindprobe Green Line 1 Unit 3: „(1) (1) ___" – ohne Streichung blieb das
+  // ungerichtete Paket stehen, die Richtungen der Regeln gingen verloren)
+  const nachRegel = { ...paket, aufgaben: regel.aufgaben }
   // 3. Blindprobe mit Überarbeitung (28.10.2026, Wunsch der Lehrkraft)
   return blindGeprueft(nachRegel, a, ai, melde, bericht)
 }
