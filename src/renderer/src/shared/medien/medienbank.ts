@@ -18,7 +18,7 @@
  * in der Fassung der Zielkultur, wo sie dort typisch anders aussehen.
  */
 import type { OnlineImageHit, OnlineImageSource, StructuredRequest, TtsRequest } from '@shared/types'
-import { mitSatzpunkt, WORT_ANWEISUNG_OPENAI, WORT_KONTEXT, WORT_TTS_SETTINGS } from '@shared/voiceSettings'
+import { mitSatzpunkt, SATZ_TTS_SETTINGS, WORT_ANWEISUNG_OPENAI, WORT_KONTEXT, WORT_TTS_SETTINGS } from '@shared/voiceSettings'
 import { tonMessen } from './tonMessung'
 import {
   einmalErzeugen,
@@ -493,10 +493,14 @@ export async function tonErzeugen(
  * Auftrag an die Sprach-KI (12.10.2026, Wunsch der Lehrkraft: einsilbige Wörter identifizierbar). Einzelwörter bekommen
  * eigene Sprech-Einstellungen (langsamer, stabiler), einen Satzpunkt und – bei ElevenLabs – einen unhörbaren
  * Vorsprech-Rahmen als `previous_text`/`next_text`; OpenAI-Stimmen eine Sprechanweisung (Begründung: voiceSettings.ts).
- * Der gespeicherte Sprechtext bleibt unverändert. Sätze gehen wie bisher.
+ * Der gespeicherte Sprechtext bleibt unverändert. Sätze gehen mit dem Tempo ihrer Sprache (SATZ_TTS_SETTINGS).
  */
 export function sprechAuftrag(id: string, sprache: string, art: TonArt, stimme: string, sprech: string): TtsRequest {
-  if (art !== 'wort') return { id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache }
+  if (art !== 'wort') {
+    // Sätze: je Sprache eigenes Tempo (04.11.2026, Spanisch 0.85 – Begründung: voiceSettings.ts)
+    const satz = SATZ_TTS_SETTINGS[sprachKurz(sprache)]
+    return { id, turns: [{ voiceId: stimme, text: sprech }], languageCode: sprache, ...(satz ? { settings: satz } : {}) }
+  }
   const kontext = WORT_KONTEXT[sprachKurz(sprache)]
   return {
     id,

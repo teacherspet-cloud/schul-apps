@@ -33,6 +33,14 @@ export const TTS_DEFAULTS: TtsSettings = { stability: 0.5, similarity: 0.75, sty
 export const WORT_TTS_SETTINGS: TtsSettings = { ...TTS_DEFAULTS, stability: 0.7, speed: 0.9 }
 
 /**
+ * Beispielsätze der Vokabellisten langsamer (04.11.2026, Befund der Lehrkraft: spanische Sätze für Lernende zu schnell).
+ * ElevenLabs nimmt für eleven_multilingual_v2 keine Sprechanweisung in Worten an; verlässlich wirkt nur `speed`
+ * (0.7–1.2). Bei 1.0 sprechen die Stimmen rund 205 Wörter je Minute, bei 0.85 etwa 175. Vorerst nur Spanisch; Sprachen
+ * ohne Eintrag bleiben bei den Voreinstellungen.
+ */
+export const SATZ_TTS_SETTINGS: Record<string, TtsSettings> = { es: { ...TTS_DEFAULTS, speed: 0.85 } }
+
+/**
  * Unhörbarer Zusammenhang für Einzelwörter (12.10.2026): BELEGT ist, dass die ElevenLabs-Schnittstelle (auch
  * `…/with-timestamps`) `previous_text` und `next_text` annimmt und damit die Sprechmelodie an den Zusammenhang anpasst,
  * ohne ihn zu sprechen. FAUSTREGEL ist, dass ein Vorsprech-Rahmen („Listen and repeat the word.") das Wort deutlicher und

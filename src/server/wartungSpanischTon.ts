@@ -51,3 +51,30 @@ export function spanischToeneAussortieren(): string {
 }
 
 export const SPANISCH_TON: [string, (d: DatabaseSync) => string] = ['spanisch-ton-2026-11-01', () => spanischToeneAussortieren()]
+
+/**
+ * Spanische Satzaufnahmen vom 04.11.2026 entfernen (Wunsch der Lehrkraft: Sätze für Lernende zu schnell gesprochen). Ab
+ * jetzt gehen spanische Beispielsätze mit Tempo 0.85 an ElevenLabs (SATZ_TTS_SETTINGS in shared/voiceSettings.ts). Die
+ * Aufnahmen dieses Tages (am Server 76: je 38 weiblich/männlich, 13:08–13:20 Uhr, ältere spanische Sätze gab es keine)
+ * kommen in die Sicherung und werden beim nächsten Erzeugen neu und langsamer gesprochen. Einzelwörter bleiben.
+ */
+export const SPANISCH_SATZ_SICHERUNG = 'sicherung-spanisch-saetze-2026-11-04'
+const TAG_VON = Date.parse('2026-11-04T00:00:00+01:00')
+const TAG_BIS = Date.parse('2026-11-05T00:00:00+01:00')
+
+export function spanischSatzVomTag(ton: MedienTon, art: TonArt, sprache: string): boolean {
+  if (art !== 'satz' || String(sprache ?? '').toLowerCase().split(/[-_]/)[0] !== 'es') return false
+  return typeof ton?.zeit === 'number' && ton.zeit >= TAG_VON && ton.zeit < TAG_BIS
+}
+
+export const SPANISCH_SAETZE_LANGSAM: [string, (d: DatabaseSync) => string] = [
+  'spanisch-saetze-langsam-2026-11-04',
+  () => {
+    try {
+      const z = toeneAussortieren(spanischSatzVomTag, SPANISCH_SATZ_SICHERUNG)
+      return `${z.saetze} spanische Satz-Aufnahmen vom 04.11.2026 entfernt (${z.dateien} Dateien, gesichert in ${SPANISCH_SATZ_SICHERUNG})`
+    } catch (e) {
+      return `nichts entfernt (${e instanceof Error ? e.name : 'Fehler'})`
+    }
+  }
+]

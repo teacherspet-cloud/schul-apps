@@ -25,7 +25,7 @@ import { GRAMMATIK_KLASSE10 } from './wartungGrammatik10'
 import { GRAMMATIK_BANK_LOESCHEN } from './wartungBankLoeschen'
 import { GRAMMATIK_NEUBEGINN } from './wartungGrammatikNeubeginn'
 import { APUNTATE_2016 } from './wartungApuntate2016'
-import { SPANISCH_TON } from './wartungSpanischTon'
+import { SPANISCH_SAETZE_LANGSAM, SPANISCH_TON } from './wartungSpanischTon'
 import { ABSCHNITTE_TEILEN } from './wartungAbschnitteTeilen'
 import { VOKABEL_BAENDE } from './wartungVokabelBaende'
 import { ABKUERZUNG_TON } from './wartungAbkuerzungTon'
@@ -184,7 +184,9 @@ const AUFGABEN: [string, (d: DatabaseSync) => string][] = [
   // ¡Apúntate! Ausgabe 2016 aus dem Bücherkatalog nehmen (30.10.2026, von der Lehrkraft gewünscht; wartungApuntate2016.ts)
   APUNTATE_2016,
   // Spanische Aufnahmen nach alten Sprechregeln in die Sicherung (01.11.2026, Wunsch der Lehrkraft; wartungSpanischTon.ts)
-  SPANISCH_TON
+  SPANISCH_TON,
+  // Spanische Satzaufnahmen vom 04.11.2026 in die Sicherung, neu mit Tempo 0.85 (Wunsch der Lehrkraft; wartungSpanischTon.ts)
+  SPANISCH_SAETZE_LANGSAM
 ]
 
 export function wartungAusfuehren(d: DatabaseSync): void {
