@@ -220,7 +220,7 @@ export function schuetzeText(text: string, muster: Muster[]): { text: string; z:
   return { text: neu, z }
 }
 
-/** Sprachausgabe: echte Namen sperren statt ersetzen */
+/** Sprachausgabe: echte Namen sperren statt ersetzen (Aussprache der Vokabellisten ausgenommen, namensschutz.ts) */
 export function pruefeHoertext(req: TtsRequest, muster: Muster[]): void {
   const text = req.turns.map((t) => t.text).join('\n')
   const namen = gefundeneNamen(text, muster)

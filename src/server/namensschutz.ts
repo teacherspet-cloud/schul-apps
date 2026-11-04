@@ -116,7 +116,13 @@ export function mitNamensschutz(aufruf: Aufruf): Aufruf {
     }
     if (kanal === 'audio:speak' && args[0] && typeof args[0] === 'object') {
       try {
-        pruefeHoertext(args[0] as TtsRequest, namensMuster())
+        const req = args[0] as TtsRequest
+        /*
+         * Aussprache der Vokabellisten, Verbformen und Beispielsätze (Kennung „vok-", medien/medienbank.ts) ohne Namensprüfung
+         * (04.11.2026, Entscheidung der Lehrkraft: „es sind nie reale Personen" – die Bücher erzählen von erfundenen Figuren,
+         * und Kinder der Schule, die wie eine Figur heißen, sperrten ganze Sätze). Hörtexte und Vorlesen bleiben geprüft.
+         */
+        if (!String(req.id ?? '').startsWith('vok-')) pruefeHoertext(req, namensMuster())
       } catch (e) {
         protokolliereServer('namensschutz', 'Hörtext mit echtem Namen gesperrt', n?.id)
         throw e

@@ -235,4 +235,15 @@ describe('Datenbank und Übersicht', () => {
     expect(ergebnis.text).toBe('Brief an Bea Bergfeld')
     expect(faelle).toHaveLength(1)
   })
+
+  it('Aussprache der Vokabellisten („vok-") geht ohne Namensprüfung, Hörtexte bleiben gesperrt (04.11.2026)', async () => {
+    const roh = vi.fn().mockResolvedValue({ dataUrl: 'data:audio/mpeg;base64,' })
+    const aufruf = mitNamensschutz(roh)
+    const nutzer = { id: lk, benutzer: 'a.lehr', name: 'Ada Lehr', rolle: 'lehrkraft' as const, quelle: 'lokal' }
+    const tts = (id: string) => ({ id, turns: [{ voiceId: 'v', text: 'This is Bea Bergfeld.' }], languageCode: 'en' })
+    await imNutzer(nutzer as never, () => aufruf('audio:speak', [tts('vok-1')]))
+    expect(roh).toHaveBeenCalledTimes(1)
+    await expect(imNutzer(nutzer as never, () => aufruf('audio:speak', [tts('hoertext-1')]))).rejects.toThrow(/echten Person/)
+    expect(roh).toHaveBeenCalledTimes(1)
+  })
 })
