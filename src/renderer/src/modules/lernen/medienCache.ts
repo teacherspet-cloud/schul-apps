@@ -6,7 +6,7 @@
  * Eine Sitzung trainiert EINE Liste; deshalb genügt ein Zwischenspeicher für die gerade geladene.
  */
 import type { MedienSicht } from '@shared/medienbank'
-import { satzSchluessel, stufeVon } from '@shared/medienbank'
+import { satzSchluessel, stufeVon, tonPasst } from '@shared/medienbank'
 import { alsAnfrage, anfrageSchluessel, istEinfach, type MedienAnfrage } from '@shared/medienBedeutung'
 import { senden } from '../onlinetest/serverApi'
 import { useDarstellung } from '../onlinetest/schuelerDarstellung'
@@ -96,7 +96,8 @@ export function aufnahmeSpielen(text: string): boolean {
   const t = (satzFassung(text.trim())?.text ?? text).trim()
   let url: string | undefined
   const w = medien[t]
-  if (w?.ton?.url && w.ton.text.trim() === t) url = w.ton.url
+  // Gleiche Vokabel in anderer Schreibweise („Look!" = „look", 08.11.2026) – nur die Frage-Betonung zählt (`tonPasst`)
+  if (w?.ton?.url && tonPasst(w.ton, t)) url = w.ton.url
   if (!url) {
     // Beispielsatz: in irgendeinem Eintrag gespeichert
     const k = satzSchluessel(t)

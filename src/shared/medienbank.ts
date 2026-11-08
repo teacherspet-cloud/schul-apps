@@ -110,6 +110,13 @@ export interface MedienEintrag {
   tonM?: MedienTon
   saetzeM?: Record<string, MedienTon>
   /**
+   * Zweite Betonung desselben Wortes (08.11.2026, Wunsch der Lehrkraft): Schreiben die Lehrwerke ein Wort einmal als
+   * Frage und einmal nicht („¿Vamos?" – „¡Vamos!", „de verdad" – „¿De verdad?"), klingt es verschieden. Die Aufnahme mit
+   * der anderen Betonung als `ton` bzw. `tonM` liegt hier; welche gilt, entscheidet `wortTon` nach dem Wortlaut.
+   */
+  tonAnders?: MedienTon
+  tonAndersM?: MedienTon
+  /**
    * Geschlechtsbezogene Beispielsätze (12.10.2026, shared/satzFassung.ts): angepasste Fassung für eine Stimme, Schlüssel =
    * satzSchluessel des Originals. Ohne `lage` = geprüft, keine Anpassung nötig.
    */
@@ -146,6 +153,38 @@ export interface MedienSicht {
   vorlaeufig?: true
   mehrdeutig?: true
   andere?: BildTeil['andere']
+}
+
+/** Frage-Betonung: Fragezeichen im Wortlaut („¿Vamos?", „How many …?") */
+export const istFrage = (s: string | undefined): boolean => /[?¿]/.test(String(s ?? ''))
+
+/** Feld der Wort-Aufnahme für Stimme und Betonung: der erste Platz, solange er frei ist oder dieselbe Betonung hat */
+export function wortTonFeld(
+  e: { ton?: { text: string }; tonM?: { text: string } } | undefined,
+  lage: Stimmlage,
+  text: string
+): 'ton' | 'tonM' | 'tonAnders' | 'tonAndersM' {
+  const erst = lage === 'm' ? e?.tonM : e?.ton
+  if (!erst || istFrage(erst.text) === istFrage(text)) return lage === 'm' ? 'tonM' : 'ton'
+  return lage === 'm' ? 'tonAndersM' : 'tonAnders'
+}
+
+/**
+ * Wort-Aufnahme einer Stimme zum Wortlaut `text` (08.11.2026): die mit derselben Betonung (Frage oder nicht); gibt es
+ * die nicht, die vorhandene als Rückfall zum Abspielen (`tonPasst` meldet sie dann als nicht passend).
+ */
+export function wortTon<T extends MedienTon>(
+  e: { ton?: T; tonM?: T; tonAnders?: T; tonAndersM?: T } | undefined,
+  lage: Stimmlage,
+  text: string | undefined
+): T | undefined {
+  const erst = lage === 'm' ? e?.tonM : e?.ton
+  const zweit = lage === 'm' ? e?.tonAndersM : e?.tonAnders
+  if (text === undefined) return erst ?? zweit
+  const f = istFrage(text)
+  if (erst && istFrage(erst.text) === f) return erst
+  if (zweit && istFrage(zweit.text) === f) return zweit
+  return erst ?? zweit
 }
 
 /** Ton bzw. Sätze einer Fassung */
@@ -239,6 +278,15 @@ export const satzSchluessel = (satz: string): string => textKanon(satz).slice(0,
 
 /** Gesprochenen Text vergleichen: vereinheitlicht und klein (Initialwörter stehen dort schon buchstabiert) */
 const sprechKanon = (s: string): string => textKanon(s).toLowerCase()
+/**
+ * Gesprochenes Einzelwort vergleichen (08.11.2026, Wunsch der Lehrkraft): Satzzeichen am Rand, Ausrufezeichen und
+ * Auslassungspunkte klingen nicht anders („look" = „Look!", „a ver" = „A ver …", „Oye, …" = „oye"); nur die
+ * Frage-Betonung zählt („¿Vamos?" ≠ „¡Vamos!").
+ */
+const sprechWortKanon = (s: string): string =>
+  `${sprechKanon(s)
+    .replace(/^[\s.,;:!?¡¿"'-]+|[\s.,;:!?¡¿"'-]+$/g, '')
+    .replace(/[!¡]/g, '')}${istFrage(s) ? '?' : ''}`
 
 /**
  * Passt die Aufnahme noch zum Wort bzw. Satz und zu seinem Sprechtext? (10.10.2026 gemeinsam für Aufträge und Knöpfe:
@@ -247,8 +295,13 @@ const sprechKanon = (s: string): string => textKanon(s).toLowerCase()
  */
 export const tonPasst = (ton: { text: string; gesprochen?: string } | undefined, text: string, gesprochen?: string, art: TonArt = 'wort'): boolean => {
   if (!ton) return false
-  const gleich = art === 'wort' ? wortKanon(ton.text) === wortKanon(text) : satzSchluessel(ton.text) === satzSchluessel(text)
-  return gleich && (gesprochen === undefined || sprechKanon(ton.gesprochen ?? ton.text) === sprechKanon(gesprochen))
+  if (art === 'wort')
+    return (
+      wortKanon(ton.text) === wortKanon(text) &&
+      istFrage(ton.text) === istFrage(text) &&
+      (gesprochen === undefined || sprechWortKanon(ton.gesprochen ?? ton.text) === sprechWortKanon(gesprochen))
+    )
+  return satzSchluessel(ton.text) === satzSchluessel(text) && (gesprochen === undefined || sprechKanon(ton.gesprochen ?? ton.text) === sprechKanon(gesprochen))
 }
 
 /** Kennung einer Aufnahme für die Erzeugungssperre (ohne Stimme und Sprechtext – die prüft `tonPasst` danach) */

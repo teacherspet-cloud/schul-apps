@@ -55,7 +55,9 @@ import {
   type Bildstufe,
   sprachKurz,
   stimmenNormiert,
-  tonVon,
+  istFrage,
+  wortTon,
+  wortTonFeld,
   type MedienBild,
   type Stimmen,
   type Stimmlage,
@@ -114,6 +116,8 @@ const istLeer = (e: MedienEintrag | null): boolean =>
     !e.ohneBild?.length &&
     !e.ton &&
     !e.tonM &&
+    !e.tonAnders &&
+    !e.tonAndersM &&
     !Object.keys(e.saetze ?? {}).length &&
     !Object.keys(e.saetzeM ?? {}).length &&
     !Object.keys(e.fassungen ?? {}).length)
@@ -369,7 +373,11 @@ export function medienFuer(
      */
     if (opts.lage) {
       const andere: Stimmlage = opts.lage === 'w' ? 'm' : 'w'
-      const ton = tonVon(e, opts.lage) ?? tonVon(e, andere)
+      // Wort-Aufnahme mit der Betonung des angefragten Wortlauts (08.11.2026, `wortTon`)
+      // – die eigene Stimme mit passender Betonung, sonst die andere Stimme mit passender, sonst was da ist
+      const eigene = wortTon(e, opts.lage, w)
+      const fremde = wortTon(e, andere, w)
+      const ton = [eigene, fremde].find((t) => t && istFrage(t.text) === istFrage(w)) ?? eigene ?? fremde
       const saetze = saetzeMitUrl({ ...(saetzeVon(e, andere) ?? {}), ...(saetzeVon(e, opts.lage) ?? {}) })
       const fassungen = fassungenFuerLernende(e, opts.lage)
       aus[w] = {
@@ -381,13 +389,16 @@ export function medienFuer(
       continue
     }
     const saetzeM = saetzeMitUrl(e.saetzeM)
+    // Lehrkraft: je Stimme die Wort-Aufnahme mit der Betonung des angefragten Wortlauts (08.11.2026, `wortTon`)
+    const tonW = wortTon(e, 'w', w)
+    const tonM = wortTon(e, 'm', w)
     aus[w] = {
       // Geschlechtsbezogene Beispielsätze (12.10.2026): die Lehrkraft sieht alle Fassungen
       ...(e.fassungen && Object.keys(e.fassungen).length ? { fassungen: e.fassungen } : {}),
-      ...(e.tonM ? { tonM: mitUrl(e.tonM) } : {}),
+      ...(tonM ? { tonM: mitUrl(tonM) } : {}),
       ...(saetzeM ? { saetzeM } : {}),
       ...bildTeil,
-      ...(e.ton ? { ton: { ...e.ton, ...(opts.basisUrl ? { url: url(e.ton.datei) } : {}) } } : {}),
+      ...(tonW ? { ton: mitUrl(tonW) } : {}),
       ...(e.saetze && Object.keys(e.saetze).length
         ? { saetze: Object.fromEntries(Object.entries(e.saetze).map(([k, t]) => [k, { ...t, ...(opts.basisUrl ? { url: url(t.datei) } : {}) }])) }
         : {})
@@ -550,7 +561,7 @@ export function toeneAussortieren(
     const sp = schluessel.split(':')[0] ?? ''
     const e: MedienEintrag = { ...e0 }
     const eintrag = { wort: schluessel.slice(sp.length + 1), saetze: [...Object.keys(e0.saetze ?? {}), ...Object.keys(e0.saetzeM ?? {})] }
-    for (const feld of ['ton', 'tonM'] as const) {
+    for (const feld of ['ton', 'tonM', 'tonAnders', 'tonAndersM'] as const) {
       const t = e[feld]
       if (t && weg_(t, 'wort', sp, eintrag)) {
         loeschen(t)
@@ -571,7 +582,15 @@ export function toeneAussortieren(
       else delete e[feld]
     }
     const leer =
-      !e.bild && !Object.keys(e.bildStufen ?? {}).length && !e.ohneBild?.length && !e.ton && !e.tonM && !Object.keys(e.saetze ?? {}).length && !Object.keys(e.saetzeM ?? {}).length
+      !e.bild &&
+      !Object.keys(e.bildStufen ?? {}).length &&
+      !e.ohneBild?.length &&
+      !e.ton &&
+      !e.tonM &&
+      !e.tonAnders &&
+      !e.tonAndersM &&
+      !Object.keys(e.saetze ?? {}).length &&
+      !Object.keys(e.saetzeM ?? {}).length
     if (leer) delete i[schluessel]
     else i[schluessel] = e
   }
@@ -627,12 +646,13 @@ export function tonSetzen(
     if (t.behalteVorher) ton.vorher = { datei: alt.datei, stimme: alt.stimme, zeit: alt.zeit, ...(grund ? { grund } : {}) }
     else weg(alt.datei)
   }
-  const tonFeld = lage === 'm' ? 'tonM' : 'ton'
   const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(sprache, wort, (e) => {
     if (art === 'wort') {
-      ersetze(e[tonFeld])
-      return { ...e, [tonFeld]: ton }
+      // Zweite Betonung (08.11.2026): eine Frage neben der Aussage bekommt ihren eigenen Platz (`wortTonFeld`)
+      const feld = wortTonFeld(e, lage, ton.text)
+      ersetze(e[feld])
+      return { ...e, [feld]: ton }
     }
     // Ersetzt wird die Aufnahme dieses Satzes in jeder Schreibweise („it’s" = „it's", 10.10.2026) – die neueste als Rückfall
     const k = satzSchluessel(t.text)
@@ -677,10 +697,11 @@ export function tonPruefungSetzen(
   const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(sprache, wort, (e) => {
     if (art === 'wort') {
-      const t = e[tonFeld]
-      if (t?.datei !== datei) return e
+      const feld = ([tonFeld, lage === 'm' ? 'tonAndersM' : 'tonAnders'] as const).find((f) => e[f]?.datei === datei)
+      const t = feld ? e[feld] : undefined
+      if (!feld || !t) return e
       getroffen = true
-      return { ...e, [tonFeld]: { ...t, pruefung } }
+      return { ...e, [feld]: { ...t, pruefung } }
     }
     const k = satzSchluessel(satz ?? '')
     const saetze = { ...(e[satzFeld] ?? {}) }
@@ -789,7 +810,7 @@ export function medienKanonOrdnen(sicherung = 'sicherung-kanon-2026-10-10'): { v
       ks.forEach((k) => (weg_[k] = i[k]))
     } else if (ks[0] !== c) zahl.verschoben++
     const e: MedienEintrag = { ...alle[0] }
-    for (const feld of ['ton', 'tonM'] as const) {
+    for (const feld of ['ton', 'tonM', 'tonAnders', 'tonAndersM'] as const) {
       const t = alle.map((x) => x[feld]).sort(besserTon)[0]
       if (t) e[feld] = t
     }
@@ -836,10 +857,17 @@ export function tonLoeschen(sprache: string, wort: string, art: TonArt, satz?: s
   const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(sprache, wort, (e) => {
     if (art === 'wort') {
-      weg(e[tonFeld]?.datei)
-      weg(e[tonFeld]?.vorher?.datei)
+      // Die Aufnahme mit der Betonung dieses Wortlauts (08.11.2026); rückt die zweite Betonung auf den ersten Platz
+      const andersFeld = lage === 'm' ? 'tonAndersM' : 'tonAnders'
+      const feld = e[andersFeld] && wortTon(e, lage, wort) === e[andersFeld] ? andersFeld : tonFeld
+      weg(e[feld]?.datei)
+      weg(e[feld]?.vorher?.datei)
       const rest = { ...e }
-      delete rest[tonFeld]
+      delete rest[feld]
+      if (feld === tonFeld && rest[andersFeld]) {
+        rest[tonFeld] = rest[andersFeld]
+        delete rest[andersFeld]
+      }
       return rest
     }
     const k = satzSchluessel(satz ?? '')
