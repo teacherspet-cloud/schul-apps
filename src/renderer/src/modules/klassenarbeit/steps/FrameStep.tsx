@@ -3,6 +3,7 @@ import { useExperte } from '../../../shared/settingsStore'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import SchreibGrammatikFeld from './SchreibGrammatikFeld'
 import SprechpruefungKarte from './SprechpruefungKarte'
+import TeilOperatoren from './TeilOperatoren'
 import { sprechpruefungAlsArbeit } from '../generation/sprechpruefung'
 import { BY_GYM_ZWEIG_KERNFAECHER as BY_GYM_ZWEIGE, nachweisFuer, NACHWEIS_BEZEICHNUNGEN, type ByZweig } from '../model/nachweise'
 import FachKarte, { FehlerquoteFelder } from './FachKarte'
@@ -830,6 +831,11 @@ export default function FrameStep(): React.JSX.Element {
                                       defaultValue={part.notes ?? ''}
                                       onBlur={(e) => update((d) => (d.parts[i].notes = e.currentTarget.value))}
                                     />
+                                    {formatArt(part.formatId) !== 'speaking' && (
+                                      <Box mt="xs">
+                                        <TeilOperatoren exam={exam} part={part} setzen={(ops) => update((d) => (d.parts[i].operatoren = ops))} />
+                                      </Box>
+                                    )}
                                     {formatArt(part.formatId) === 'speaking' && (
                                       <SprechpruefungKarte
                                         exam={exam}
@@ -1375,7 +1381,23 @@ function AufbauKurz({ exam, neu }: { exam: Exam; neu: () => void }): React.JSX.E
  */
 function Gewichtung({ exam, update }: { exam: Exam; update: (fn: (d: Exam) => void) => void }): React.JSX.Element | null {
   const alle = useAlleOptionen()
-  if (istFremdsprache(exam.meta.subjectId) || !exam.parts.length) return null
+  if (!exam.parts.length) return null
+  // Fremdsprachen: Anteile folgen den Kompetenzen – im Standardmodus nur die Operatoren je Teil
+  if (istFremdsprache(exam.meta.subjectId))
+    return alle ? null : (
+      <Stack gap={6} mt="sm">
+        {exam.parts.map((part, i) =>
+          formatArt(part.formatId) === 'speaking' ? null : (
+            <Group key={part.id} gap="xs" wrap="nowrap">
+              <Text size="sm" w={220} truncate title={part.label}>
+                {part.label}
+              </Text>
+              <TeilOperatoren exam={exam} part={part} setzen={(ops) => update((d) => (d.parts[i].operatoren = ops))} />
+            </Group>
+          )
+        )}
+      </Stack>
+    )
   const vorschlag = afbVorschlag(exam)
   const afb = exam.meta.afbMix ?? vorschlag
   const setzeAfb = (I: number, III: number): void =>
@@ -1387,31 +1409,39 @@ function Gewichtung({ exam, update }: { exam: Exam; update: (fn: (d: Exam) => vo
   const summe = examWeight(exam)
   return (
     <Stack gap="xs" mt="sm" data-gewichtung>
-      {!alle && exam.parts.length > 1 && (
-        <Group gap="xs" align="flex-end">
+      {!alle && (
+        <Stack gap={6}>
           {exam.parts.map((part, i) => (
-            <ZahlFeld
-              key={part.id}
-              size="xs"
-              w={150}
-              label={`${part.label} (%)`}
-              min={5}
-              max={100}
-              step={5}
-              clampBehavior="blur"
-              value={part.weight}
-              onChange={(v) => {
-                const weight = typeof v === 'number' ? v : Number(v)
-                if (!Number.isFinite(weight) || weight <= 0) return
-                update((d) => {
-                  d.parts[i].weight = weight
-                  d.parts[i].minutes = Math.max(1, Math.round((d.meta.minutes * weight) / 100))
-                  d.parts[i].points = pointsFromWeight(weight, d.meta.points)
-                })
-              }}
-            />
+            <Group key={part.id} gap="xs" wrap="nowrap" align="center">
+              <Text size="sm" w={220} truncate title={part.label}>
+                {part.label}
+              </Text>
+              {exam.parts.length > 1 && (
+                <ZahlFeld
+                  size="xs"
+                  w={90}
+                  aria-label={`Anteil ${part.label}`}
+                  suffix=" %"
+                  min={5}
+                  max={100}
+                  step={5}
+                  clampBehavior="blur"
+                  value={part.weight}
+                  onChange={(v) => {
+                    const weight = typeof v === 'number' ? v : Number(v)
+                    if (!Number.isFinite(weight) || weight <= 0) return
+                    update((d) => {
+                      d.parts[i].weight = weight
+                      d.parts[i].minutes = Math.max(1, Math.round((d.meta.minutes * weight) / 100))
+                      d.parts[i].points = pointsFromWeight(weight, d.meta.points)
+                    })
+                  }}
+                />
+              )}
+              <TeilOperatoren exam={exam} part={part} setzen={(ops) => update((d) => (d.parts[i].operatoren = ops))} />
+            </Group>
           ))}
-          {summe !== 100 && (
+          {exam.parts.length > 1 && summe !== 100 && (
             <Button
               size="compact-sm"
               variant="subtle"
@@ -1433,7 +1463,7 @@ function Gewichtung({ exam, update }: { exam: Exam; update: (fn: (d: Exam) => vo
               {summe} % – auf 100 % bringen
             </Button>
           )}
-        </Group>
+        </Stack>
       )}
       <Group gap="xs" align="flex-end">
         <ZahlFeld size="xs" w={90} label="AFB I (%)" min={0} max={100} step={5} value={afb.I} onChange={(v) => setzeAfb(Number(v) || 0, afb.III)} />

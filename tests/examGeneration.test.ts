@@ -384,3 +384,15 @@ describe('Gewichtung der Anforderungsbereiche (10.11.2026)', () => {
     expect(worksheetMetaFor(ge({ grade: 12 })).overrides.afbMix).toBeUndefined()
   })
 })
+
+describe('Operatoren je Teil (10.11.2026)', () => {
+  it('gewählte Operatoren stehen verbindlich im Auftrag des Teils', () => {
+    const p = part('ge-source', { operatoren: ['beschreiben', 'erläutern', 'beurteilen'] })
+    const text = partPrompt(exam([p], { subjectId: 'geschichte', subjectLabel: 'Geschichte', grade: 12 }), p, 1)
+    expect(text).toContain('OPERATOREN DER LEHRKRAFT (verbindlich)')
+    expect(text).toContain('„beschreiben“, „erläutern“, „beurteilen“')
+  })
+  it('ohne Auswahl keine Vorgabe', () => {
+    expect(partNotes(part('ge-source'))).not.toContain('OPERATOREN DER LEHRKRAFT')
+  })
+})

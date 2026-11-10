@@ -93,6 +93,11 @@ export interface ExamPart {
    * z. B. „Der Text handelt von einem Schüleraustausch" oder „Aufgabe zum past perfect".
    */
   notes?: string
+  /**
+   * Operatoren aus der Liste des Landes (KC), mit denen die Aufgaben dieses Teils gestellt werden –
+   * verbindlich, je Operator mindestens eine Aufgabe (10.11.2026, Wunsch der Lehrkraft). Leer = KI wählt.
+   */
+  operatoren?: string[]
   /** Produktive Teile: Textsorte, in der die Lernenden schreiben ('' = die KI wählt passend) */
   studentTextType?: string
   /** Fremdsprachen, Schreibteil: ausdrücklich mitgeprüfte Grammatik (29.09.2026, didactics/schreibGrammatik.ts) */

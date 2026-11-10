@@ -245,6 +245,8 @@ function answerKeyRules(exam: Exam, part: ExamPart): string {
 }
 
 /** Nähere Vorgaben der Lehrkraft für diesen Teil. */
+const operatorenText = (ops: string[]): string => ops.map((o) => `„${o}“`).join(', ')
+
 export function partNotes(part: ExamPart): string {
   // Deutsch: Aufsatzformen (Befund D4), sonst die Textsorten der Fremdsprachen
   const textType = [...STUDENT_TEXT_TYPES, ...DEUTSCHE_TEXTSORTEN].find((t) => t.value === part.studentTextType && t.value)
@@ -252,7 +254,11 @@ export function partNotes(part: ExamPart): string {
     textType
       ? `TEXTSORTE VORGEGEBEN: Die Lernenden schreiben „${textType.label}“ (brief.textType = "${textType.english}"). Die Situation muss dazu passen, und die Aufgabe verlangt die Merkmale dieser Textsorte.`
       : '',
-    part.notes?.trim() ? `VORGABEN DER LEHRKRAFT (verbindlich):\n${part.notes.trim()}` : ''
+    part.notes?.trim() ? `VORGABEN DER LEHRKRAFT (verbindlich):\n${part.notes.trim()}` : '',
+    // Operatoren aus der Liste des Landes, von der Lehrkraft gewählt (10.11.2026)
+    part.operatoren?.length
+      ? `OPERATOREN DER LEHRKRAFT (verbindlich): Stelle die Aufgaben dieses Teils mit genau diesen Operatoren aus der Operatorenliste: ${operatorenText(part.operatoren)}. Jeder gewählte Operator steht in mindestens einer Aufgabe, keine anderen Operatoren. Ordne die Aufgaben vom niedrigeren zum höheren Anforderungsbereich und halte dich an die Erläuterung der Liste.`
+      : ''
   ].filter(Boolean)
   return lines.length ? `\n${lines.join('\n')}` : ''
 }
