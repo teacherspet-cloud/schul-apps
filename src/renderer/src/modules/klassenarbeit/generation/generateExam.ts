@@ -15,6 +15,7 @@ import { obj, str } from '../../../shared/aiSchema'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
 import { comprehensionFormatById, defaultComprehensionFormats } from '../../arbeitsblatt/didactics/comprehensionFormats'
 import { buildLearnerProfile, stageForGrade } from '../../arbeitsblatt/didactics/profile'
+import type { AfbMix } from '../../arbeitsblatt/didactics/ageBands'
 import { browserWorksheetImageDeps, worksheetImagePool } from '../../arbeitsblatt/generation/browserImages'
 import { checkIntegrity, verschluesseleMaterialverweise } from '../../arbeitsblatt/didactics/integrity'
 import { checkClosedFormatsHistory, checkItemWording, checkTrueFalseEvidence } from '../../arbeitsblatt/didactics/itemWording'
@@ -146,6 +147,8 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     aiCanary: m.aiCanary,
     aiCanaryWords: m.aiCanaryWords,
     boardPlan: false,
+    // Gewichtung der Anforderungsbereiche aus der Arbeit (10.11.2026)
+    overrides: m.afbMix ? { afbMix: m.afbMix } : {},
     // Hörtext-Einstellungen der Arbeit gelten für den Hörverstehensteil
     audioAi: m.audioAi,
     audioFormat: m.audioFormat,
@@ -600,20 +603,28 @@ export interface ExamProgress {
   (message: string): void
 }
 
+/** Vorschlag des Lerngruppen-Profils für die Anforderungsbereiche – ohne die Vorgabe der Lehrkraft (10.11.2026). */
+export function afbVorschlag(exam: Exam): AfbMix {
+  return profileFor({ ...worksheetMetaFor(exam), overrides: {} }).afbMix
+}
+
 /** Lerngruppen-Profil aus den Angaben der Arbeit. */
 function profileFor(meta: WorksheetMeta): ReturnType<typeof buildLearnerProfile> {
-  return buildLearnerProfile({
-    stateId: meta.stateId,
-    schoolTypeId: meta.schoolTypeId,
-    schoolTypeName: meta.schoolTypeName,
-    grade: meta.grade,
-    courseLevel: meta.courseLevel,
-    subjectId: meta.subjectId,
-    subjectLabel: meta.subjectLabel,
-    languageMode: meta.languageMode,
-    cefrLevel: meta.cefrLevel,
-    instructionsInGerman: meta.instructionsInGerman
-  })
+  return buildLearnerProfile(
+    {
+      stateId: meta.stateId,
+      schoolTypeId: meta.schoolTypeId,
+      schoolTypeName: meta.schoolTypeName,
+      grade: meta.grade,
+      courseLevel: meta.courseLevel,
+      subjectId: meta.subjectId,
+      subjectLabel: meta.subjectLabel,
+      languageMode: meta.languageMode,
+      cefrLevel: meta.cefrLevel,
+      instructionsInGerman: meta.instructionsInGerman
+    },
+    meta.overrides
+  )
 }
 
 /**

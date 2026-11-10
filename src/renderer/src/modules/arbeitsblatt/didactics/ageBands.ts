@@ -125,7 +125,8 @@ export const AGE_BANDS: AgeBand[] = [
     language: { avgSentenceWords: 18, maxSentenceWords: 25, lixMax: 60 },
     tasksPerPage: [2, 4],
     minutesPerTask: [20, 45],
-    afbMix: { I: 25, II: 45, III: 30 },
+    // Wunsch der Lehrkraft (10.11.2026): Schwerpunkt deutlich im AFB II, I und III gleich stark
+    afbMix: { I: 30, II: 40, III: 30 },
     exampleFirst: false,
     instructionSymbols: false,
     scaffolding: 'gering',

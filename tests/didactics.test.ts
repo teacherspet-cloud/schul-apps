@@ -30,12 +30,13 @@ describe('Lerngruppen-Profil', () => {
     expect(p.selfAssessment).toBe('smileys')
   })
 
-  it('Gymnasium NI Kl. 12: Sek-II-Operatoren, G9, mehr AFB III', () => {
+  it('Gymnasium NI Kl. 12: Sek-II-Operatoren, G9, Schwerpunkt AFB II (30 / 40 / 30)', () => {
     const p = buildLearnerProfile(input({ grade: 12, subjectId: 'geschichte' }))
     expect(p.stage).toBe('sek2')
     expect(p.operators.III).toContain('erörtern')
     expect(p.gymnasiumTiming).toContain('G9')
-    expect(p.afbMix.III).toBe(35)
+    // Wunsch der Lehrkraft 10.11.2026: Oberstufe 30 / 40 / 30, ohne Verschiebung nach Schulform
+    expect(p.afbMix).toEqual({ I: 30, II: 40, III: 30 })
     expect(p.afbMix.I + p.afbMix.II + p.afbMix.III).toBe(100)
     expect(p.curriculumName).toBe('Kerncurriculum')
   })

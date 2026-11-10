@@ -30,6 +30,9 @@ import { ueberlaufUnten } from './seitenUeberlauf'
 import { anmerkungenJeAbsatz, anmerkungenImStueck, anmerkungsArt, anmerkungenVon, type Anmerkung } from '../didactics/anmerkungen'
 import { aufAbsaetze, zeilenBaender, zeilenEinheiten, zeilenSchnitte, type AbsatzMessung, type Streifen, type ZeilenStelle } from './zeilenTeilung'
 import { linieMmFuerMeta, schreibRegelFuerMeta } from '../didactics/schreibraum'
+// Blatt-Stil am Renderer selbst (10.11.2026): Seit die Programme getrennt geladen werden (0.4.204), fehlte er in
+// Ansichten vor dem Editor – etwa der Live-Vorschau einer entstehenden Klassenarbeit – völlig unformatiert.
+import './ws.css'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(

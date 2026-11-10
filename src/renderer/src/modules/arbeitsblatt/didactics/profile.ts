@@ -117,7 +117,8 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
 
   // Anforderungsbereiche: Altersband + Verschiebung der Schulform; Förderschule wie Kl. 1–2
   let afbMix: AfbMix = foerder ? { I: 60, II: 35, III: 5 } : { ...ageBand.afbMix }
-  if (!foerder && stage !== 'primar') {
+  // Oberstufe ohne Verschiebung nach Schulform: dort gilt für alle 30 / 40 / 30 (Wunsch der Lehrkraft 10.11.2026)
+  if (!foerder && stage === 'sek1') {
     afbMix = clampMix({
       I: afbMix.I + (effectiveProfile.afbShift.I ?? 0),
       II: afbMix.II,

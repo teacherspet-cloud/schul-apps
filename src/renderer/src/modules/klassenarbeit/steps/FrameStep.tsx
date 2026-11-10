@@ -8,7 +8,7 @@ import { BY_GYM_ZWEIG_KERNFAECHER as BY_GYM_ZWEIGE, nachweisFuer, NACHWEIS_BEZEI
 import FachKarte, { FehlerquoteFelder } from './FachKarte'
 import { istAlteSprache } from '../model/faecher'
 import { taktZeile } from '../model/examRules'
-import { upperSecondary } from '../generation/generateExam'
+import { afbVorschlag, upperSecondary } from '../generation/generateExam'
 import { useLehrplanVorschlaege } from '../../../shared/lehrplanVorschlaege'
 import { fachDerArbeit, formatArt, inhaltsanteil, istFremdsprache, KLASSENARBEIT_FAECHER, sprachfolge, zweiterTeil } from '../model/faecher'
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
@@ -726,6 +726,7 @@ export default function FrameStep(): React.JSX.Element {
                       </NurExperte>
                     </Group>
                     <AufbauKurz exam={exam} neu={fillParts} />
+                    <Gewichtung exam={exam} update={update} />
                     <NurExperte>
                       {exam.parts.length === 0 ? (
                         <Text size="sm" c="dimmed">
@@ -1363,6 +1364,92 @@ function AufbauKurz({ exam, neu }: { exam: Exam; neu: () => void }): React.JSX.E
         Neu vorschlagen
       </Button>
     </Group>
+  )
+}
+
+/**
+ * Gewichtung der Arbeit (10.11.2026, Befund der Lehrkraft: in Geschichte im Standardmodus nicht
+ * änderbar). Im Standardmodus die Anteile der Teile – im Expertenmodus stehen sie an jedem Teil –,
+ * in beiden Modi die Anforderungsbereiche. Nur Fächer mit einer Note aus Punkten; in den
+ * Fremdsprachen folgen die Anteile den Kompetenzen (Schreibanteil).
+ */
+function Gewichtung({ exam, update }: { exam: Exam; update: (fn: (d: Exam) => void) => void }): React.JSX.Element | null {
+  const alle = useAlleOptionen()
+  if (istFremdsprache(exam.meta.subjectId) || !exam.parts.length) return null
+  const vorschlag = afbVorschlag(exam)
+  const afb = exam.meta.afbMix ?? vorschlag
+  const setzeAfb = (I: number, III: number): void =>
+    update((d) => {
+      const i = Math.max(0, Math.min(100, I))
+      const iii = Math.max(0, Math.min(100 - i, III))
+      d.meta.afbMix = i === vorschlag.I && iii === vorschlag.III ? undefined : { I: i, II: 100 - i - iii, III: iii }
+    })
+  const summe = examWeight(exam)
+  return (
+    <Stack gap="xs" mt="sm" data-gewichtung>
+      {!alle && exam.parts.length > 1 && (
+        <Group gap="xs" align="flex-end">
+          {exam.parts.map((part, i) => (
+            <ZahlFeld
+              key={part.id}
+              size="xs"
+              w={150}
+              label={`${part.label} (%)`}
+              min={5}
+              max={100}
+              step={5}
+              clampBehavior="blur"
+              value={part.weight}
+              onChange={(v) => {
+                const weight = typeof v === 'number' ? v : Number(v)
+                if (!Number.isFinite(weight) || weight <= 0) return
+                update((d) => {
+                  d.parts[i].weight = weight
+                  d.parts[i].minutes = Math.max(1, Math.round((d.meta.minutes * weight) / 100))
+                  d.parts[i].points = pointsFromWeight(weight, d.meta.points)
+                })
+              }}
+            />
+          ))}
+          {summe !== 100 && (
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              color="orange"
+              onClick={() =>
+                update((d) => {
+                  const shares = d.parts.map((p) => p.weight)
+                  const weights = distribute(shares, 100)
+                  const minutes = distribute(shares, d.meta.minutes)
+                  const points = distribute(shares, d.meta.points)
+                  d.parts.forEach((p, k) => {
+                    p.weight = weights[k]
+                    p.minutes = Math.max(1, minutes[k])
+                    p.points = points[k]
+                  })
+                })
+              }
+            >
+              {summe} % – auf 100 % bringen
+            </Button>
+          )}
+        </Group>
+      )}
+      <Group gap="xs" align="flex-end">
+        <ZahlFeld size="xs" w={90} label="AFB I (%)" min={0} max={100} step={5} value={afb.I} onChange={(v) => setzeAfb(Number(v) || 0, afb.III)} />
+        <ZahlFeld size="xs" w={90} label="AFB II (%)" value={afb.II} disabled />
+        <ZahlFeld size="xs" w={90} label="AFB III (%)" min={0} max={100} step={5} value={afb.III} onChange={(v) => setzeAfb(afb.I, Number(v) || 0)} />
+        {exam.meta.afbMix ? (
+          <Button size="compact-sm" variant="subtle" color="orange" onClick={() => update((d) => (d.meta.afbMix = undefined))}>
+            Vorschlag {vorschlag.I} / {vorschlag.II} / {vorschlag.III}
+          </Button>
+        ) : (
+          <Text size="xs" c="dimmed" pb={6}>
+            Vorschlag für die Lerngruppe; AFB II ergibt sich aus dem Rest.
+          </Text>
+        )}
+      </Group>
+    </Stack>
   )
 }
 

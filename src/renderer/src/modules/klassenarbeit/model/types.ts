@@ -171,6 +171,11 @@ export interface ExamMeta {
   minutes: number
   /** Gesamtpunktzahl */
   points: number
+  /**
+   * Gewichtung der Anforderungsbereiche, von der Lehrkraft gesetzt (10.11.2026). Fehlt sie, gilt der
+   * Vorschlag des Lerngruppen-Profils (Oberstufe 30 / 40 / 30). Geht als Vorgabe in jeden Teil-Auftrag.
+   */
+  afbMix?: AfbMix
   /** Erlaubte Hilfsmittel (z. B. „einsprachiges Wörterbuch“) */
   aids: string
   /**

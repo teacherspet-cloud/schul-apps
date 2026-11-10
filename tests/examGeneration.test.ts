@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultWeights, writingWeightFor } from '../src/renderer/src/modules/klassenarbeit/model/formats'
-import { generateExam, partNotes, partPrompt, vocabRules, worksheetMetaFor } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
+import { afbVorschlag, generateExam, partNotes, partPrompt, vocabRules, worksheetMetaFor } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
 import { examHeadBlock, examToWorksheet } from '../src/renderer/src/modules/klassenarbeit/render/examWorksheet'
 import { upperSecondary, upperSecondaryRules } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
 import { AIDS_SUGGESTIONS, translateAids } from '../src/renderer/src/modules/klassenarbeit/model/aids'
@@ -368,5 +368,19 @@ describe('Gymnasiale Oberstufe: nur Originalmaterial', () => {
     expect(prompt).toContain('ORIGINALQUELLEN')
     // In der Mittelstufe steht die Vorgabe nicht im Auftrag
     expect(partPrompt(exam([], { grade: 9 }), part('en-reading'), 1)).not.toContain('OBERSTUFE')
+  })
+})
+
+describe('Gewichtung der Anforderungsbereiche (10.11.2026)', () => {
+  const ge = (patch: Partial<Exam['meta']> = {}): Exam => exam([], { subjectId: 'geschichte', subjectLabel: 'Geschichte', ...patch })
+  it('Oberstufe: Vorschlag 30 / 40 / 30, auch am Gymnasium', () => {
+    expect(afbVorschlag(ge({ grade: 12 }))).toEqual({ I: 30, II: 40, III: 30 })
+    expect(afbVorschlag(ge({ grade: 11, schoolTypeId: 'gesamtschule', schoolTypeName: 'Gesamtschule' }))).toEqual({ I: 30, II: 40, III: 30 })
+  })
+  it('die Vorgabe der Lehrkraft geht in den Auftrag, der Vorschlag bleibt unberührt', () => {
+    const e = ge({ grade: 12, afbMix: { I: 20, II: 50, III: 30 } })
+    expect(worksheetMetaFor(e).overrides.afbMix).toEqual({ I: 20, II: 50, III: 30 })
+    expect(afbVorschlag(e)).toEqual({ I: 30, II: 40, III: 30 })
+    expect(worksheetMetaFor(ge({ grade: 12 })).overrides.afbMix).toBeUndefined()
   })
 })
