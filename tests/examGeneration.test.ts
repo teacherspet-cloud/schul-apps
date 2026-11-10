@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultWeights, writingWeightFor } from '../src/renderer/src/modules/klassenarbeit/model/formats'
+import { defaultWeights, suggestParts, writingWeightFor } from '../src/renderer/src/modules/klassenarbeit/model/formats'
 import { afbVorschlag, generateExam, partNotes, partPrompt, vocabRules, worksheetMetaFor } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
 import { examHeadBlock, examToWorksheet } from '../src/renderer/src/modules/klassenarbeit/render/examWorksheet'
 import { upperSecondary, upperSecondaryRules } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
@@ -394,5 +394,21 @@ describe('Operatoren je Teil (10.11.2026)', () => {
   })
   it('ohne Auswahl keine Vorgabe', () => {
     expect(partNotes(part('ge-source'))).not.toContain('OPERATOREN DER LEHRKRAFT')
+  })
+})
+
+describe('Geschichte Oberstufe: ein Material, drei Teilaufgaben AFB I–III (10.11.2026)', () => {
+  it('Vorschlag ab Klasse 11 ist ein Teil, darunter wie bisher drei', () => {
+    expect(suggestParts('geschichte', 12, 60, 135).map((p) => p.formatId)).toEqual(['ge-klausur'])
+    expect(suggestParts('geschichte', 12, 60, 135)[0].points).toBe(60)
+    expect(suggestParts('geschichte', 9, 60, 90)).toHaveLength(3)
+  })
+  it('Punkte der Teilaufgaben folgen der AFB-Gewichtung', () => {
+    const p = part('ge-klausur', { points: 60 })
+    const ge = { subjectId: 'geschichte' as const, subjectLabel: 'Geschichte', grade: 12 }
+    expect(partPrompt(exam([p], ge), p, 1)).toContain('18 Punkte; 2. Anforderungsbereich II (z. B. analysieren, einordnen, erläutern) – 24 Punkte')
+    const eigen = partPrompt(exam([p], { ...ge, afbMix: { I: 20, II: 50, III: 30 } }), p, 1)
+    expect(eigen).toContain('– 12 Punkte; 2.')
+    expect(eigen).toContain('20 / 50 / 30 %')
   })
 })

@@ -53,6 +53,7 @@ import { subjectById } from '../../arbeitsblatt/model/subjects'
 import type { LanguageSkill, OriginalMaterialAblage, Sheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam, ExamPart } from '../model/types'
+import { distribute } from '../model/types'
 import { knownVocabRulesDe } from '../../../shared/knownVocab'
 import { formenRegelFuerFach } from '../../../shared/bekannteFormen'
 import { bilingualAktiv, checkBilingualOperatoren, PRUEFUNGSSPRACHE_HINWEIS } from '../../arbeitsblatt/didactics/bilingual'
@@ -245,6 +246,23 @@ function answerKeyRules(exam: Exam, part: ExamPart): string {
 }
 
 /** Nähere Vorgaben der Lehrkraft für diesen Teil. */
+/**
+ * Geschichte, Oberstufe (10.11.2026): ein Material, genau drei Teilaufgaben nach AFB I, II und III.
+ * Die Punkte folgen der Gewichtung der Arbeit (Vorgabe der Lehrkraft oder Vorschlag, z. B. 30 / 40 / 30).
+ */
+export function klausurTeilaufgaben(exam: Exam, part: ExamPart): string {
+  if (part.formatId !== 'ge-klausur') return ''
+  const afb = exam.meta.afbMix ?? afbVorschlag(exam)
+  const [p1, p2, p3] = distribute([afb.I, afb.II, afb.III], part.points)
+  return [
+    'AUFBAU DER KLAUSUR (verbindlich):',
+    '- EIN Material für den ganzen Teil (in der Regel eine Textquelle mit Zeilennummern); alle Teilaufgaben beziehen sich darauf.',
+    `- GENAU DREI Teilaufgaben in dieser Reihenfolge: 1. Anforderungsbereich I (z. B. wiedergeben, beschreiben, zusammenfassen) – ${p1} Punkte; 2. Anforderungsbereich II (z. B. analysieren, einordnen, erläutern) – ${p2} Punkte; 3. Anforderungsbereich III (z. B. beurteilen, erörtern, Stellung nehmen) – ${p3} Punkte.`,
+    `- Gewichtung der Anforderungsbereiche: ${afb.I} / ${afb.II} / ${afb.III} % – der Schwerpunkt liegt auf der zweiten Teilaufgabe. Nenne die Punkte je Teilaufgabe im Feld points und im Erwartungshorizont.`,
+    '- Keine weiteren Teilaufgaben, keine Aufgabe ohne Bezug zum Material.'
+  ].join('\n')
+}
+
 const operatorenText = (ops: string[]): string => ops.map((o) => `„${o}“`).join(', ')
 
 export function partNotes(part: ExamPart): string {
@@ -508,7 +526,7 @@ export async function materialFuerTeil(
 
 /** Textgebundene Teile: Dort steht das Material der Lehrkraft als Lesetext auf der Arbeit */
 /** Formate, deren Material eine echte, zu analysierende Quelle ist (Begründung bei `brauchtOriginaltext`) */
-const QUELLENFORMATE = ['ge-source', 'ge-comparison', 'pol-text', 'de-textanalyse', 'de-gedicht', 'de-sachtext']
+const QUELLENFORMATE = ['ge-source', 'ge-klausur', 'ge-comparison', 'pol-text', 'de-textanalyse', 'de-gedicht', 'de-sachtext']
 /** Fremdsprachen: Leseverstehen und Sprachmittlung jeder Sprache */
 function istQuellenformat(formatId: string): boolean {
   return QUELLENFORMATE.includes(formatId) || ['reading', 'mediation'].includes(formatArt(formatId) ?? '')
@@ -585,6 +603,7 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
     partNotes(part),
     // Fächer vom 29.09.2026: Mathematik (Teil A/B), Latein/Griechisch (Fehlerquote), NaWi (Versuch), Informatik, Musik/Kunst, Werte-Fächer
     fachRegeln(exam, part),
+    klausurTeilaufgaben(exam, part),
     schreibvorgabenRegeln(exam, part),
     '',
     upperSecondaryRules(m, material),

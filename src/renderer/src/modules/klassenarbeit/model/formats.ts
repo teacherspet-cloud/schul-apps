@@ -222,6 +222,25 @@ const SACHFAECHER: ExamFormat[] = [
    * 29.09.2026, Befunde G3/G4: EPA Geschichte 3.2.3 „Erörtern von Erklärungen historischer
    * Sachverhalte aus Darstellungen" – bisher gab es nur Quellen; dazu die historische Karte.
    */
+  /*
+   * Oberstufe (10.11.2026, Wunsch der Lehrkraft): EIN Material mit drei Teilaufgaben nach den
+   * Anforderungsbereichen I, II und III – so ist die Klausur in der Qualifikationsphase üblich (EPA
+   * Geschichte: Quelleninterpretation, materialgestützt, Schwerpunkt AFB II). Die Punkte der
+   * Teilaufgaben folgen der AFB-Gewichtung der Arbeit (generateExam.ts, klausurTeilaufgaben).
+   */
+  {
+    id: 'ge-klausur',
+    subject: 'geschichte',
+    label: 'Materialgestützte Aufgabe (Quelleninterpretation)',
+    competence: 'Sach-, Methoden- und Urteilskompetenz',
+    description:
+      'Ein Material (in der Regel eine Textquelle) mit drei Teilaufgaben: AFB I wiedergeben bzw. beschreiben, AFB II analysieren, einordnen und erläutern, AFB III beurteilen bzw. erörtern.',
+    afb: ['I', 'II', 'III'],
+    share: 100,
+    grades: [11, 13],
+    material: 'text',
+    note: 'Übliche Klausurform der Oberstufe; die Punkte der drei Teilaufgaben folgen der Gewichtung der Anforderungsbereiche.'
+  },
   {
     id: 'ge-darstellung',
     subject: 'geschichte',
@@ -816,7 +835,8 @@ export function defaultWeights(
 
 /** Üblicher Aufbau je Fach (Deutsch und Sachfächer) */
 const VORSCHLAG: Partial<Record<ExamSubjectId, (grade: number) => string[]>> = {
-  geschichte: (g) => (g <= 7 ? ['ge-knowledge', 'ge-source', 'ge-judgement'] : ['ge-source', 'ge-comparison', 'ge-judgement']),
+  // Oberstufe: ein Material mit drei Teilaufgaben AFB I–III (10.11.2026)
+  geschichte: (g) => (g <= 7 ? ['ge-knowledge', 'ge-source', 'ge-judgement'] : g >= 11 ? ['ge-klausur'] : ['ge-source', 'ge-comparison', 'ge-judgement']),
   politik: (g) => (g <= 7 ? ['pol-knowledge', 'pol-data', 'pol-judgement'] : ['pol-text', 'pol-conflict', 'pol-judgement']),
   erdkunde: (g) => (g <= 7 ? ['geo-knowledge', 'geo-map', 'geo-climate'] : ['geo-map', 'geo-text', 'geo-judgement']),
   gesellschaftslehre: (g) => (g <= 7 ? ['gl-knowledge', 'gl-map', 'gl-judgement'] : ['gl-source', 'gl-conflict', 'gl-judgement']),
