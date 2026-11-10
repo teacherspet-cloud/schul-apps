@@ -411,4 +411,11 @@ describe('Geschichte Oberstufe: ein Material, drei Teilaufgaben AFB I–III (10.
     expect(eigen).toContain('– 12 Punkte; 2.')
     expect(eigen).toContain('20 / 50 / 30 %')
   })
+  it('verlangt Operatoren und einen roten Faden', () => {
+    const p = part('ge-klausur', { points: 60 })
+    const text = partPrompt(exam([p], { subjectId: 'geschichte' as const, subjectLabel: 'Geschichte', grade: 12 }), p, 1)
+    expect(text).toContain('mit einem Operator der Operatorenliste des Landes beginnt')
+    expect(text).toContain('ROTER FADEN')
+    expect(text).toContain('Leitfrage')
+  })
 })

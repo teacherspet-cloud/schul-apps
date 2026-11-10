@@ -259,6 +259,10 @@ export function klausurTeilaufgaben(exam: Exam, part: ExamPart): string {
     '- EIN Material für den ganzen Teil (in der Regel eine Textquelle mit Zeilennummern); alle Teilaufgaben beziehen sich darauf.',
     `- GENAU DREI Teilaufgaben in dieser Reihenfolge: 1. Anforderungsbereich I (z. B. wiedergeben, beschreiben, zusammenfassen) – ${p1} Punkte; 2. Anforderungsbereich II (z. B. analysieren, einordnen, erläutern) – ${p2} Punkte; 3. Anforderungsbereich III (z. B. beurteilen, erörtern, Stellung nehmen) – ${p3} Punkte.`,
     `- Gewichtung der Anforderungsbereiche: ${afb.I} / ${afb.II} / ${afb.III} % – der Schwerpunkt liegt auf der zweiten Teilaufgabe. Nenne die Punkte je Teilaufgabe im Feld points und im Erwartungshorizont.`,
+    // Wunsch der Lehrkraft 10.11.2026: „mit Operatoren formulierte Aufgaben, die einen erkennbaren roten Faden bilden"
+    '- OPERATOREN: Jede Teilaufgabe ist ein Arbeitsauftrag, der mit einem Operator der Operatorenliste des Landes beginnt (z. B. „Fassen Sie … zusammen.", „Ordnen Sie … ein.", „Beurteilen Sie …"). Keine W-Fragen, keine Aufgabe ohne Operator, kein Operator aus einem anderen Anforderungsbereich als vorgesehen; höchstens ein zweiter Operator desselben Anforderungsbereichs.',
+    '- ROTER FADEN: Lege zuerst EINE historische Leitfrage bzw. einen Untersuchungsaspekt fest, der sich aus dem Material ergibt. Alle drei Teilaufgaben arbeiten an genau diesem Aspekt und bauen aufeinander auf: Teilaufgabe 1 erschließt aus dem Material, was für Teilaufgabe 2 gebraucht wird; Teilaufgabe 2 analysiert das Material unter diesem Aspekt bzw. ordnet es in den historischen Zusammenhang ein; Teilaufgabe 3 beurteilt die Leitfrage auf der Grundlage der Ergebnisse von 1 und 2. Der Aspekt ist in allen drei Aufgabenstellungen wörtlich wiederzuerkennen (gleicher Schlüsselbegriff); keine Teilaufgabe springt zu einem neuen Thema.',
+    '- Nenne die Leitfrage im Erwartungshorizont vorab in einem Satz und zeige dort, wie die Teilaufgaben aufeinander aufbauen.',
     '- Keine weiteren Teilaufgaben, keine Aufgabe ohne Bezug zum Material.'
   ].join('\n')
 }
