@@ -9,6 +9,7 @@
 import { describe, it } from 'vitest'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { createHash } from 'crypto'
 import { LEHRWERK_GRAMMATIK } from '../../src/renderer/src/shared/lehrwerkGrammatik'
 import { kennungLabel, teilbereicheVon, teilHinweise } from '../../src/renderer/src/modules/grammatikformen/grammatikformen'
 import { mixSchluessel, UEBUNGEN, zielJeFeld, type Stufe, type Uebung } from '../../src/shared/grammatikBank'
@@ -16,6 +17,12 @@ import type { BankAuftrag } from '../../src/renderer/src/modules/lernen/grammati
 import { wortschatzStandServer } from '../../src/server/grammatikBank'
 
 const ORDNER = process.env.HANDBETRIEB ?? ''
+
+/** Ordnername je Schlüssel – lange Misch-Schlüssel (zehn Teilformen) gekürzt, sonst sprengt der Pfad die Windows-Grenze (12.11.2026) */
+const kurzId = (k: string): string => {
+  const id = k.replace(/[^a-z0-9]+/gi, '_')
+  return id.length <= 70 ? id : `${id.slice(0, 50)}_${createHash('sha1').update(k).digest('hex').slice(0, 8)}`
+}
 const PUFFER = 2
 const ARTEN_JE_ANFRAGE = 3
 
@@ -54,7 +61,7 @@ describe.skipIf(!ORDNER)('Aufträge Green Line (Band/Unit)', () => {
         for (let i = 0; i < offen.length; i += ARTEN_JE_ANFRAGE) {
           const uebungen = offen.slice(i, i + ARTEN_JE_ANFRAGE)
           auftraege.push({
-            id: `${r.schluessel.replace(/[^a-z0-9]+/gi, '_')}__${st}__${uebungen.join('-')}`,
+            id: `${kurzId(r.schluessel)}__${st}__${uebungen.join('-')}`,
             auftrag: {
               niveau: st,
               schluessel: r.schluessel,

@@ -548,7 +548,11 @@ const EINSPIELEN: [string, string][] = [
   ['grammatik-bank-greenline6-unit1-2026-10-30', 'greenline6-unit1-2026-10-30.json'],
   // Green Line 1 Unit 2 und Unit 3 (04.11.2026): gleicher Ablauf, Vorgaben der Lehrkraft (has erlaubt, Genitiv ohne Namen auf -s,
   // keine Subjektfragen, Fragewörter ohne which/whose/what kind of)
-  ['grammatik-bank-greenline1-unit2-3-2026-11-04', 'greenline1-unit2-3-2026-11-04.json']
+  ['grammatik-bank-greenline1-unit2-3-2026-11-04', 'greenline1-unit2-3-2026-11-04.json'],
+  // Green Line 6 Unit 2 und Rest Unit 1 (12.11.2026, Auftrag der Lehrkraft „geeignet, verständlich, machbar, sinnvoll"):
+  // Modal expressions, Bedingungssätze Typ 1–3 (Klasse und Wortschatz der frühesten Einführung, z. B. Typ 1 Klasse 6),
+  // Phrasal verbs, Infinitive, Gerund mit eigenem Subjekt – gleicher Ablauf mit Prüfung und Blindproben
+  ['grammatik-bank-greenline6-unit2-2026-11-12', 'greenline6-unit2-2026-11-12.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
