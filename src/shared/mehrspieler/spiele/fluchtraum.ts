@@ -94,7 +94,7 @@ const kern = (s: string): string =>
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/[^\p{L}]/gu, '')
-const enthaeltWort = (text: string | undefined, wort: string): boolean => {
+export const enthaeltWort = (text: string | undefined, wort: string): boolean => {
   if (!text) return false
   const w = kern(wort)
   return text.split(/[^\p{L}]+/u).some((t) => t && kern(t) === w)
@@ -137,7 +137,7 @@ export function codewortWaehlen(k: StartKontext, z: { saat: number }): SpielItem
 }
 
 /** Andere Wörter mit gleicher Bedeutung (aus den Synonymgruppen des Kurses) */
-function synonymVon(inhalt: SpielInhalt, wort: string): string | null {
+export function synonymVon(inhalt: SpielInhalt, wort: string): string | null {
   const w = kern(wort)
   for (const g of inhalt.synonyme) if (g.woerter.some((x) => kern(x) === w)) return g.woerter.find((x) => kern(x) !== w) ?? null
   return null

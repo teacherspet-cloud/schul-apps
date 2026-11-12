@@ -207,11 +207,11 @@ const BESCHREIBUNG: Record<string, Omit<Texte, 'de'>> = {
     la: 'Instrumentum verba vocat. Campum rectum in tabula tua tange. Linea plena est Bingo!'
   },
   schiffe: {
-    en: ['Give some right answers, then you may shoot. Find all the ships first to win!', 'A few correct answers in a row load a shot. The first team to find all the other team’s ships wins.'],
-    fr: 'Quelques bonnes réponses, puis tu peux tirer. Trouve tous les bateaux le premier !',
-    es: 'Unas respuestas correctas y puedes disparar. ¡Encuentra primero todos los barcos!',
-    it: 'Qualche risposta giusta e puoi sparare. Trova per primo tutte le navi!',
-    la: 'Post aliquot responsa recta iacere licet. Primus omnes naves inveni!'
+    en: 'Place your fleet. Right answers load a shot – with every few hits the tasks get harder. Sink all the ships first to win!',
+    fr: 'Placez votre flotte. Les bonnes réponses chargent un tir – plus vous touchez, plus les tâches sont difficiles. Coulez tous les bateaux les premiers !',
+    es: 'Colocad vuestra flota. Las respuestas correctas cargan un disparo – con cada tocado las tareas son más difíciles. ¡Hundid primero todos los barcos!',
+    it: 'Disponete la flotta. Le risposte giuste caricano un colpo – con ogni colpo a segno i compiti diventano più difficili. Affondate per primi tutte le navi!',
+    la: 'Classem instruite. Responsa recta iactum parant – quo plures ictus, eo difficiliora pensa. Primi omnes naves mergite!'
   },
   wortkette: {
     en: 'Say a word in turns. Each word starts with the last letter of the word before.',

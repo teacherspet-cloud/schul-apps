@@ -180,7 +180,7 @@ export const MEHRSPIELE: MehrspielInfo[] = [
     min: 2,
     max: 4,
     bereiche: ['vok', 'gram'],
-    beschreibung: 'Ein paar richtige Antworten laden einen Schuss. Wer zuerst alle Schiffe findet, gewinnt.',
+    beschreibung: 'Stellt eure Flotte auf. Richtige Antworten laden einen Schuss – mit jedem Treffer werden die Aufgaben schwerer. Wer zuerst alle Schiffe versenkt, gewinnt.',
     einheit: 'Treffer',
     kleinerBesser: false,
     achievements: true

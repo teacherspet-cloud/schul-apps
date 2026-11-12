@@ -196,6 +196,12 @@ function loeser(id: MehrspielId, z: Z, wer: string): Zug | null {
       return dran === wer ? { aktion: 'antwort', wert: z.fragen[wer].loesung } : null
     }
     case 'schiffe': {
+      // Aufstellen (12.11.2026): erst zufällig verteilen, dann „Fertig"
+      if (z.phase === 'legen') {
+        const t = z.teams[0].includes(wer) ? 0 : 1
+        if (z.bereit[t]) return null
+        return z.plaetze[t].every(Boolean) ? { aktion: 'fertig' } : { aktion: 'zufall' }
+      }
       const dran = z.teams[z.dran][z.laeufer[z.dran]]
       if (dran !== wer) return null
       if (!z.schiessen) return { aktion: 'antwort', wert: z.fragen[wer].loesung }
@@ -414,6 +420,7 @@ describe('Einzelne Regeln', () => {
   it('Schiffe versenken: die gegnerische Flotte steht nie in der Sicht', () => {
     const z = starte('schiffe', vokInhalt(), 2)
     const a = z.spieler[0].id
+    for (const w of [a, z.spieler[1].id]) REGELN.schiffe.zug(z, w, { aktion: 'zufall' }, 0), REGELN.schiffe.zug(z, w, { aktion: 'fertig' }, 0)
     const sicht = REGELN.schiffe.sicht(z, a, 0) as Extract<Block, { typ: 'kacheln' }>[]
     const gegner = sicht.filter((x) => x.typ === 'kacheln')[0]
     expect(gegner.kacheln.some((k) => k.status === 'schiff')).toBe(false)
@@ -440,10 +447,38 @@ describe('Einzelne Regeln', () => {
     const z = starte('beschreiben', vokInhalt(), 2)
     const vorher = z.erklaerer
     const erkl = z.spieler[z.erklaerer].id
-    REGELN.beschreiben.zug(z, erkl, { aktion: 'hinweise', wert: ['anfang', 'laenge'] }, 0)
+    REGELN.beschreiben.zug(z, erkl, { aktion: 'hinweise', wert: z.hinweise.slice(0, 2).map((h: { id: string }) => h.id) }, 0)
     const rater = z.spieler.find((s) => s.id !== erkl)!.id
     REGELN.beschreiben.zug(z, rater, { aktion: 'antwort', wert: item(z, z.reihe[0]).vok!.term }, 0)
     expect(z.erklaerer).not.toBe(vorher)
+  })
+  it('Beschreib-Raten schwerer (12.11.2026): Inhalts- statt Buchstabenhinweise, höchstens zwei, ab Klasse 7 schreiben', () => {
+    const it0 = vokItems(WOERTER)[0]
+    const gross = hinweiseFuer(it0, 'en', 9).map((h) => h.id)
+    expect(gross).not.toContain('ende')
+    expect(gross).not.toContain('laenge')
+    expect(gross).not.toContain('anfang')
+    expect(gross.length).toBeGreaterThanOrEqual(2)
+    expect(hinweiseFuer(it0, 'en', 5).map((h) => h.id)).toContain('anfang')
+    const z = starte('beschreiben', vokInhalt(), 2, 'mittel', 9)
+    expect(z.schreiben).toBe(true)
+    expect(z.optionen).toEqual([])
+    const erkl = z.spieler[z.erklaerer].id
+    REGELN.beschreiben.zug(z, erkl, { aktion: 'hinweise', wert: z.hinweise.slice(0, 3).map((h: { id: string }) => h.id) }, 0)
+    expect(z.gewaehlt).toBeNull()
+    REGELN.beschreiben.zug(z, erkl, { aktion: 'hinweise', wert: z.hinweise.slice(0, 2).map((h: { id: string }) => h.id) }, 0)
+    expect(z.gewaehlt).toHaveLength(2)
+    const rater = z.spieler.find((s) => s.id !== erkl)!.id
+    const sicht = REGELN.beschreiben.sicht(z, rater, 0) as Block[]
+    const frage = sicht.find((b) => b.typ === 'frage') as Extract<Block, { typ: 'frage' }>
+    expect(frage.tippen).toBe(true)
+    // Geschrieben, mit kleinem Tippfehler bei langen Wörtern: zählt
+    const wort = item(z, z.reihe[0]).vok!.term
+    REGELN.beschreiben.zug(z, rater, { aktion: 'antwort', wert: wort.toUpperCase() }, 0)
+    expect(z.erraten).toBe(1)
+    const klein = starte('beschreiben', vokInhalt(), 2, 'mittel', 5)
+    expect(klein.schreiben).toBe(false)
+    expect(klein.optionen).toHaveLength(4)
   })
   it('Reiseplaner: viele Zufallsrunden – genau eine Reise passt, jede Person ist nötig, niemand löst allein', () => {
     let saat = 1

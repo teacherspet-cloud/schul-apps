@@ -43,6 +43,11 @@ export type Block =
   | { typ: 'knoepfe'; knoepfe: { text: string; aktion: string; wert?: string; farbe?: string; gesperrt?: boolean }[] }
   | { typ: 'eingaben'; felder: { id: string; titel: string }[]; aktion: string; gesperrt?: boolean; werte?: Record<string, string> }
   | { typ: 'turm'; hoehe: number; ziel: number; wackeln: number }
+  /**
+   * Flotte aufstellen (Schiffe versenken, 12.11.2026): eigenes Feld mit Hafen; Aktionen legen {s, feld, quer}, drehen s,
+   * hafen s, zufall, fertig, aendern. `platz.feld` = Bug (oben bzw. links).
+   */
+  | { typ: 'flotte'; groesse: number; schiffe: { name: string; laenge: number; platz: { feld: number; quer: boolean } | null }[]; bereit: boolean }
 
 /** Ein Zug vom Gerät: Aktion und Wert (Text, Kennung oder Liste) */
 export interface Zug {

@@ -118,6 +118,7 @@ describe('Übertragene Regeln', () => {
   it('Schiffe versenken: Schuss erst nach 2 (mittel) bzw. 3 (schwer) richtigen Antworten; Ladung bleibt dem Team', () => {
     const z = starte('schiffe', inhalt(), 2, 'mittel')
     expect(z.noetig).toBe(2)
+    for (const w of ['a', 'b']) REGELN.schiffe.zug(z, w, { aktion: 'zufall' }, 0), REGELN.schiffe.zug(z, w, { aktion: 'fertig' }, 0)
     expect(starte('schiffe', inhalt(), 2, 'schwer').noetig).toBe(3)
     expect(starte('schiffe', inhalt(), 2, 'schwer', 5).noetig).toBe(2)
     REGELN.schiffe.zug(z, 'a', { aktion: 'antwort', wert: z.fragen.a.loesung }, 0)

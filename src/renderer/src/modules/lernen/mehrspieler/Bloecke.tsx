@@ -4,7 +4,7 @@
  * nur, wo die Schwierigkeit es verlangt.
  */
 import { Alert, Badge, Button, Card, Group, Image, Progress, SimpleGrid, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
-import { IconCheck, IconClock, IconVolume } from '@tabler/icons-react'
+import { IconArrowsShuffle, IconCheck, IconClock, IconRotateClockwise2, IconVolume } from '@tabler/icons-react'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { spielText, type TextSchluessel } from '@shared/spielSprache'
 import type { Block, Kachel } from '@shared/mehrspieler/kern'
@@ -283,6 +283,208 @@ function Eingaben({ b, senden }: { b: Extract<Block, { typ: 'eingaben' }>; sende
   )
 }
 
+/** Farbe je Schiff im Aufstellfeld – unterscheidbar, auch für Farbschwache durch die Nummer im Feld */
+const SCHIFF_FARBE = ['var(--mantine-color-indigo-filled)', 'var(--mantine-color-teal-filled)', 'var(--mantine-color-orange-filled)', 'var(--mantine-color-grape-filled)', 'var(--mantine-color-cyan-filled)']
+
+type Platz = { feld: number; quer: boolean }
+const felderVon = (p: Platz, laenge: number, g: number): number[] | null => {
+  const x = p.feld % g
+  const y = Math.floor(p.feld / g)
+  if (p.quer ? x + laenge > g : y + laenge > g) return null
+  return Array.from({ length: laenge }, (_, i) => (p.quer ? p.feld + i : p.feld + i * g))
+}
+/** Wie auf dem Server (shared/mehrspieler/spiele/staffel.ts `einpassen`): am Rand angetippt, liegt das Schiff trotzdem ganz im Feld */
+const einpassen = (feld: number, quer: boolean, laenge: number, g: number): Platz => {
+  let x = feld % g
+  let y = Math.floor(feld / g)
+  if (quer) x = Math.min(x, g - laenge)
+  else y = Math.min(y, g - laenge)
+  return { feld: y * g + x, quer }
+}
+
+/**
+ * Flotte aufstellen (Schiffe versenken, 12.11.2026, abgestimmt): Schiff im Hafen antippen, dann ein Feld – das Schiff liegt
+ * dort (am Rand rückt es ins Feld). Ein gelegtes Schiff antippen = auswählen, noch einmal antippen = drehen; dazu der große
+ * Knopf „Drehen", „In den Hafen", „Zufällig verteilen" und „Fertig!". Am PC zeigt eine Vorschau, wo das Schiff landet.
+ * Der Server prüft jede Lage noch einmal (Überlappen, Rand).
+ */
+function Flotte({ b, senden }: { b: Extract<Block, { typ: 'flotte' }>; senden: Senden }): React.JSX.Element {
+  const t = useT()
+  const g = b.groesse
+  const [wahl, setWahl] = useState<number | null>(() => {
+    const i = b.schiffe.findIndex((s) => !s.platz)
+    return i >= 0 ? i : null
+  })
+  const [querNeu, setQuerNeu] = useState(true)
+  const [ueber, setUeber] = useState<number | null>(null)
+  const [hinweis, setHinweis] = useState('')
+  const besitzer = new Map<number, number>()
+  b.schiffe.forEach((s, i) => s.platz && felderVon(s.platz, s.laenge, g)?.forEach((f) => besitzer.set(f, i)))
+  const frei = (s: number, p: Platz): boolean => {
+    const f = felderVon(p, b.schiffe[s].laenge, g)
+    return Boolean(f && f.every((x) => !besitzer.has(x) || besitzer.get(x) === s))
+  }
+  const quer = (s: number): boolean => b.schiffe[s].platz?.quer ?? querNeu
+  // Vorschau beim Darüberfahren (PC): wo würde das gewählte Schiff liegen?
+  const vorschau = wahl !== null && ueber !== null && !besitzer.has(ueber) ? einpassen(ueber, quer(wahl), b.schiffe[wahl].laenge, g) : null
+  const vorschauFelder = new Set(vorschau && wahl !== null ? (felderVon(vorschau, b.schiffe[wahl].laenge, g) ?? []) : [])
+  const vorschauOk = vorschau !== null && wahl !== null && frei(wahl, vorschau)
+  const alleGelegt = b.schiffe.every((s) => s.platz)
+  const gesperrt = b.bereit
+
+  const drehen = (s: number): void => {
+    setHinweis('')
+    if (!b.schiffe[s].platz) return setQuerNeu((q) => !q)
+    const p = einpassen(b.schiffe[s].platz!.feld, !b.schiffe[s].platz!.quer, b.schiffe[s].laenge, g)
+    if (!frei(s, p)) return setHinweis(t('schiffPasstNicht'))
+    senden('drehen', s)
+  }
+  const tippe = (feld: number): void => {
+    if (gesperrt) return
+    setHinweis('')
+    const s0 = besitzer.get(feld)
+    if (s0 !== undefined) return s0 === wahl ? drehen(s0) : setWahl(s0)
+    if (wahl === null) return setHinweis(t('flotteHilfe'))
+    const p = einpassen(feld, quer(wahl), b.schiffe[wahl].laenge, g)
+    if (!frei(wahl, p)) return setHinweis(t('schiffPasstNicht'))
+    const warNeu = !b.schiffe[wahl].platz
+    senden('legen', { s: wahl, feld, quer: p.quer })
+    // Neu gelegt: gleich das nächste Schiff aus dem Hafen wählen
+    if (warNeu) {
+      const n = b.schiffe.findIndex((s, i) => i !== wahl && !s.platz)
+      setWahl(n >= 0 ? n : null)
+    }
+  }
+
+  return (
+    <Stack gap="sm" data-mehr-flotte data-bereit={b.bereit || undefined}>
+      {!gesperrt && (
+        <Text size="sm" c="dimmed">
+          {t('flotteHilfe')}
+        </Text>
+      )}
+      <div>
+        <Text size="sm" fw={700} mb={4}>
+          {t('hafen')}
+        </Text>
+        <Group gap="xs">
+          {b.schiffe.map((s, i) => (
+            <UnstyledButton
+              key={i}
+              disabled={gesperrt}
+              onClick={() => (setHinweis(''), setWahl(i))}
+              aria-pressed={wahl === i}
+              data-mehr-schiff={i}
+              data-gelegt={s.platz ? true : undefined}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 10,
+                border: `2px solid ${wahl === i ? SCHIFF_FARBE[i % SCHIFF_FARBE.length] : 'var(--mantine-color-gray-3)'}`,
+                opacity: s.platz && wahl !== i ? 0.55 : 1
+              }}
+            >
+              <Text size="xs" fw={700}>
+                {s.platz ? '✓ ' : ''}
+                {s.name}
+              </Text>
+              <div style={{ display: 'flex', flexDirection: wahl === i && !quer(i) ? 'column' : 'row', gap: 2, marginTop: 4 }}>
+                {Array.from({ length: s.laenge }, (_, k) => (
+                  <div key={k} style={{ width: 14, height: 14, borderRadius: 3, background: SCHIFF_FARBE[i % SCHIFF_FARBE.length] }} />
+                ))}
+              </div>
+            </UnstyledButton>
+          ))}
+        </Group>
+      </div>
+      <div
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${g}, 1fr)`, gap: 3, maxWidth: 420, width: '100%', touchAction: 'manipulation' }}
+        onMouseLeave={() => setUeber(null)}
+        data-mehr-flotte-feld
+      >
+        {Array.from({ length: g * g }, (_, f) => {
+          const s = besitzer.get(f)
+          const inVorschau = vorschauFelder.has(f)
+          return (
+            <UnstyledButton
+              key={f}
+              disabled={gesperrt}
+              onClick={() => tippe(f)}
+              onMouseEnter={() => setUeber(f)}
+              data-mehr-flotte-zelle={f}
+              data-schiff={s}
+              aria-label={s !== undefined ? b.schiffe[s].name : String(f + 1)}
+              style={{
+                aspectRatio: '1',
+                borderRadius: 6,
+                display: 'grid',
+                placeItems: 'center',
+                color: 'white',
+                fontWeight: 800,
+                fontSize: 12,
+                background:
+                  s !== undefined
+                    ? SCHIFF_FARBE[s % SCHIFF_FARBE.length]
+                    : inVorschau
+                      ? vorschauOk
+                        ? 'var(--mantine-color-teal-light)'
+                        : 'var(--mantine-color-red-light)'
+                      : 'var(--mantine-color-blue-light)',
+                outline: s !== undefined && s === wahl ? '3px solid var(--mantine-color-yellow-filled)' : undefined,
+                outlineOffset: -3
+              }}
+            >
+              {s !== undefined ? s + 1 : ''}
+            </UnstyledButton>
+          )
+        })}
+      </div>
+      {hinweis && (
+        <Text size="sm" c="orange" fw={600} data-mehr-flotte-hinweis>
+          {hinweis}
+        </Text>
+      )}
+      {gesperrt ? (
+        <>
+          <Alert color="teal" radius="md" py={6}>
+            <Text size="sm" fw={600}>
+              {t('wirSindBereit')}
+            </Text>
+          </Alert>
+          <Button variant="default" onClick={() => senden('aendern')} data-mehr-knopf="aendern">
+            {t('flotteAendern')}
+          </Button>
+        </>
+      ) : (
+        <>
+          <Group grow>
+            <Button size="lg" variant="light" leftSection={<IconRotateClockwise2 size={20} />} disabled={wahl === null} onClick={() => wahl !== null && drehen(wahl)} data-mehr-knopf="drehen">
+              {t('drehen')}
+            </Button>
+            {wahl !== null && b.schiffe[wahl].platz && (
+              <Button size="lg" variant="default" onClick={() => (senden('hafen', wahl), setHinweis(''))} data-mehr-knopf="hafen">
+                {t('zurueckInHafen')}
+              </Button>
+            )}
+          </Group>
+          <Group grow>
+            <Button variant="default" leftSection={<IconArrowsShuffle size={18} />} onClick={() => (senden('zufall'), setWahl(null), setHinweis(''))} data-mehr-knopf="zufall">
+              {t('zufaellig')}
+            </Button>
+            <Button color="teal" disabled={!alleGelegt} onClick={() => senden('fertig')} data-mehr-knopf="fertig">
+              {t('flotteFertig')}
+            </Button>
+          </Group>
+          {!alleGelegt && (
+            <Text size="xs" c="dimmed" ta="center">
+              {t('erstAlleSchiffe')}
+            </Text>
+          )}
+        </>
+      )}
+    </Stack>
+  )
+}
+
 /**
  * Nichts markieren im Spiel (29.10.2026, Befund der Lehrkraft: Lernende tippen nebenbei herum, Texte werden markiert,
  * danach reagiert der Bildschirm nicht mehr): Am iPad schluckt eine Markierung samt Menü den nächsten Tipp, am PC startet
@@ -409,6 +611,8 @@ export function Bloecke({
                   ))}
                 </Group>
               )
+            case 'flotte':
+              return <Flotte key={i} b={b} senden={senden} />
             case 'eingaben':
               return <Eingaben key={i} b={b} senden={senden} />
             case 'turm':

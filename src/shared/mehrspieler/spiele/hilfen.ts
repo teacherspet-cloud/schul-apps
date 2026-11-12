@@ -18,7 +18,14 @@ export const artNach = (z: Basis): FragenArt => (z.inhalt.bereich === 'gram' ? '
 export function naechsteFrage(
   z: MitFragen,
   wer: string,
-  opt: { gemeinsam?: boolean; filter?: (i: SpielItem) => boolean; art?: FragenArt; optionen?: number } = {}
+  opt: {
+    gemeinsam?: boolean
+    filter?: (i: SpielItem) => boolean
+    art?: FragenArt
+    optionen?: number
+    /** Aufgabenart je Item (Schiffe versenken, 12.11.2026: Stufe nach Treffern und Lernstand des Wortes) */
+    format?: (i: SpielItem) => { art: FragenArt; optionen?: number; tippen?: boolean }
+  } = {}
 ): Frage | null {
   const filter = opt.filter ?? istFrageItem
   let s = z.schlange[wer] ?? []
@@ -26,7 +33,8 @@ export function naechsteFrage(
   const id = s.shift()
   z.schlange[wer] = s
   const item = id ? z.inhalt.items.find((i) => i.id === id) : undefined
-  const f = item ? frageAus(z, item, opt.art ?? artNach(z), opt.optionen ?? 4) : null
+  const fm = item && opt.format ? opt.format(item) : null
+  const f = item ? (fm ? frageAus(z, item, fm.art, fm.optionen ?? 4, fm.tippen ?? z.tippen) : frageAus(z, item, opt.art ?? artNach(z), opt.optionen ?? 4)) : null
   z.fragen[wer] = f
   return f
 }
