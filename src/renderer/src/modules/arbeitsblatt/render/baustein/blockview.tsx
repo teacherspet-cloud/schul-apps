@@ -26,7 +26,7 @@ import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
 import { ProtokollView } from './protokoll'
-import { wortzahlText, zaehleWoerter } from '../../../../shared/kopfSprache'
+import { EINSCHAETZUNG_KOPF, kopfSpracheVon, wortzahlText, zaehleWoerter } from '../../../../shared/kopfSprache'
 import { anmerkungenVon, ohneFussnotenMarken, type Anmerkung } from '../../didactics/anmerkungen'
 import { fassungWechseln } from '../../didactics/textauswahl'
 import { useTextAuswahl } from './textauswahl'
@@ -707,8 +707,13 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
         })
       const scGriffe = (r: number | 'kopf', c: number): React.ReactNode =>
         scZiehbar && <TabellenGriffe c={c} spalten={4} zeile={r} breiten={scBreiten} onZug={scZug} />
+      // Köpfe in der Sprache der Anweisungen (12.11.2026) – sonst „sicher" unter „How well can I do this?"
       const kopf =
-        block.format === 'kompetenzraster' ? ['sicher', 'teilweise', 'noch nicht'] : block.format === 'ampel' ? ['🟢', '🟡', '🔴'] : ['🙂', '😐', '🙁']
+        block.format === 'kompetenzraster'
+          ? EINSCHAETZUNG_KOPF[kopfSpracheVon(ctx.anweisungsSprache)]
+          : block.format === 'ampel'
+            ? ['🟢', '🟡', '🔴']
+            : ['🙂', '😐', '🙁']
       return (
         <div className={`ws-block ws-selfcheck ${placed?.continued ? 'ws-continued' : ''}`}>
           {von > 0 && <FortsetzungsHinweis bezeichnung={block.title} />}

@@ -75,6 +75,51 @@ export const SEITE: Record<KopfSprache, string> = {
   el: 'Σελίδα'
 }
 
+/**
+ * Spaltenköpfe der Selbsteinschätzung „Kompetenzraster" (12.11.2026, Befund der Lehrkraft: über
+ * „How well can I do this?" standen „sicher / teilweise / noch nicht" immer auf Deutsch). Die
+ * Wörter folgen der Sprache der Arbeitsanweisungen und antworten auf „Wie gut kann ich das?".
+ * Nicht muttersprachlich geprüft (wie die Kopfzeilen oben).
+ */
+export const EINSCHAETZUNG_KOPF: Record<KopfSprache, readonly [string, string, string]> = {
+  de: ['sicher', 'teilweise', 'noch nicht'],
+  en: ['well', 'partly', 'not yet'],
+  fr: ['bien', 'en partie', 'pas encore'],
+  es: ['bien', 'en parte', 'todavía no'],
+  it: ['bene', 'in parte', 'non ancora'],
+  ru: ['хорошо', 'частично', 'пока нет'],
+  nl: ['goed', 'gedeeltelijk', 'nog niet'],
+  pl: ['dobrze', 'częściowo', 'jeszcze nie'],
+  cs: ['dobře', 'částečně', 'ještě ne'],
+  pt: ['bem', 'em parte', 'ainda não'],
+  tr: ['iyi', 'kısmen', 'henüz değil'],
+  zh: ['很好', '部分', '还不会'],
+  ja: ['よくできる', '少しできる', 'まだ'],
+  ar: ['جيدًا', 'جزئيًا', 'ليس بعد'],
+  da: ['godt', 'delvist', 'ikke endnu'],
+  el: ['καλά', 'εν μέρει', 'όχι ακόμα']
+}
+
+/** Ampel-Spalten in Word (dort ohne Farbkreise): grün/gelb/rot in der Sprache der Anweisungen */
+export const AMPEL_KOPF: Record<KopfSprache, readonly [string, string, string]> = {
+  de: ['grün', 'gelb', 'rot'],
+  en: ['green', 'yellow', 'red'],
+  fr: ['vert', 'jaune', 'rouge'],
+  es: ['verde', 'amarillo', 'rojo'],
+  it: ['verde', 'giallo', 'rosso'],
+  ru: ['зелёный', 'жёлтый', 'красный'],
+  nl: ['groen', 'geel', 'rood'],
+  pl: ['zielony', 'żółty', 'czerwony'],
+  cs: ['zelená', 'žlutá', 'červená'],
+  pt: ['verde', 'amarelo', 'vermelho'],
+  tr: ['yeşil', 'sarı', 'kırmızı'],
+  zh: ['绿', '黄', '红'],
+  ja: ['緑', '黄', '赤'],
+  ar: ['أخضر', 'أصفر', 'أحمر'],
+  da: ['grøn', 'gul', 'rød'],
+  el: ['πράσινο', 'κίτρινο', 'κόκκινο']
+}
+
 /** Rechtsläufige Schrift (Arabisch) – Felder und Texte brauchen dir="rtl" */
 export const istRtl = (code: string | undefined): boolean => code === 'ar'
 

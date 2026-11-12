@@ -38,6 +38,17 @@ export function anweisungenDeutsch(meta: Pick<WorksheetMeta, 'subjectId' | 'inst
 }
 
 /**
+ * Sprache der Arbeitsanweisungen (12.11.2026) – für feste Beschriftungen, die zur Anweisung gehören
+ * (Spaltenköpfe der Selbsteinschätzung). Deutsch, wenn `anweisungenDeutsch`; bilingual die
+ * Arbeitssprache (in Prüfungen mit Prüfsprache „deutsch" Deutsch), sonst die Zielsprache des Faches.
+ */
+export function anweisungsSprache(meta: Pick<WorksheetMeta, 'subjectId' | 'instructionsInGerman' | 'bilingual'>): string {
+  const b = meta.bilingual
+  if (b?.an && b.sprache) return b.pruefsprache === 'deutsch' ? 'de' : b.sprache
+  return anweisungenDeutsch(meta) ? 'de' : (subjectById(meta.subjectId).foreignLanguage ?? 'de')
+}
+
+/**
  * Die Texte eines Bausteins, die die Lernenden ANSPRECHEN.
  *
  * Material bleibt außen vor – Texte, Quellen, Tabellen, Hörtexte, Rollenkarten, Merkkästen:

@@ -69,6 +69,8 @@ export interface WsContextValue {
   answerLanguage?: string
   /** Fach des Blattes – entscheidet u. a. über die Regeln für Hörtexte */
   subjectId?: string
+  /** Sprache der Arbeitsanweisungen (didactics/anrede.ts `anweisungsSprache`) – Köpfe der Selbsteinschätzung */
+  anweisungsSprache?: string
   /** Sprache der festen Beschriftungen (Klassenarbeit in der Fremdsprache: en/fr/es) */
   labelLanguage?: KopfSprache
   /** Anrede der Lernenden in den festen Texten der App: Sek I du, Sek II Sie (Paket 8b) */

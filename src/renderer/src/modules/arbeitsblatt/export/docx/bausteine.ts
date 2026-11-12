@@ -27,6 +27,7 @@ import { galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraphs } from '../
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { headerLine } from '../../didactics/sourceHeader'
+import { AMPEL_KOPF, EINSCHAETZUNG_KOPF, kopfSpracheVon } from '../../../../shared/kopfSprache'
 import { anmerkungenVon, anmerkungsArt, type Anmerkung } from '../../didactics/anmerkungen'
 import { gridDrawing } from '../../render/gridSvg'
 import { qrSvg } from '../../render/qr'
@@ -38,7 +39,7 @@ import { beschriftetesBildSvg } from '../../render/beschriftungSvg'
 import { imageSizeFromDataUrl } from '../../../../shared/imageSize'
 import { trueFalseLabels } from '../../../../shared/trueFalseLabels'
 import { subjectById } from '../../model/subjects'
-import { anredeFuerMeta } from '../../didactics/anrede'
+import { anredeFuerMeta, anweisungsSprache } from '../../didactics/anrede'
 import { Child, PX_PER_MM, PX_MM, tint, Ctx, materialNo } from './grundlagen'
 import { rich, richRun } from './kopf'
 import { taskContent } from './aufgaben'
@@ -559,8 +560,10 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
     }
     case 'selfCheck': {
       if (key) return []
+      // In der Sprache der Anweisungen wie am Bildschirm (12.11.2026)
+      const sp = kopfSpracheVon(anweisungsSprache(ctx.ws.meta))
       const heads =
-        block.format === 'kompetenzraster' ? ['sicher', 'teilweise', 'noch nicht'] : block.format === 'ampel' ? ['grün', 'gelb', 'rot'] : ['🙂', '😐', '🙁']
+        block.format === 'kompetenzraster' ? [...EINSCHAETZUNG_KOPF[sp]] : block.format === 'ampel' ? [...AMPEL_KOPF[sp]] : ['🙂', '😐', '🙁']
       return [
         await gridTable(
           ctx,

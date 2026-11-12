@@ -20,7 +20,7 @@ import { punkteZeilen } from '../../../shared/notenpunkte'
 import { GRAMMAR_TOPICS } from '../didactics/grammar'
 import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
-import { anredeFuerMeta, anweisungenDeutsch } from '../didactics/anrede'
+import { anredeFuerMeta, anweisungenDeutsch, anweisungsSprache } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
 import { druckDesign } from '../../../shared/fachfarben'
 import { boardList } from '../didactics/boardDesign'
@@ -185,6 +185,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     wordLimit: ws.meta.wordLimit,
     subjectId: ws.meta.subjectId,
     labelLanguage: ws.meta.labelLanguage,
+    anweisungsSprache: anweisungsSprache(ws.meta),
     anrede: anredeFuerMeta(ws.meta),
     // Textauswahl-Menü (01.10.2026): nur Fach, Jahrgang, Schulform, Thema – keine Personendaten
     lerngruppeText: {
