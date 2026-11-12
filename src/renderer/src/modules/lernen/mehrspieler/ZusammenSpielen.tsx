@@ -23,6 +23,22 @@ const BEREICHE: { art: MehrArt; id: string; name: TextSchluessel; text: TextSchl
  * Feld „Einladungscode" (09.10.2026, Wunsch der Lehrkraft: ganz oben im Spielbereich statt in den aufgeklappten
  * Bereichen Kooperativ/Versus): sechs Ziffern, Enter oder „Beitreten" öffnet die Lobby. Nur für angemeldete Lernende.
  */
+/**
+ * Ziel eines sechsstelligen Codes (12.11.2026, Befund der Lehrkraft: Lernende kamen über den Englischordner nicht ins
+ * Klassenspiel – das Feld kannte nur Spielrunden der Lernenden): erst eine Spielrunde, sonst ein Klassenspiel der
+ * Lehrkraft (wie die Code-Seite, SchuelerBereich `oeffneCode`). Kennt der Server beides nicht, kommt seine Meldung.
+ */
+async function codeZiel(c: string): Promise<string> {
+  try {
+    await holen(`/s/api/spiel/zugang?code=${c}`)
+    return `/s/sp/${c}`
+  } catch (e) {
+    const k = await holen<{ code: string }>(`/s/api/klassenspiel/zugang?code=${c}`).catch(() => null)
+    if (k?.code) return `/s/ks/${k.code}`
+    throw e
+  }
+}
+
 export function EinladungsCode({ sprache = 'de' }: { sprache?: string }): React.JSX.Element | null {
   const t = (k: TextSchluessel): string => spielText(sprache, null, k)
   const [code, setCode] = useState('')
@@ -35,8 +51,7 @@ export function EinladungsCode({ sprache = 'de' }: { sprache?: string }): React.
     setLaeuft(true)
     setFehler('')
     try {
-      await holen(`/s/api/spiel/zugang?code=${c}`)
-      window.location.assign(`/s/sp/${c}`)
+      window.location.assign(await codeZiel(c))
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
       setLaeuft(false)
@@ -156,8 +171,7 @@ export default function ZusammenSpielen({
     const c = code.replace(/\D/g, '')
     if (c.length !== 6) return setFehler(t('uiCodeSechs'))
     try {
-      await holen(`/s/api/spiel/zugang?code=${c}`)
-      window.location.assign(`/s/sp/${c}`)
+      window.location.assign(await codeZiel(c))
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
     }
