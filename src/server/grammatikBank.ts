@@ -552,7 +552,10 @@ const EINSPIELEN: [string, string][] = [
   // Green Line 6 Unit 2 und Rest Unit 1 (12.11.2026, Auftrag der Lehrkraft „geeignet, verständlich, machbar, sinnvoll"):
   // Modal expressions, Bedingungssätze Typ 1–3 (Klasse und Wortschatz der frühesten Einführung, z. B. Typ 1 Klasse 6),
   // Phrasal verbs, Infinitive, Gerund mit eigenem Subjekt – gleicher Ablauf mit Prüfung und Blindproben
-  ['grammatik-bank-greenline6-unit2-2026-11-12', 'greenline6-unit2-2026-11-12.json']
+  ['grammatik-bank-greenline6-unit2-2026-11-12', 'greenline6-unit2-2026-11-12.json'],
+  // Nachtrag (13.11.2026, Auftrag der Lehrkraft „mach die noch fehlenden Aufgaben"): die zwei Anwenden-Aufgaben der
+  // gemischten Übung Bedingungssätze Typ 1–3, Stufe a
+  ['grammatik-bank-greenline6-nachtrag-2026-11-13', 'greenline6-nachtrag-2026-11-13.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {

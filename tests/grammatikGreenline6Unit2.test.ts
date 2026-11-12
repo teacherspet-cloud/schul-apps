@@ -12,10 +12,14 @@ import { pruefeGrammatik } from '../src/shared/grammatiktrainer'
  * Überarbeitung, weitere Blindproben. Jede Aufgabe muss wie beim Einspielen ohne Mangel bleiben, den Selbsttest bestehen,
  * ihre eigene Lösung als richtig werten und nur Wortschatz der Station ihrer Form nutzen.
  */
-const d = JSON.parse(readFileSync('resources/grammatik-bank/greenline6-unit2-2026-11-12.json', 'utf8')) as {
+type Datei = {
   regeln: Record<string, { titel: string; erklaerung: string; beispiele: string[] }>
   neu: { schluessel: string; aufgabe: Record<string, unknown> }[]
 }
+const haupt = JSON.parse(readFileSync('resources/grammatik-bank/greenline6-unit2-2026-11-12.json', 'utf8')) as Datei
+// Nachtrag 13.11.2026: die zwei fehlenden Anwenden-Aufgaben (gemischt Typ 1–3, Stufe a) – gleiche Prüfungen
+const nachtrag = JSON.parse(readFileSync('resources/grammatik-bank/greenline6-nachtrag-2026-11-13.json', 'utf8')) as Datei
+const d: Datei = { regeln: { ...nachtrag.regeln, ...haupt.regeln }, neu: [...haupt.neu, ...nachtrag.neu] }
 
 describe('Green Line 6, Unit 2 (Handbetrieb)', () => {
   it('jede Aufgabe ohne Mangel, Selbsttest bestanden, eigene Lösung richtig, Wortschatz der Station', () => {

@@ -1,0 +1,54 @@
+{
+ "hinweis": "Nachtrag Green Line 6 (13.11.2026): zwei Anwenden-Aufgaben der gemischten Übung Bedingungssätze Typ 1–3, Stufe a – App-Weg im Handbetrieb mit Prüfung und Blindprobe",
+ "regeln": {
+  "mix:en.cond.type1+en.cond.type2+en.cond.type3": {
+   "titel": "Bedingungssätze Typ 1, 2, 3 und Mischformen",
+   "erklaerung": "Typ 1: reale Möglichkeit – if + present, will + Grundform. Typ 2: gedacht, Gegenwart – if + past, would + Grundform. Typ 3: Vergangenheit, nicht mehr änderbar – if + past perfect, would have + 3. Form. Mischformen verbinden eine Bedingung in der Vergangenheit mit einer Folge jetzt (oder umgekehrt).",
+   "beispiele": [
+    "If it rains, we'll stay at home.",
+    "If I had more time, I would read more.",
+    "If we had left earlier, we wouldn't have missed the train."
+   ]
+  }
+ },
+ "neu": [
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2+en.cond.type3",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation. Setze die richtige Verbform ein.",
+    "satz": "If Jack ___ his mum's birthday, she wouldn't be upset with him now.",
+    "vorgabe": "(remember)",
+    "loesungen": [
+     "had remembered",
+     "'d remembered"
+    ],
+    "erklaerung": "Bedingung in der Vergangenheit (gestern vergessen), Folge jetzt (now): if + past perfect, would + Grundform.",
+    "uebung": "anwenden",
+    "kontext": "Jack forgot his mum's birthday yesterday. Today she is still upset with him.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2+en.cond.type3",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib einen Bedingungssatz: Was wäre damals passiert, wenn es heute anders wäre?",
+    "satz": "I'm not good at maths, so I didn't get into the science club last year.",
+    "vorgabe": "Mischform: Bedingung jetzt – Folge in der Vergangenheit",
+    "loesungen": [
+     "If I were good at maths, I would have got into the science club last year.",
+     "If I was good at maths, I would have got into the science club last year.",
+     "If I were good at maths, I'd have got into the science club last year.",
+     "If I was good at maths, I'd have got into the science club last year.",
+     "If I were good at maths, I would have gotten into the science club last year.",
+     "If I was good at maths, I would have gotten into the science club last year."
+    ],
+    "erklaerung": "Dauerhafte Eigenschaft jetzt (not good at maths) → if + past (were); Folge letztes Jahr → would have + 3. Form.",
+    "uebung": "anwenden",
+    "anfang": "If I",
+    "niveau": "a"
+   }
+  }
+ ]
+}
