@@ -239,6 +239,7 @@ const FORM_ZUSATZ: Record<string, string[]> = {
   // Green Line 2 Unit 2 (13.11.2026, Handbetrieb): bad – worse – worst und „a bit + Komparativ" sind Lernstoff der
   // Steigerung, die NI-Wortliste führt worse/worst/bit/least aber nicht
   'en.adj.comparison': ['worse', 'worst', 'bit', 'least', 'further', 'furthest'],
+  'en.adv.comparison': ['worse', 'worst', 'least', 'further', 'furthest'],
   // Present perfect (Green Line 2 Unit 3 Station 1): Signalwörter gehören zur Form, „ever" steht in der NI-Liste erst in Station 2
   'en.verb.present_perfect': ['ever', 'never', 'just', 'already', 'yet', 'since', 'for', 'been', 'gone'],
   'en.verb.pp_vs_past': ['ever', 'never', 'just', 'already', 'yet', 'since', 'for', 'ago', 'been', 'gone'],
@@ -248,6 +249,8 @@ const FORM_ZUSATZ: Record<string, string[]> = {
     'no-one',
     'else'
   ],
+  // Question tags (Green Line 2 Unit 5): „Let's …, shall we?" ist Lernstoff, shall fehlt in der NI-Liste
+  'en.syn.question_tags': ['shall'],
   // Indirekte Ja/Nein-Fragen: whether steht in der NI-Liste (Green Line 2 Trailer 5) nicht
   'en.reported': ['whether'],
   // Vorhersage nach Anzeichen (Green Line 2 Unit 2): das Wetter ist das Standardbeispiel, rain/cloud/sky fehlen in der NI-Liste

@@ -559,7 +559,10 @@ const EINSPIELEN: [string, string][] = [
   // Fehlende Green-Line-Formen, Runde 1 (13.11.2026, Auftrag der Lehrkraft „sinnvolle, machbare und zielführende Aufgaben,
   // passend zu Vokabeln und Thema der Unit/Station"): GL1 Unit 4 (Mengen, present progressive), GL2 Welcome back bis Unit 2
   // (was/were, simple past, going to, Steigerung) – Stationsthema im Auftrag, Prüfung, Blindproben, Überarbeitung
-  ['grammatik-bank-greenline-runde1-2026-11-13', 'greenline1-unit4-greenline2-unit1-2-2026-11-13.json']
+  ['grammatik-bank-greenline-runde1-2026-11-13', 'greenline1-unit4-greenline2-unit1-2-2026-11-13.json'],
+  // Runde 2 (13.11.2026): Green Line 5 Unit 2/3 (future progressive/perfect, Wahrnehmungsverben, Zustandsverben, Satzadverbien,
+  // Partizipien, past perfect progressive) und Mischformen aus GL5 Unit 1 / GL6 Unit 1 – gleicher Ablauf
+  ['grammatik-bank-greenline-runde2-2026-11-13', 'greenline5-unit2-3-2026-11-13.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
