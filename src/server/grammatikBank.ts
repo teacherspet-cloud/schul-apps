@@ -555,7 +555,11 @@ const EINSPIELEN: [string, string][] = [
   ['grammatik-bank-greenline6-unit2-2026-11-12', 'greenline6-unit2-2026-11-12.json'],
   // Nachtrag (13.11.2026, Auftrag der Lehrkraft „mach die noch fehlenden Aufgaben"): die zwei Anwenden-Aufgaben der
   // gemischten Übung Bedingungssätze Typ 1–3, Stufe a
-  ['grammatik-bank-greenline6-nachtrag-2026-11-13', 'greenline6-nachtrag-2026-11-13.json']
+  ['grammatik-bank-greenline6-nachtrag-2026-11-13', 'greenline6-nachtrag-2026-11-13.json'],
+  // Fehlende Green-Line-Formen, Runde 1 (13.11.2026, Auftrag der Lehrkraft „sinnvolle, machbare und zielführende Aufgaben,
+  // passend zu Vokabeln und Thema der Unit/Station"): GL1 Unit 4 (Mengen, present progressive), GL2 Welcome back bis Unit 2
+  // (was/were, simple past, going to, Steigerung) – Stationsthema im Auftrag, Prüfung, Blindproben, Überarbeitung
+  ['grammatik-bank-greenline-runde1-2026-11-13', 'greenline1-unit4-greenline2-unit1-2-2026-11-13.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {

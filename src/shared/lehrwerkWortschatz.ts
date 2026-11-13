@@ -234,6 +234,24 @@ const FORM_ZUSATZ: Record<string, string[]> = {
   'en.focus.emphasis': SELF,
   'en.focus.inversion': ['seldom', 'scarcely', 'sooner', 'circumstances', 'account'],
   'en.verb.will_vs_goingto': ['probably', 'perhaps', 'maybe', 'sure'],
+  // will-future (Green Line 2 Unit 4, 13.11.2026): Signalwörter der Vorhersage fehlen in der NI-Liste
+  'en.verb.will_future': ['probably', 'perhaps', 'maybe', 'sure', 'tonight'],
+  // Green Line 2 Unit 2 (13.11.2026, Handbetrieb): bad – worse – worst und „a bit + Komparativ" sind Lernstoff der
+  // Steigerung, die NI-Wortliste führt worse/worst/bit/least aber nicht
+  'en.adj.comparison': ['worse', 'worst', 'bit', 'least', 'further', 'furthest'],
+  // Present perfect (Green Line 2 Unit 3 Station 1): Signalwörter gehören zur Form, „ever" steht in der NI-Liste erst in Station 2
+  'en.verb.present_perfect': ['ever', 'never', 'just', 'already', 'yet', 'since', 'for', 'been', 'gone'],
+  'en.verb.pp_vs_past': ['ever', 'never', 'just', 'already', 'yet', 'since', 'for', 'ago', 'been', 'gone'],
+  // Indefinitpronomen (Green Line 2 Unit 3 Station 3): alle Zusammensetzungen sind Lernstoff, die NI-Liste führt nur einige
+  'en.pron.indefinite': [
+    ...['some', 'any', 'no', 'every'].flatMap((a) => ['body', 'one', 'thing', 'where'].map((b) => a + b)),
+    'no-one',
+    'else'
+  ],
+  // Indirekte Ja/Nein-Fragen: whether steht in der NI-Liste (Green Line 2 Trailer 5) nicht
+  'en.reported': ['whether'],
+  // Vorhersage nach Anzeichen (Green Line 2 Unit 2): das Wetter ist das Standardbeispiel, rain/cloud/sky fehlen in der NI-Liste
+  'en.verb.going_to/anzeichen': ['rain', 'cloud', 'clouds', 'sky', 'tonight', 'windy', 'storm'],
   // Green Line 6 Unit 1 (30.10.2026): „be supposed / likely / sure / certain to" – certain, unlikely fehlen in der Liste
   'en.verb.passive_reporting': ['supposed', 'likely', 'unlikely', 'sure', 'certain', 'said', 'believed', 'thought', 'reported', 'expected', 'known'],
   // Unpersönlicher Stil (Green Line 6 Unit 1): Kernwendungen „There is evidence/concern that …", „It is argued/claimed …"
