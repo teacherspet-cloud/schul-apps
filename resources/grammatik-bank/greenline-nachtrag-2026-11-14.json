@@ -1,0 +1,1872 @@
+{
+ "hinweis": "Nachtrag zu Green Line 1/2/5 (14.11.2026, Auftrag der Lehrkraft: fehlende Grammatikformen): question tags mit Vorgabe in Klammern (in Runde 3 von der App gestrichen), present perfect Erfahrung nur als Aussagesätze, Einzelfelder aus Runde 1/2 – App-Weg im Handbetrieb",
+ "regeln": {
+  "en.verb.participle/passiv-partizip": {
+   "titel": "Passivisches Partizip am Satzanfang",
+   "erklaerung": "Einen Passivsatz kannst du mit dem Partizip Perfekt (3. Form des Verbs) verkürzen: Statt „The house was built in 1900. It needs repairs.“ sagst du „Built in 1900, the house needs repairs.“ Die Form von be fällt weg. Wichtig: Das gedachte Subjekt des Partizips ist dasselbe wie das Subjekt des Hauptsatzes.",
+   "beispiele": [
+    "Written in 1950, the book is still very popular today.",
+    "Painted in bright colours, the old bus looks like new."
+   ]
+  },
+  "en.noun.quantifiers/much-many": {
+   "titel": "much oder many?",
+   "erklaerung": "Many steht vor Nomen, die man zählen kann (Plural): many friends, many people. Much steht vor Nomen, die man nicht zählen kann: much money, much time. Beide stehen vor allem in Fragen (How much …? How many …?) und in verneinten Sätzen.",
+   "beispiele": [
+    "How many pets do you have?",
+    "There isn't much bread in the kitchen."
+   ]
+  },
+  "en.noun.quantifiers/a-lot-of": {
+   "titel": "a lot of / lots of – viele, viel",
+   "erklaerung": "Mit a lot of oder lots of sagst du „viele“ oder „viel“. Beides passt vor Nomen im Plural (a lot of friends) und vor Nomen ohne Plural (a lot of water). Achte auf die Form: Es heißt immer a lot of oder lots of – nie „a lots of“ und nie „lot of“ ohne a.",
+   "beispiele": [
+    "We have a lot of fun at school.",
+    "There are lots of books in the library."
+   ]
+  },
+  "en.verb.past_simple/unregelmaessig": {
+   "titel": "Simple past: unregelmäßige Verben",
+   "erklaerung": "Viele wichtige Verben bilden das simple past nicht mit -ed, sondern haben eine eigene Form: go – went, see – saw, buy – bought. Diese Formen musst du auswendig lernen. Die Form ist für alle Personen gleich: I went, she went, they went.",
+   "beispiele": [
+    "We went to the beach last Sunday.",
+    "My mum bought a new bag yesterday."
+   ]
+  },
+  "en.adj.comparison/unregelmaessig": {
+   "titel": "good – better – best, bad – worse – worst",
+   "erklaerung": "Die Adjektive good und bad werden unregelmäßig gesteigert. Es heißt good – better – best und bad – worse – worst. Formen wie „gooder“ oder „baddest“ gibt es nicht. Nach dem Komparativ folgt than, vor dem Superlativ steht the.",
+   "beispiele": [
+    "Tom's pizza is better than my pizza.",
+    "This is the worst day of the week."
+   ]
+  },
+  "en.verb.present_perfect/erfahrung": {
+   "titel": "Present perfect: Erfahrungen (never, ever)",
+   "erklaerung": "Mit dem present perfect sagst du, was jemand in seinem Leben schon (oder noch nie) gemacht hat. Wann genau es war, ist nicht wichtig. Du bildest es mit have/has + 3. Form des Verbs. Never steht zwischen have/has und der 3. Form.",
+   "beispiele": [
+    "I have never been to Scotland.",
+    "My aunt has seen a lot of countries."
+   ]
+  },
+  "en.pron.prop_one/one": {
+   "titel": "one nach einem Adjektiv",
+   "erklaerung": "Wenn du ein Nomen nicht noch einmal sagen willst, ersetzt du es durch one. Das Wort one steht dann nach einem Adjektiv: the red one, a new one. Bei einem Nomen im Plural heißt es ones.",
+   "beispiele": [
+    "I don't want the old bike. I want the new one.",
+    "These apples are green. I like the red ones."
+   ]
+  },
+  "en.syn.question_tags/be": {
+   "titel": "Bestätigungsfragen mit be",
+   "erklaerung": "Mit einer Bestätigungsfrage (question tag) am Satzende fragst du, ob der andere dir zustimmt – wie „…, oder?“ im Deutschen. Steht im Satz eine Form von be (am, is, are, was, were), nimmst du diese Form auch im Tag. Ist der Satz bejaht, ist der Tag verneint; ist der Satz verneint, ist der Tag bejaht. Im Tag steht das Subjekt als Pronomen (it, he, she, they …).",
+   "beispiele": [
+    "It's cold, isn't it?",
+    "Your sisters are at home, aren't they?",
+    "Jack isn't here, is he?"
+   ]
+  },
+  "en.syn.question_tags/do": {
+   "titel": "Bestätigungsfragen mit do, does und did",
+   "erklaerung": "Hat der Satz kein Hilfsverb (nur ein Vollverb wie like, play, go), brauchst du im Tag do, does oder did. Simple present: don't bzw. doesn't (bei he, she, it); simple past: didn't. Ist der Satz bejaht, ist der Tag verneint. Das Subjekt steht im Tag als Pronomen.",
+   "beispiele": [
+    "You like tea, don't you?",
+    "Anna plays football, doesn't she?",
+    "They went to Scotland, didn't they?"
+   ]
+  },
+  "en.syn.question_tags/modal-have": {
+   "titel": "Bestätigungsfragen mit can, will und have",
+   "erklaerung": "Steht im Satz ein Hilfsverb wie can, will oder have/has (present perfect), dann nimmst du genau dieses Hilfsverb auch im Tag. Bejahter Satz → verneinter Tag (can't, won't, haven't, hasn't), verneinter Satz → bejahter Tag. Das Subjekt steht im Tag als Pronomen.",
+   "beispiele": [
+    "You can swim, can't you?",
+    "She has left, hasn't she?",
+    "They will come, won't they?"
+   ]
+  },
+  "en.syn.question_tags/verneinter-hauptsatz": {
+   "titel": "Verneinter Satz – bejahter Tag",
+   "erklaerung": "Ist der Satz verneint (isn't, don't, can't, haven't …), dann ist die Bestätigungsfrage bejaht. Du nimmst dasselbe Hilfsverb ohne not und das Subjekt als Pronomen. So fragst du, ob der andere zustimmt.",
+   "beispiele": [
+    "You aren't tired, are you?",
+    "Sam doesn't like fish, does he?",
+    "We can't stay here, can we?"
+   ]
+  },
+  "en.syn.question_tags/sonderfaelle": {
+   "titel": "Sonderfälle bei Bestätigungsfragen",
+   "erklaerung": "Einige Tags musst du dir merken: Nach I am heißt der Tag aren't I (nicht „amn't I“). Nach Let's … heißt der Tag shall we. Nach einer Aufforderung (Imperativ) sagst du will you – bei bejahten Aufforderungen geht auch won't you, would you, can you oder could you.",
+   "beispiele": [
+    "I'm right, aren't I?",
+    "Let's go, shall we?",
+    "Close the door, will you?"
+   ]
+  },
+  "en.syn.question_tags/intonation": {
+   "titel": "Bestätigungsfragen: Stimme hoch oder runter?",
+   "erklaerung": "Mit der Stimme zeigst du, was du mit dem Tag meinst. Bist du dir sicher und willst nur Zustimmung, geht die Stimme am Ende nach unten (fallend). Weißt du es wirklich nicht und willst eine Antwort, geht die Stimme am Ende nach oben (steigend). Der Tag selbst wird in beiden Fällen gleich gebildet.",
+   "beispiele": [
+    "It's nice, isn't it? (fallend – du bist sicher)",
+    "The bus leaves at six, doesn't it? (steigend – echte Frage)"
+   ]
+  }
+ },
+ "neu": [
+  {
+   "schluessel": "en.verb.participle/passiv-partizip",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation. Setze das Verb als Partizip ein.",
+    "satz": "___ only ten minutes for the last exercise, the students had to work very fast.",
+    "vorgabe": "(give)",
+    "loesungen": [
+     "Given",
+     "given",
+     "Having been given",
+     "having been given"
+    ],
+    "erklaerung": "Die Schüler bekamen die Zeit (passiv) → Partizip Perfekt given.",
+    "uebung": "anwenden",
+    "kontext": "The English test was really long. The teacher gave the class only ten minutes for the last exercise.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.noun.quantifiers/much-many",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle much oder many.",
+    "satz": "How ___ money do you need for the school trip?",
+    "loesungen": [
+     "much"
+    ],
+    "optionen": [
+     "much",
+     "many"
+    ],
+    "erklaerung": "money kann man nicht zählen → How much money.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.noun.quantifiers/much-many",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies den Dialog. Wähle much oder many.",
+    "satz": "A: How ___ sugar do you want in your tea? B: Only a little, please.",
+    "loesungen": [
+     "much"
+    ],
+    "optionen": [
+     "much",
+     "many"
+    ],
+    "erklaerung": "Entscheidend ist das Nomen nach der Lücke: sugar kann man nicht zählen → much.",
+    "uebung": "unterscheiden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.noun.quantifiers/a-lot-of",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Form.",
+    "satz": "There are ___ animals on my grandma's farm in Wales.",
+    "loesungen": [
+     "a lot of"
+    ],
+    "optionen": [
+     "a lot of",
+     "a lots of",
+     "lot of",
+     "a lot"
+    ],
+    "erklaerung": "Die Form heißt immer a lot of – mit a, ohne -s an lot und mit of vor dem Nomen.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_simple/unregelmaessig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation. Setze das Verb im simple past ein.",
+    "satz": "They ___ a lot of old castles there.",
+    "vorgabe": "(see)",
+    "loesungen": [
+     "saw"
+    ],
+    "erklaerung": "Der Urlaub war letzten Sommer → simple past; see ist unregelmäßig: saw.",
+    "uebung": "anwenden",
+    "kontext": "Last summer Emma and her family were on holiday in Scotland.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_simple/unregelmaessig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation. Setze das Verb im simple past ein.",
+    "satz": "He ___ us maths for two years.",
+    "vorgabe": "(teach)",
+    "loesungen": [
+     "taught"
+    ],
+    "erklaerung": "Mr Brown ist nicht mehr an der Schule → abgeschlossene Vergangenheit; teach – taught.",
+    "uebung": "anwenden",
+    "kontext": "Our old maths teacher, Mr Brown, left our school last summer.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.adj.comparison/unregelmaessig",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Im Satz ist ein Fehler bei der Steigerung. Finde das falsche Wort und schreibe die richtige Form.",
+    "satz": "The weather on Monday was bad, but the weather on Tuesday was badder.",
+    "loesungen": [
+     "worse"
+    ],
+    "fehlerWort": "badder",
+    "erklaerung": "bad wird unregelmäßig gesteigert: bad – worse – worst; zwei Tage werden verglichen → worse.",
+    "uebung": "fehler",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.present_perfect/erfahrung",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Form.",
+    "satz": "Lucy ___ never been to Ireland.",
+    "loesungen": [
+     "has"
+    ],
+    "optionen": [
+     "has",
+     "have",
+     "is"
+    ],
+    "erklaerung": "Bei he/she/it (Lucy) heißt es has + 3. Form.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.present_perfect/erfahrung",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "We have never seen a real lion.",
+    "loesungen": [
+     "We have never seen a real lion."
+    ],
+    "erklaerung": "Richtig: have never + 3. Form seen.",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.present_perfect/erfahrung",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb im present perfect ein.",
+    "satz": "Mia ___ to London.",
+    "vorgabe": "(never / be)",
+    "loesungen": [
+     "has never been",
+     "'s never been"
+    ],
+    "erklaerung": "has never + 3. Form; be – been.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.present_perfect/erfahrung",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation. Setze das Verb im present perfect ein.",
+    "satz": "He ___ in the sea.",
+    "vorgabe": "(never / swim)",
+    "loesungen": [
+     "has never swum",
+     "'s never swum"
+    ],
+    "erklaerung": "Erfahrung mit never → has never + 3. Form; swim – swum.",
+    "uebung": "anwenden",
+    "kontext": "Ben is ten. He is scared of water.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.present_perfect/erfahrung",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation. Setze das Verb im present perfect ein.",
+    "satz": "He ___ a horse.",
+    "vorgabe": "(never / ride)",
+    "loesungen": [
+     "has never ridden",
+     "'s never ridden"
+    ],
+    "erklaerung": "Lebenserfahrung mit never → has never + 3. Form; ride – ridden.",
+    "uebung": "anwenden",
+    "kontext": "Max loves animals, but he lives in a big city.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.present_perfect/erfahrung",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb im present perfect ein.",
+    "satz": "My cousin Jack ___ in a plane, so he is really scared.",
+    "vorgabe": "(never / fly)",
+    "loesungen": [
+     "has never flown",
+     "'s never flown"
+    ],
+    "erklaerung": "Erfahrung im Leben mit never → has never + 3. Form; fly ist unregelmäßig: flown.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.pron.prop_one/one",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle das passende Wort.",
+    "satz": "This pen is old. I need a new ___.",
+    "loesungen": [
+     "one"
+    ],
+    "optionen": [
+     "one",
+     "ones",
+     "it"
+    ],
+    "erklaerung": "one ersetzt das Nomen pen (Einzahl) nach dem Adjektiv new.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.pron.prop_one/one",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "I don't like the brown jacket. I like the green one.",
+    "loesungen": [
+     "I don't like the brown jacket. I like the green one."
+    ],
+    "erklaerung": "Richtig: the green one ersetzt the green jacket (Einzahl).",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You are from Scotland, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't you"
+    ],
+    "erklaerung": "Bejahter Satz mit are → verneinter Tag: aren't you.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "The youth hostel is near the lake, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "isn't it"
+    ],
+    "erklaerung": "is → isn't; the youth hostel wird im Tag zu it.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "The bagpipes are very loud.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "The bagpipes are very loud, aren't they?"
+    ],
+    "erklaerung": "are → aren't; the bagpipes werden im Tag zu they.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "It's very windy today, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "isn't it"
+    ],
+    "erklaerung": "It's = it is → Tag isn't it.",
+    "uebung": "anwenden",
+    "kontext": "Ben and his dad are on a trip in Scotland. They are on a mountain.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: Look, that's the castle. It's really old, ___?\nB: Yes, it is. It's more than 800 years old.\nA: Our guide is very nice, ___?\nB: Yes, she is. And she knows a lot about the castle.\nA: We're on time for the tour, ___?\nB: Yes, we are. It starts at ten.",
+    "loesungen": [
+     "isn't it | isn't she | aren't we"
+    ],
+    "erklaerung": "is → isn't it / isn't she; are → aren't we – das Pronomen passt zum Subjekt.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "isn't it"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "isn't she"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "aren't we"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du bist sicher, dass Mia müde ist. Hänge eine Bestätigungsfrage an.",
+    "satz": "Mia is tired.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Mia is tired, isn't she?",
+     "Mia's tired, isn't she?"
+    ],
+    "erklaerung": "is → isn't; Mia wird im Tag zu she.",
+    "uebung": "anwenden",
+    "kontext": "Mia and her friends are at the youth hostel. It's late.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "The museum was closed on Monday, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "wasn't it"
+    ],
+    "erklaerung": "was → wasn't; the museum wird im Tag zu it.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "The tickets for the castle aren't cheap.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "The tickets for the castle aren't cheap, are they?",
+     "The tickets for the castle are not cheap, are they?"
+    ],
+    "erklaerung": "Verneinter Satz mit aren't → bejahter Tag are they.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "This is you, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "isn't it"
+    ],
+    "erklaerung": "Nach this is steht im Tag it: isn't it.",
+    "uebung": "anwenden",
+    "kontext": "Grandma shows Jack an old photo of a girl in a tartan skirt. Jack smiles.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: The weather was terrible on Sunday, ___?\nB: Yes, it was. There was a lot of rain.\nA: But you weren't wet, ___?\nB: No, I wasn't. I had my umbrella.\nA: And the parade is today, ___?\nB: Yes, it is. Let's go and see it!",
+    "loesungen": [
+     "wasn't it | were you | isn't it"
+    ],
+    "erklaerung": "Zeitform und Polarität aus dem Satz: was → wasn't it, weren't → were you, is → isn't it.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "wasn't it"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "were you"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "isn't it"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die Aussage mit Bestätigungsfrage, auf die B antwortet.",
+    "satz": "No, it isn't. It's only a short walk from here.",
+    "vorgabe": "(the station / far)",
+    "loesungen": [
+     "The station is far, isn't it?",
+     "The station's far, isn't it?",
+     "The station is far from here, isn't it?",
+     "The station's far from here, isn't it?",
+     "The station isn't far, is it?",
+     "The station is not far, is it?"
+    ],
+    "erklaerung": "Bejahter Satz mit is → isn't it; die Antwort „No, it isn't“ passt dazu.",
+    "uebung": "anwenden",
+    "kontext": "Nora and her dad are at the youth hostel. They want to go to the station.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "There are a lot of old castles in Scotland, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't there"
+    ],
+    "erklaerung": "Bei there are steht im Tag there: aren't there.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Those kilts in the shop window aren't very expensive.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Those kilts in the shop window aren't very expensive, are they?",
+     "Those kilts in the shop window are not very expensive, are they?"
+    ],
+    "erklaerung": "Verneinter Satz → bejahter Tag; those kilts werden zu they: are they.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Everyone is ready for the long journey, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't they"
+    ],
+    "erklaerung": "everyone wird im Tag zu they, deshalb are: aren't they.",
+    "uebung": "anwenden",
+    "kontext": "Lily's class is going to go to Scotland. The bus is outside the school, and the teacher looks at the children.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: The food at the festival was really good, ___?\nB: Yes, it was! The haggis was yummy.\nA: But the music wasn't very loud, ___?\nB: No, it wasn't. I could hear every word.\nA: There's another festival in August, ___?\nB: Yes, there is. And we're going to go there, ___?\nA: Of course we are!",
+    "loesungen": [
+     "wasn't it | was it | isn't there | aren't we"
+    ],
+    "erklaerung": "was → wasn't it; wasn't → was it; there's → isn't there; we're going to → aren't we.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "wasn't it"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "was it"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "isn't there"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "aren't we"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/be",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die Aussage mit Bestätigungsfrage, auf die B antwortet. Nutze going to.",
+    "satz": "Yes, I am. I'm going to wear my new kilt.",
+    "vorgabe": "(dance at the party)",
+    "loesungen": [
+     "You're going to dance at the party, aren't you?",
+     "You are going to dance at the party, aren't you?",
+     "You aren't going to dance at the party, are you?",
+     "You're not going to dance at the party, are you?",
+     "You are not going to dance at the party, are you?"
+    ],
+    "erklaerung": "Bei going to steckt be im Satz: you are going to → aren't you.",
+    "uebung": "anwenden",
+    "kontext": "Finn's sister knows about the big party on Saturday. She asks Finn.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You like haggis, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "don't you"
+    ],
+    "erklaerung": "Kein Hilfsverb, simple present mit you → don't you.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Your grandparents live in Scotland, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "don't they"
+    ],
+    "erklaerung": "live (simple present, Plural) → don't; your grandparents werden zu they.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Mr Hill speaks Gaelic.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Mr Hill speaks Gaelic, doesn't he?"
+    ],
+    "erklaerung": "speaks (he, simple present) → doesn't he.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Your dad gets up early, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "doesn't he"
+    ],
+    "erklaerung": "gets (he, simple present) → doesn't he.",
+    "uebung": "anwenden",
+    "kontext": "Ella's dad makes breakfast for the family every morning at six.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: Your parents love Scotland, ___?\nB: Yes, they do. We go there every summer.\nA: And your brother wears a kilt there, ___?\nB: Yes, he does! He looks really funny in it.\nA: You and your sister like the mountains, ___?\nB: Yes, we do. We walk a lot there.",
+    "loesungen": [
+     "don't they | doesn't he | don't you"
+    ],
+    "erklaerung": "love → don't they; wears (he) → doesn't he; like (you and your sister) → don't you.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "don't they"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "doesn't he"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "don't you"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du bist sicher, dass Jake Fußball spielt. Hänge eine Bestätigungsfrage an.",
+    "satz": "Jake plays football every Saturday.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Jake plays football every Saturday, doesn't he?"
+    ],
+    "erklaerung": "plays (he, simple present) → doesn't he.",
+    "uebung": "anwenden",
+    "kontext": "Jake has a football in his bag.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "The ferry leaves at eight, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "doesn't it"
+    ],
+    "erklaerung": "leaves (it, simple present) → doesn't it.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "You bought a new tartan hat.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "You bought a new tartan hat, didn't you?"
+    ],
+    "erklaerung": "bought ist simple past → didn't you.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You went there with your dad, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "didn't you"
+    ],
+    "erklaerung": "went ist simple past → didn't you.",
+    "uebung": "anwenden",
+    "kontext": "Leo shows his friend Mia his photos from the Scottish mountains.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: You met Fiona at the youth hostel, ___?\nB: Yes, I did. She lives in Scotland.\nA: She speaks Gaelic, ___?\nB: No, she doesn't. But her grandma does.\nA: You didn't understand her accent, ___?\nB: No, I didn't. It was really difficult.\nA: But your parents met her too, ___?\nB: Yes, they did.",
+    "loesungen": [
+     "didn't you | doesn't she | did you | didn't they"
+    ],
+    "erklaerung": "met (past) → didn't you; speaks (she) → doesn't she; didn't understand → did you; met (they) → didn't they.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "didn't you"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "doesn't she"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "did you"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "didn't they"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du bist ziemlich sicher. Hänge eine Bestätigungsfrage an.",
+    "satz": "The bus left at seven.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "The bus left at seven, didn't it?"
+    ],
+    "erklaerung": "left ist simple past → didn't it.",
+    "uebung": "anwenden",
+    "kontext": "Oscar is at the bus stop at ten past seven. There is no bus.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Everybody in our class likes the Scottish dances, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "don't they"
+    ],
+    "erklaerung": "everybody wird im Tag zu they, deshalb don't (nicht doesn't): don't they.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Mrs Fraser told the class about the history of Scotland.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Mrs Fraser told the class about the history of Scotland, didn't she?"
+    ],
+    "erklaerung": "told ist simple past → didn't; Mrs Fraser wird zu she.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You ate too much cake at the party, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "didn't you"
+    ],
+    "erklaerung": "ate ist simple past → didn't you.",
+    "uebung": "anwenden",
+    "kontext": "On Saturday Noah had three big pieces of cake at his cousin's party. Now he feels sick.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: You and your family went to Scotland by car, ___?\nB: Yes, we did. It took ten hours.\nA: Your little sister didn't like the long journey, ___?\nB: No, she didn't. She was very bored.\nA: But everyone enjoys the holiday now, ___?\nB: Yes! We go to the beach every day.\nA: Your dad sometimes swims in the cold sea, ___?\nB: Yes, he does. He's very brave!",
+    "loesungen": [
+     "didn't you | did she | don't they | doesn't he"
+    ],
+    "erklaerung": "went → didn't you; didn't like → did she; everyone enjoys → don't they; swims (he) → doesn't he.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "didn't you"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "did she"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "don't they"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "doesn't he"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/do",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du glaubst, dass Lily ihre Hausaufgaben nicht gemacht hat. Hänge eine Bestätigungsfrage an.",
+    "satz": "Lily didn't do her homework.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Lily didn't do her homework, did she?",
+     "Lily did not do her homework, did she?"
+    ],
+    "erklaerung": "Verneinter Satz mit didn't → bejahter Tag did she.",
+    "uebung": "anwenden",
+    "kontext": "There is nothing in Lily's exercise book, and she looks at the floor.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Your sister can play the bagpipes, ___?",
+    "vorgabe": "(can)",
+    "loesungen": [
+     "can't she"
+    ],
+    "erklaerung": "can im Satz → can't im Tag; your sister wird zu she.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You have been to Scotland, ___?",
+    "vorgabe": "(have)",
+    "loesungen": [
+     "haven't you"
+    ],
+    "erklaerung": "Present perfect mit have → haven't you.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "We will see the parade tomorrow.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "We will see the parade tomorrow, won't we?",
+     "We'll see the parade tomorrow, won't we?"
+    ],
+    "erklaerung": "will im Satz → won't im Tag: won't we.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "He can speak Gaelic, ___?",
+    "vorgabe": "(can)",
+    "loesungen": [
+     "can't he"
+    ],
+    "erklaerung": "can im Satz → can't he.",
+    "uebung": "anwenden",
+    "kontext": "Ella's grandpa is a teacher at a school in Scotland. Ella's friend asks her.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: You have made sandwiches for the trip, ___?\nB: Yes, I have. Cheese sandwiches!\nA: We can take the bus to the lake, ___?\nB: Yes, we can. It leaves at nine.\nA: And Dad will come to the station with us, ___?\nB: Yes, he will.",
+    "loesungen": [
+     "haven't you | can't we | won't he"
+    ],
+    "erklaerung": "have made → haven't you; can → can't we; will → won't he.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(have)",
+      "loesungen": [
+       "haven't you"
+      ]
+     },
+     {
+      "vorgabe": "(can)",
+      "loesungen": [
+       "can't we"
+      ]
+     },
+     {
+      "vorgabe": "(will)",
+      "loesungen": [
+       "won't he"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du bist sicher, dass Ruby dir helfen kann. Hänge eine Bestätigungsfrage an.",
+    "satz": "Ruby can help me with my homework.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Ruby can help me with my homework, can't she?"
+    ],
+    "erklaerung": "can → can't; Ruby wird zu she.",
+    "uebung": "anwenden",
+    "kontext": "Ruby is very good at English.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Mr Ross won't be late tomorrow, ___?",
+    "vorgabe": "(will)",
+    "loesungen": [
+     "will he"
+    ],
+    "erklaerung": "Verneinter Satz mit won't → bejahter Tag will he.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Lucy has lost her phone again.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Lucy has lost her phone again, hasn't she?",
+     "Lucy's lost her phone again, hasn't she?"
+    ],
+    "erklaerung": "Present perfect mit has → hasn't; Lucy wird zu she.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "We can't go to the beach today, ___?",
+    "vorgabe": "(can)",
+    "loesungen": [
+     "can we"
+    ],
+    "erklaerung": "Verneinter Satz mit can't → bejahter Tag can we.",
+    "uebung": "anwenden",
+    "kontext": "It's very windy and rainy. Ellie looks out of the window and asks her mum.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: Fiona has lived in Scotland all her life, ___?\nB: Yes, she has. Her family is Scottish.\nA: She can play the bagpipes, ___?\nB: No, she can't. But her dad can.\nA: You'll visit her in the summer, ___?\nB: Yes, I will. I can't wait!\nA: Your mum hasn't bought the tickets yet, ___?\nB: No, she hasn't.",
+    "loesungen": [
+     "hasn't she | can't she | won't you | has she"
+    ],
+    "erklaerung": "has lived → hasn't she; can → can't she; you'll → won't you; hasn't bought → has she.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(have)",
+      "loesungen": [
+       "hasn't she"
+      ]
+     },
+     {
+      "vorgabe": "(can)",
+      "loesungen": [
+       "can't she"
+      ]
+     },
+     {
+      "vorgabe": "(will)",
+      "loesungen": [
+       "won't you"
+      ]
+     },
+     {
+      "vorgabe": "(have)",
+      "loesungen": [
+       "has she"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du glaubst, dass Leo die Antwort nicht weiß. Hänge eine Bestätigungsfrage an.",
+    "satz": "Leo can't answer the question.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Leo can't answer the question, can he?",
+     "Leo cannot answer the question, can he?"
+    ],
+    "erklaerung": "Verneinter Satz mit can't → bejahter Tag can he.",
+    "uebung": "anwenden",
+    "kontext": "The teacher looks at Leo. Leo is very quiet.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "There will be a lot of people at the parade on Saturday, ___?",
+    "vorgabe": "(will)",
+    "loesungen": [
+     "won't there"
+    ],
+    "erklaerung": "there will be → im Tag won't there.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Achtung: Wie ist der Satz gemeint?",
+    "satz": "Nobody has seen my phone this morning, ___?",
+    "vorgabe": "(have)",
+    "loesungen": [
+     "have they"
+    ],
+    "erklaerung": "nobody macht den Satz verneint → bejahter Tag; nobody wird zu they, deshalb have they.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Everyone has brought something for the picnic.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Everyone has brought something for the picnic, haven't they?",
+     "Everyone's brought something for the picnic, haven't they?"
+    ],
+    "erklaerung": "everyone wird im Tag zu they, deshalb haven't (nicht hasn't): haven't they.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You've had a great time in Scotland, ___?",
+    "vorgabe": "(have)",
+    "loesungen": [
+     "haven't you"
+    ],
+    "erklaerung": "You've had = present perfect mit have → haven't you.",
+    "uebung": "anwenden",
+    "kontext": "Ava and her brother are on holiday in Scotland with their aunt. Their mum calls them and hears them laugh.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog. Achte auf das Verb in jedem Satz.",
+    "satz": "A: You've just come back from Scotland, ___?\nB: Yes, we came back on Sunday.\nA: You couldn't sleep on the night train, ___?\nB: No, I couldn't. It was really noisy.\nA: But you'll go there again next year, ___?\nB: I hope so!\nA: Your sister has a Scottish friend now, ___?\nB: Yes, she does. They write an email every week.",
+    "loesungen": [
+     "haven't you | could you | won't you | doesn't she"
+    ],
+    "erklaerung": "have come → haven't you; couldn't → could you; you'll → won't you; has (besitzen, Vollverb) → doesn't she.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(have)",
+      "loesungen": [
+       "haven't you"
+      ]
+     },
+     {
+      "vorgabe": "(can)",
+      "loesungen": [
+       "could you"
+      ]
+     },
+     {
+      "vorgabe": "(will)",
+      "loesungen": [
+       "won't you"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "doesn't she"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/modal-have",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Alle haben es versucht. Hänge eine Bestätigungsfrage an.",
+    "satz": "Nobody can open the door.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Nobody can open the door, can they?"
+    ],
+    "erklaerung": "nobody macht den Satz verneint → bejahter Tag; nobody wird zu they: can they.",
+    "uebung": "anwenden",
+    "kontext": "The door of the old castle tower is very heavy. Five children try, but it doesn't move.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "The water isn't very warm, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "is it"
+    ],
+    "erklaerung": "Verneinter Satz mit isn't → bejahter Tag is it.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "They aren't from Scotland, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "are they"
+    ],
+    "erklaerung": "Verneinter Satz mit aren't → bejahter Tag are they.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Your brother doesn't eat meat.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Your brother doesn't eat meat, does he?",
+     "Your brother does not eat meat, does he?"
+    ],
+    "erklaerung": "Verneinter Satz mit doesn't → bejahter Tag does he.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "We can't walk there, ___?",
+    "vorgabe": "(can)",
+    "loesungen": [
+     "can we"
+    ],
+    "erklaerung": "Verneinter Satz mit can't → bejahter Tag can we.",
+    "uebung": "anwenden",
+    "kontext": "Emma looks at the map. The castle is very far away.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze die Bestätigungsfragen im Dialog.",
+    "satz": "A: The museum isn't open today, ___?\nB: No, it isn't. It's Monday.\nA: Your parents don't want to stay at home, ___?\nB: No, they don't. They want to go to the beach.\nA: But your little brother can't come with us, ___?\nB: Yes, he can. Mum says it's OK.",
+    "loesungen": [
+     "is it | do they | can he"
+    ],
+    "erklaerung": "isn't → is it; don't → do they; can't → can he.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "is it"
+      ]
+     },
+     {
+      "vorgabe": "(do)",
+      "loesungen": [
+       "do they"
+      ]
+     },
+     {
+      "vorgabe": "(can)",
+      "loesungen": [
+       "can he"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "The bus wasn't on time this morning, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "was it"
+    ],
+    "erklaerung": "Verneinter Satz mit wasn't → bejahter Tag was it.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "Amy won't be at the festival.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "Amy won't be at the festival, will she?",
+     "Amy will not be at the festival, will she?"
+    ],
+    "erklaerung": "Verneinter Satz mit won't → bejahter Tag will she.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Your dad doesn't speak Gaelic, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "does he"
+    ],
+    "erklaerung": "Verneinter Satz mit doesn't → bejahter Tag does he.",
+    "uebung": "anwenden",
+    "kontext": "Finn's family lives in Scotland, but his dad is from London.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Achtung: Ist der Satz verneint?",
+    "satz": "Your uncle never wears his kilt at home, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "does he"
+    ],
+    "erklaerung": "never macht den Satz verneint; wears (he) → bejahter Tag does he.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Satz an.",
+    "satz": "The children in the youth hostel couldn't sleep because of the storm.",
+    "vorgabe": "Satz + Bestätigungsfrage",
+    "loesungen": [
+     "The children in the youth hostel couldn't sleep because of the storm, could they?",
+     "The children in the youth hostel could not sleep because of the storm, could they?"
+    ],
+    "erklaerung": "Verneinter Satz mit couldn't → bejahter Tag could they.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/verneinter-hauptsatz",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "You've never been on a ferry before, ___?",
+    "vorgabe": "(have)",
+    "loesungen": [
+     "have you"
+    ],
+    "erklaerung": "never macht den Satz verneint; you've = you have → have you.",
+    "uebung": "anwenden",
+    "kontext": "Charlie is on the ferry to Scotland. He looks at the sea and holds his dad's hand.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Achtung, Sonderfall!",
+    "satz": "I'm in your team today, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't I"
+    ],
+    "erklaerung": "Nach I am heißt der Tag aren't I.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Achtung, Sonderfall!",
+    "satz": "I'm your best friend, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't I"
+    ],
+    "erklaerung": "I'm = I am → Tag aren't I (nicht „amn't I“).",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Vorschlag an.",
+    "satz": "Let's go to the beach.",
+    "vorgabe": "Let's … → Bestätigungsfrage",
+    "loesungen": [
+     "Let's go to the beach, shall we?"
+    ],
+    "erklaerung": "Nach Let's heißt der Tag shall we.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Help me with these bags, ___?",
+    "vorgabe": "(will)",
+    "loesungen": [
+     "will you",
+     "won't you",
+     "would you",
+     "can you",
+     "could you"
+    ],
+    "erklaerung": "Aufforderung (Imperativ) → Tag will you.",
+    "uebung": "anwenden",
+    "kontext": "Mum comes home from the shops. She has a lot of heavy bags.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Achtung, Sonderfall!",
+    "satz": "I'm older than you, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't I"
+    ],
+    "erklaerung": "I'm = I am → Tag aren't I.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "I'm not in the photo, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "am I"
+    ],
+    "erklaerung": "Verneinter Satz mit I'm not → bejahter Tag am I.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an den Vorschlag an.",
+    "satz": "Let's take the ferry.",
+    "vorgabe": "Let's … → Bestätigungsfrage",
+    "loesungen": [
+     "Let's take the ferry, shall we?"
+    ],
+    "erklaerung": "Nach Let's heißt der Tag shall we.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Be quiet, ___?",
+    "vorgabe": "(will)",
+    "loesungen": [
+     "will you",
+     "won't you",
+     "would you",
+     "can you",
+     "could you"
+    ],
+    "erklaerung": "Aufforderung (Imperativ) → Tag will you.",
+    "uebung": "anwenden",
+    "kontext": "Jack wants to do his homework. His little sister is very noisy.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Achtung, Sonderfall!",
+    "satz": "I'm going to sleep in the top bed at the youth hostel, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't I"
+    ],
+    "erklaerung": "I'm going to = I am going to → Tag aren't I.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "I'm not the only one in a kilt today, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "am I"
+    ],
+    "erklaerung": "Verneinter Satz mit I'm not → bejahter Tag am I.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Hänge eine Bestätigungsfrage an die verneinte Aufforderung an.",
+    "satz": "Don't tell Mum about the broken window.",
+    "vorgabe": "Imperativ → Bestätigungsfrage",
+    "loesungen": [
+     "Don't tell Mum about the broken window, will you?"
+    ],
+    "erklaerung": "Nach einer verneinten Aufforderung (Don't …) heißt der Tag will you.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/sonderfaelle",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage.",
+    "satz": "Hurry up, ___?",
+    "vorgabe": "(will)",
+    "loesungen": [
+     "will you",
+     "won't you",
+     "would you",
+     "can you",
+     "could you"
+    ],
+    "erklaerung": "Aufforderung (Imperativ) → Tag will you.",
+    "uebung": "anwenden",
+    "kontext": "The family wants to go to the airport. Everyone is in the car, but Ben is still in the bathroom.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Du bist sicher – deine Stimme geht am Ende nach unten.",
+    "satz": "What a great view! The mountains are beautiful, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "aren't they"
+    ],
+    "erklaerung": "are → aren't they; du erwartest Zustimmung, also fallende Stimme.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du weißt es nicht genau und willst es wissen. Mache aus der Frage eine Aussage mit Bestätigungsfrage (Stimme steigt).",
+    "satz": "Is the youth hostel near the station?",
+    "vorgabe": "Aussage + Bestätigungsfrage",
+    "loesungen": [
+     "The youth hostel is near the station, isn't it?",
+     "The youth hostel's near the station, isn't it?"
+    ],
+    "erklaerung": "is → isn't it; als echte Frage gesprochen steigt die Stimme am Ende.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Du bist sicher, dass die Party toll war, und erwartest Zustimmung. Bilde die Aussage mit Bestätigungsfrage, auf die B antwortet.",
+    "satz": "Yes, it was. The best party ever!",
+    "vorgabe": "(the party / great)",
+    "loesungen": [
+     "The party was great, wasn't it?",
+     "Tom's party was great, wasn't it?"
+    ],
+    "erklaerung": "was → wasn't it; du erwartest Zustimmung, also fallende Stimme.",
+    "uebung": "bilden",
+    "kontext": "Jess and Amy walk home after Tom's birthday party.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Grace erwartet Zustimmung – ihre Stimme geht am Ende nach unten.",
+    "satz": "The music is fantastic, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "isn't it"
+    ],
+    "erklaerung": "is → isn't it; beide finden die Musik toll – Zustimmung erwartet, fallend.",
+    "uebung": "bilden",
+    "kontext": "Grace and Lily watch the parade. They both love the bagpipes.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du weißt es nicht genau und willst es wissen. Mache aus der Frage eine Aussage mit Bestätigungsfrage (Stimme steigt).",
+    "satz": "Did Oscar take the photos at the castle?",
+    "vorgabe": "Aussage + Bestätigungsfrage",
+    "loesungen": [
+     "Oscar took the photos at the castle, didn't he?"
+    ],
+    "erklaerung": "took (simple past) → didn't he; als echte Frage steigt die Stimme am Ende.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Du bist sicher und erwartest Zustimmung. Bilde die Aussage mit Bestätigungsfrage, auf die B antwortet.",
+    "satz": "Yes, it is. I can see the sea from here!",
+    "vorgabe": "(the view / amazing)",
+    "loesungen": [
+     "The view is amazing, isn't it?",
+     "The view's amazing, isn't it?"
+    ],
+    "erklaerung": "is → isn't it; du bist sicher, also fallende Stimme.",
+    "uebung": "bilden",
+    "kontext": "Two friends are on the top of a mountain in Scotland. They look down at the lake.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Ruby weiß es wirklich nicht – ihre Stimme geht am Ende nach oben.",
+    "satz": "You took my ticket for the ferry, ___?",
+    "vorgabe": "(do)",
+    "loesungen": [
+     "didn't you"
+    ],
+    "erklaerung": "took (simple past) → didn't you; echte Frage, also steigende Stimme.",
+    "uebung": "bilden",
+    "kontext": "Ruby can't find her ticket. She asks her brother, but she isn't sure.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die Bestätigungsfrage. Die Lehrerin erwartet Zustimmung – ihre Stimme geht am Ende nach unten.",
+    "satz": "This trip to the mountains was a great idea, ___?",
+    "vorgabe": "(be)",
+    "loesungen": [
+     "wasn't it"
+    ],
+    "erklaerung": "was → wasn't it; alle sind glücklich – Zustimmung erwartet, fallend.",
+    "uebung": "bilden",
+    "kontext": "The whole class is on the top of a mountain. Everyone looks at the view, and the teacher smiles.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.syn.question_tags/intonation",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Du weißt es nicht genau und willst es wissen. Mache aus der Frage eine Aussage mit Bestätigungsfrage (Stimme steigt).",
+    "satz": "Have Max and Ella already had breakfast?",
+    "vorgabe": "Aussage + Bestätigungsfrage",
+    "loesungen": [
+     "Max and Ella have already had breakfast, haven't they?",
+     "Max and Ella have had breakfast already, haven't they?"
+    ],
+    "erklaerung": "have had → haven't they; als echte Frage steigt die Stimme am Ende.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  }
+ ]
+}
