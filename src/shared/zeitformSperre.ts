@@ -137,7 +137,10 @@ export const SPERRBARE_ZEITFORMEN: SperrbareZeitform[] = [
     name: 'Passiv (be + Partizip)',
     themen: ['en.verb.passive_basic', 'en.verb.passive_ext', 'en.verb.passive_personal', 'en.verb.passive_prep', 'en.verb.passive_reporting'],
     titel: /passiv|passive/i,
-    erkenne: (t) => {
+    erkenne: (roh) => {
+      // be allowed to / be supposed to / be used to sind Ersatz- bzw. feste Formen, kein Passiv (14.11.2026: alle Aufgaben zu
+      // „be allowed to" in Green Line 3 fielen als „Passiv noch nicht bekannt" weg)
+      const t = roh.replace(/\b(?:allowed|supposed|used)\s+to\b/g, 'x to')
       const be = "(?:am|is|are|was|were|be|been|being|'m|'re|isn't|aren't|wasn't|weren't)"
       const pp = PP_UNREG.filter((w) => !['done', 'gone', 'been', 'had', 'come', 'run'].includes(w))
       return new RegExp(`\\b${be}\\s+(?:not\\s+)?(?:${W(pp)})\\b`).test(t) || hatEd(t, new RegExp(`\\b${be}\\s+(?:not\\s+)?([a-z]+)\\b`, 'g'))

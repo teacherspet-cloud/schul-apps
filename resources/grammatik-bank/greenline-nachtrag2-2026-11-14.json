@@ -1,0 +1,3333 @@
+{
+ "hinweis": "Nachtrag 2 (14.11.2026) zu Green Line 3/4/Transition: be allowed to und Ersatzformen der Modalverben (bisher von der Zeitform-Sperre fälschlich als Passiv gestrichen), indirekte Fragen, Passiv mit Präposition u. a. – App-Weg im Handbetrieb",
+ "regeln": {
+  "mix:en.cond.type1+en.cond.type2": {
+   "titel": "If-Sätze Typ 1 und Typ 2",
+   "erklaerung": "Typ 1 beschreibt etwas, das gut passieren kann: if + simple present, im Hauptsatz will (oder can, must, Imperativ). Typ 2 beschreibt etwas Unwahrscheinliches oder nur Gedachtes: if + simple past, im Hauptsatz would (oder could, might). Für Ratschläge sagt man „If I were you, I would …“.",
+   "beispiele": [
+    "If it rains on Saturday, we will stay at home.",
+    "If I had more money, I would buy a new bike."
+   ]
+  },
+  "mix:en.verb.ger_vs_inf/nur-infinitiv+en.verb.infinitive/first-to+en.verb.infinitive/fragewort+en.verb.infinitive/ohne-to+en.verb.infinitive/verb-objekt-inf+en.verb.make_let/let+en.verb.make_let/make": {
+   "titel": "Infinitiv mit und ohne to",
+   "erklaerung": "Nach make und let + Objekt steht die Grundform ohne to (make me wait, let us go). Nach want, ask oder tell + Objekt steht der to-Infinitiv (want you to help). Nach the first, the last oder the only steht ebenfalls der to-Infinitiv.",
+   "beispiele": [
+    "My parents let me go to the concert.",
+    "Our coach asked us to arrive early.",
+    "Ben was the last to leave the party."
+   ]
+  },
+  "en.syn.indirect_questions/einleitungen": {
+   "titel": "Indirekte Fragen nach I don't know / I wonder / I'd like to know",
+   "erklaerung": "Nach Einleitungen wie I don't know, I wonder oder I'd like to know folgt eine indirekte Frage. Sie hat die Wortstellung eines Aussagesatzes: erst das Subjekt, dann das Verb – ohne do, does oder did. Bei Ja/Nein-Fragen leitet man mit if oder whether ein. Am Ende steht ein Punkt, kein Fragezeichen.",
+   "beispiele": [
+    "I wonder where the meeting is.",
+    "I don't know whether the course starts in May."
+   ]
+  },
+  "en.clause.adverbial_ext/ort": {
+   "titel": "Adverbialsätze des Ortes: where / wherever",
+   "erklaerung": "Ein Adverbialsatz mit where gibt einen bestimmten Ort an (dort, wo …). Mit wherever ist jeder beliebige Ort gemeint (überall, wo …; egal, wohin …). Danach folgt ein ganz normaler Aussagesatz mit Subjekt und Verb.",
+   "beispiele": [
+    "Leave your bike where the others are.",
+    "Wherever we travel, we try to speak the local language."
+   ]
+  },
+  "en.syn.linking/zusammenfassung": {
+   "titel": "Zusammenfassen: all in all, in conclusion, to sum up",
+   "erklaerung": "Mit all in all, in conclusion und to sum up leitet man am Ende eines Textes die Zusammenfassung oder das Fazit ein. Sie stehen meist am Satzanfang und werden mit einem Komma abgetrennt. In formellen Texten (Kommentar, Erörterung) passen in conclusion und to sum up besonders gut.",
+   "beispiele": [
+    "In conclusion, school uniforms have more advantages than disadvantages.",
+    "All in all, it was a very successful project."
+   ]
+  },
+  "en.verb.passive_prep/phrasal-verb": {
+   "titel": "Passiv mit phrasal verbs",
+   "erklaerung": "Auch phrasal verbs wie call off, turn down oder fill in kann man ins Passiv setzen. Die Partikel (off, down, in …) bleibt dabei direkt hinter dem Partizip stehen. Die Zeitform zeigt sich wie immer an be: is called off, was called off, has been called off, must be called off.",
+   "beispiele": [
+    "The football match was called off because of the snow.",
+    "All the old furniture has been thrown away."
+   ]
+  },
+  "en.verb.passive_prep/mehrteilig": {
+   "titel": "Mehrteilige Verben im Passiv",
+   "erklaerung": "Mehrteilige Verben wie take care of, make fun of, put up with oder look down on bleiben im Passiv vollständig zusammen. Nach dem Partizip folgen also alle übrigen Teile – auch die Präposition am Ende. Die Zeitform zeigt sich wie immer an be (is, was, will be, must be …).",
+   "beispiele": [
+    "The horses are taken care of by the farmer's daughter.",
+    "His strange hat was made fun of by everyone."
+   ]
+  },
+  "en.verb.past_progressive/erzaehlhintergrund": {
+   "titel": "Past progressive als Hintergrund",
+   "erklaerung": "In Geschichten beschreibt das past progressive (was/were + -ing), was gerade im Gange war – den Hintergrund. Die neue Handlung, die dann passiert, steht im simple past. Oft unterbricht sie den Hintergrund: „We were eating when the phone rang.“",
+   "beispiele": [
+    "It was raining, and people were waiting for the bus.",
+    "Tom was reading in the garden when his friend arrived."
+   ]
+  },
+  "en.verb.modals_subst/be-allowed-to": {
+   "titel": "be allowed to – etwas tun dürfen",
+   "erklaerung": "„can“ (dürfen) gibt es nur in der Gegenwart. In anderen Zeiten nimmst du be allowed to: was/were allowed to (Vergangenheit), will be allowed to (Zukunft), have/has been allowed to (present perfect). Nach „to“ steht immer die Grundform des Verbs.",
+   "beispiele": [
+    "When I was eight, I wasn't allowed to watch films at night.",
+    "Soon you will be allowed to drive a car."
+   ]
+  },
+  "en.verb.modals_subst/must-have-to": {
+   "titel": "must und have to – müssen",
+   "erklaerung": "must und have to bedeuten beide „müssen“. Mit must sagst du oft, was du selbst wichtig findest; have to steht oft für Regeln von außen. must gibt es nur in der Gegenwart – in anderen Zeiten nimmst du had to (Vergangenheit) oder will have to (Zukunft).",
+   "beispiele": [
+    "I must ring my best friend tonight.",
+    "At our school we have to be in class at eight."
+   ]
+  },
+  "mix:en.verb.modals_subst": {
+   "titel": "Ersatzformen der Modalverben",
+   "erklaerung": "Modalverben wie can, must und needn't haben nur eine Form. Für andere Zeiten nimmst du Ersatzformen: be able to (können), be allowed to (dürfen), have to (müssen) und need to (brauchen). Achte auf den Unterschied: mustn't = nicht dürfen, don't have to / don't need to = nicht müssen.",
+   "beispiele": [
+    "Last year I wasn't able to swim.",
+    "Next week we will have to get up early."
+   ]
+  },
+  "en.verb.modals_subst/zeiten": {
+   "titel": "Ersatzformen in anderen Zeiten",
+   "erklaerung": "must, can und needn't haben keine Formen für Vergangenheit, Zukunft oder present perfect. Dann nimmst du die Ersatzform und setzt nur ihr erstes Wort in die passende Zeit: had to / will have to / has had to (müssen), was able to / will be able to / have been able to (können), was allowed to / will be allowed to (dürfen), didn't need to / won't need to (nicht müssen). Das Zeitsignal im Satz zeigt dir die Zeit.",
+   "beispiele": [
+    "Last week Ella had to stay at home.",
+    "Next year we will have to wear a uniform.",
+    "Since Monday Tom has had to walk to school."
+   ]
+  },
+  "en.verb.modals_subst/need-to": {
+   "titel": "need to / don't need to",
+   "erklaerung": "Mit need to sagst du, dass etwas nötig ist – wie have to. Don't need to, don't have to und needn't bedeuten alle „nicht müssen, nicht nötig“. Mustn't heißt dagegen „nicht dürfen“ (Verbot). In der Vergangenheit sagst du needed to / didn't need to, in der Zukunft will need to / won't need to.",
+   "beispiele": [
+    "You need to take a coat – it's cold outside.",
+    "We don't need to bring food – lunch is free.",
+    "Last week I didn't need to take the bus."
+   ]
+  }
+ },
+ "neu": [
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Verbform.",
+    "satz": "If it ___ on Saturday, we will go to the exhibition in town.",
+    "loesungen": [
+     "rains"
+    ],
+    "optionen": [
+     "rains",
+     "will rain",
+     "rained",
+     "would rain"
+    ],
+    "erklaerung": "Typ 1: Im if-Satz steht das simple present, nie will.",
+    "uebung": "erkennen",
+    "kontext": "The weather report isn't sure about the weather at the weekend.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem if-Satz den passenden Hauptsatz zu.",
+    "satz": "",
+    "loesungen": [
+     "If I were you, I would take a helmet. | If it rains tomorrow, we'll stay inside. | If you put ice in the sun, it turns into water."
+    ],
+    "erklaerung": "were → would (Typ 2); rains + tomorrow → will (Typ 1); immer so: present – present (Typ 0).",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "If I were you,",
+      "rechts": "I would take a helmet."
+     },
+     {
+      "links": "If it rains tomorrow,",
+      "rechts": "we'll stay inside."
+     },
+     {
+      "links": "If you put ice in the sun,",
+      "rechts": "it turns into water."
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch?",
+    "satz": "If I had more time, I would visit the waterfront every weekend.",
+    "loesungen": [
+     "If I had more time, I would visit the waterfront every weekend."
+    ],
+    "erklaerung": "Richtig: Typ 2 mit if + simple past (had) und would im Hauptsatz.",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Sortiere: Kann das gut passieren (Typ 1) oder ist es nur gedacht (Typ 2)?",
+    "satz": "",
+    "loesungen": [
+     "Typ 1: gut möglich: If the sun comes out, we'll go to the beach., If you help me, I'll make dinner., Unless it rains, we'll walk to the waterfront. | Typ 2: unwahrscheinlich oder gedacht: If I lived on a farm, I'd keep sheep., If we had a boat, we could go to Ireland., If I were a dragon, I'd fly over the mountains."
+    ],
+    "erklaerung": "Typ 1: if + present, will; Typ 2: if + simple past, would/could.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "Typ 1: gut möglich",
+     "Typ 2: unwahrscheinlich oder gedacht"
+    ],
+    "elemente": [
+     {
+      "text": "If the sun comes out, we'll go to the beach.",
+      "gruppe": 0
+     },
+     {
+      "text": "If you help me, I'll make dinner.",
+      "gruppe": 0
+     },
+     {
+      "text": "Unless it rains, we'll walk to the waterfront.",
+      "gruppe": 0
+     },
+     {
+      "text": "If I lived on a farm, I'd keep sheep.",
+      "gruppe": 1
+     },
+     {
+      "text": "If we had a boat, we could go to Ireland.",
+      "gruppe": 1
+     },
+     {
+      "text": "If I were a dragon, I'd fly over the mountains.",
+      "gruppe": 1
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze die richtige Form des Verbs ein (Typ 1).",
+    "satz": "If Tom ___ the leek soup, he will love it.",
+    "vorgabe": "(try)",
+    "loesungen": [
+     "tries"
+    ],
+    "erklaerung": "Typ 1: if + simple present; he → tries.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Mach aus dem Typ-1-Satz einen Typ-2-Satz (es ist eher unwahrscheinlich).",
+    "satz": "If I have enough money, I will buy a new bike.",
+    "vorgabe": "Typ 2: if + simple past, would",
+    "loesungen": [
+     "If I had enough money, I would buy a new bike.",
+     "If I had enough money, I'd buy a new bike."
+    ],
+    "erklaerung": "Typ 2: have → had, will → would.",
+    "uebung": "bilden",
+    "anfang": "If I",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde einen Bedingungssatz (Typ 1). Beginne mit „If“.",
+    "satz": "",
+    "loesungen": [
+     "If it rains, we will visit the new exhibition."
+    ],
+    "teile": [
+     "If",
+     "it rains,",
+     "we",
+     "will",
+     "visit",
+     "the new exhibition."
+    ],
+    "erklaerung": "Typ 1: if + simple present, Komma, dann will + Infinitiv.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die Frage zur Antwort (Typ 2).",
+    "satz": "If I won a lot of money, I would buy a farm in Wales.",
+    "vorgabe": "(What / do / if / win a lot of money)",
+    "loesungen": [
+     "What would you do if you won a lot of money?"
+    ],
+    "erklaerung": "Typ-2-Frage: What would you do + if + simple past (won).",
+    "uebung": "bilden",
+    "anfang": "What",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze den Dialog mit der richtigen Form der Verben in Klammern.",
+    "satz": "A: Are you coming to the exhibition about coal mines tomorrow?\nB: I don't know yet. If my mum ___ yes, I'll come.\nA: Great! If you come, we ___ to the shopping arcade after the exhibition.\nB: OK. But I don't have much money. If I ___ more money, I'd buy a new helmet for my bike.\nA: If I ___ you, I'd ask for one for your birthday!",
+    "loesungen": [
+     "says | will go | had | were"
+    ],
+    "erklaerung": "Typ 1 (says, will go) bei echten Plänen; Typ 2 (had, were) bei Gedachtem und beim Ratschlag.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(say)",
+      "loesungen": [
+       "says"
+      ]
+     },
+     {
+      "vorgabe": "(go)",
+      "loesungen": [
+       "will go",
+       "'ll go"
+      ]
+     },
+     {
+      "vorgabe": "(have)",
+      "loesungen": [
+       "had"
+      ]
+     },
+     {
+      "vorgabe": "(be)",
+      "loesungen": [
+       "were"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze die richtige Form des Verbs ein.",
+    "satz": "Unless Tom ___ up early, he will miss it.",
+    "vorgabe": "(get)",
+    "loesungen": [
+     "gets"
+    ],
+    "erklaerung": "unless (= if not) wie if im Typ 1: simple present → gets.",
+    "uebung": "anwenden",
+    "kontext": "The bus to the exhibition leaves at seven o'clock in the morning.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.cond.type1+en.cond.type2",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde die Sätze mit „if“ zu einem Bedingungssatz Typ 1.",
+    "satz": "Maybe it will rain tomorrow. Then we won't go to the beach.",
+    "vorgabe": "(if)",
+    "loesungen": [
+     "If it rains tomorrow, we won't go to the beach.",
+     "If it rains tomorrow, we will not go to the beach.",
+     "We won't go to the beach if it rains tomorrow.",
+     "We will not go to the beach if it rains tomorrow."
+    ],
+    "erklaerung": "Typ 1: Im if-Satz steht rains (nicht will rain), im Hauptsatz won't.",
+    "uebung": "anwenden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.ger_vs_inf/nur-infinitiv+en.verb.infinitive/first-to+en.verb.infinitive/fragewort+en.verb.infinitive/ohne-to+en.verb.infinitive/verb-objekt-inf+en.verb.make_let/let+en.verb.make_let/make",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Finde das falsche Wort und berichtige es.",
+    "satz": "Dad made me cleaned the garage on Saturday.",
+    "loesungen": [
+     "clean"
+    ],
+    "fehlerWort": "cleaned",
+    "erklaerung": "make + Objekt + Grundform ohne to: made me clean.",
+    "uebung": "fehler",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.indirect_questions/einleitungen",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Mach aus der direkten Frage eine indirekte Frage. Beginne mit dem vorgegebenen Satzanfang.",
+    "satz": "Why did Sam choose sociology as his main subject?",
+    "loesungen": [
+     "I wonder why Sam chose sociology as his main subject."
+    ],
+    "erklaerung": "did fällt weg, die Vergangenheit steckt im Verb: why Sam chose.",
+    "uebung": "anwenden",
+    "kontext": "Sam has always loved science. Now he is studying sociology, and you are surprised.",
+    "anfang": "I wonder",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.syn.indirect_questions/einleitungen",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde aus den Teilen eine indirekte Frage.",
+    "satz": "",
+    "loesungen": [
+     "I wonder what kind of guidance the new students need in their first week."
+    ],
+    "teile": [
+     "I wonder",
+     "what kind of",
+     "guidance",
+     "the new students",
+     "need",
+     "in their first week."
+    ],
+    "erklaerung": "Indirekte Frage: Fragewort, dann Subjekt (the new students) vor dem Verb (need) – kein do.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.syn.indirect_questions/einleitungen",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Mach aus der direkten Frage eine indirekte Frage. Beginne mit dem vorgegebenen Satzanfang.",
+    "satz": "What do young people really get out of giving back to the community?",
+    "loesungen": [
+     "I'd like to know what young people really get out of giving back to the community."
+    ],
+    "erklaerung": "do fällt weg; nach dem Fragewort folgen Subjekt (young people) und Verb (get).",
+    "uebung": "bilden",
+    "kontext": "During a discussion about volunteering, a student wants to ask the speaker this question, but more politely.",
+    "anfang": "I'd like to know",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.clause.adverbial_ext/ort",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde aus den Teilen einen Satz mit einem Adverbialsatz des Ortes.",
+    "satz": "",
+    "loesungen": [
+     "Please put the boxes where everyone can see them."
+    ],
+    "teile": [
+     "Please put",
+     "the boxes",
+     "where",
+     "everyone",
+     "can see",
+     "them."
+    ],
+    "erklaerung": "where + Subjekt + Verb nennt den bestimmten Ort: dort, wo alle sie sehen können.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/phrasal-verb",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das phrasal verb ins Passiv (simple past).",
+    "satz": "Only two days before the start, the volunteers' trip to Ghana ___ because of the bad weather.",
+    "vorgabe": "(call off)",
+    "loesungen": [
+     "was called off"
+    ],
+    "erklaerung": "Passiv simple past: was + Partizip, die Partikel off bleibt dahinter: was called off.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die passende Präposition.",
+    "satz": "When we are on holiday, our old dog is taken care ___ by our neighbours.",
+    "loesungen": [
+     "of"
+    ],
+    "optionen": [
+     "of",
+     "for",
+     "about",
+     "after"
+    ],
+    "erklaerung": "take care of bleibt im Passiv vollständig: is taken care of.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch?",
+    "satz": "Young volunteers are sometimes taken advantage of by large organisations.",
+    "loesungen": [
+     "Young volunteers are sometimes taken advantage of by large organisations."
+    ],
+    "erklaerung": "Richtig: take advantage of bleibt im Passiv vollständig (are taken advantage of).",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Satzanfang das passende Satzende zu.",
+    "satz": "",
+    "loesungen": [
+     "As a child, Ben was often made fun of because of his red hair. | In the past, nurses were often looked down on by doctors. | Bad behaviour in class will not be put up with any longer."
+    ],
+    "erklaerung": "make fun of, look down on, put up with – die Präposition gehört fest zum Verb und bleibt im Passiv stehen.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "As a child, Ben was often made fun",
+      "rechts": "of because of his red hair."
+     },
+     {
+      "links": "In the past, nurses were often looked down",
+      "rechts": "on by doctors."
+     },
+     {
+      "links": "Bad behaviour in class will not be put up",
+      "rechts": "with any longer."
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle Sätze, in denen das Passiv vollständig und richtig ist.",
+    "satz": "",
+    "loesungen": [
+     "The plants in the school garden are taken care of by Year 9.",
+     "Lucy was made fun of in her first week at the new school.",
+     "Noise after ten o'clock will not be put up with."
+    ],
+    "erklaerung": "Bei done away und looked down fehlt die Präposition (with, on) – sie muss im Passiv mitgenommen werden.",
+    "uebung": "erkennen",
+    "optionen": [
+     "The plants in the school garden are taken care of by Year 9.",
+     "Lucy was made fun of in her first week at the new school.",
+     "The old school rules were done away last year.",
+     "Noise after ten o'clock will not be put up with.",
+     "Older people should never be looked down."
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb ins Passiv (will-future).",
+    "satz": "Don't worry about your cat. While you are away, it ___ by my sister.",
+    "vorgabe": "(take care of)",
+    "loesungen": [
+     "will be taken care of"
+    ],
+    "erklaerung": "will-future Passiv: will be + Partizip, care of bleibt dahinter.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb ins Passiv (simple past).",
+    "satz": "At his old school in London, Max ___ because of his accent.",
+    "vorgabe": "(make fun of)",
+    "loesungen": [
+     "was made fun of"
+    ],
+    "erklaerung": "simple past Passiv: was + made, dann fun of.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Setze den Satz ins Passiv. Lass den Handelnden weg.",
+    "satz": "People often take advantage of young volunteers on farms.",
+    "vorgabe": "Passiv, simple present",
+    "loesungen": [
+     "Young volunteers on farms are often taken advantage of."
+    ],
+    "erklaerung": "are + taken advantage of; die Präposition of steht am Ende.",
+    "uebung": "bilden",
+    "anfang": "Young volunteers on farms",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde aus den Teilen einen Passivsatz.",
+    "satz": "",
+    "loesungen": [
+     "The elderly man is taken care of by a young volunteer."
+    ],
+    "teile": [
+     "The elderly man",
+     "is",
+     "taken",
+     "care",
+     "of",
+     "by a young volunteer."
+    ],
+    "erklaerung": "is + taken + care of – alle Teile des Verbs bleiben zusammen.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Setze den Satz ins Passiv. Behalte den Handelnden bei.",
+    "satz": "Some people look down on workers without a university degree.",
+    "vorgabe": "Passiv mit by",
+    "loesungen": [
+     "Workers without a university degree are looked down on by some people."
+    ],
+    "erklaerung": "are looked down on – on bleibt stehen, danach folgt by + Handelnde.",
+    "uebung": "anwenden",
+    "anfang": "Workers without a university degree",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze die Verben in Klammern im Passiv ein. Achte auf die Zeitform.",
+    "satz": "Last year, Lena spent her gap year as a volunteer in a children's home in Ghana. At that time, forty children ___ by just four adults there, so every volunteer was very welcome. On her first day, Lena's first words in the local language ___ by the kids, but she just laughed with them. Sadly, children without parents ___ by many people in the area even today.",
+    "loesungen": [
+     "were taken care of | were made fun of | are looked down on"
+    ],
+    "erklaerung": "Vergangenheit (at that time, on her first day) → were …; Gegenwart (even today) → are …; die Präposition bleibt immer am Ende.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(take care of)",
+      "loesungen": [
+       "were taken care of",
+       "were being taken care of"
+      ]
+     },
+     {
+      "vorgabe": "(make fun of)",
+      "loesungen": [
+       "were made fun of"
+      ]
+     },
+     {
+      "vorgabe": "(look down on)",
+      "loesungen": [
+       "are looked down on",
+       "are still looked down on"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.passive_prep/mehrteilig",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze das Verb ins Passiv.",
+    "satz": "From next month, noisy parties in the park at night will no longer ___.",
+    "vorgabe": "(put up with)",
+    "loesungen": [
+     "be put up with"
+    ],
+    "erklaerung": "Nach will: be + Partizip; put up with bleibt vollständig.",
+    "uebung": "anwenden",
+    "kontext": "Many people who live near the park have complained to the town council. Now the council has made a decision.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/erzaehlhintergrund",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Form.",
+    "satz": "We ___ on a rocky trail along the coast when it suddenly started to rain.",
+    "loesungen": [
+     "were walking"
+    ],
+    "optionen": [
+     "were walking",
+     "was walking",
+     "are walking",
+     "walk"
+    ],
+    "erklaerung": "Hintergrund, der vom Regen unterbrochen wird → past progressive; bei we heißt es were.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.past_progressive/erzaehlhintergrund",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Sortiere die Teile der Geschichte: Was war gerade im Gange, was passierte dann?",
+    "satz": "",
+    "loesungen": [
+     "Hintergrund (war gerade im Gange): the wind was getting stronger, two boys were fishing from a rock, their dog was sitting next to them | neue Handlung (passierte dann): a big wave hit the rock, one of the boys fell into the sea, his friend pulled him out"
+    ],
+    "erklaerung": "was/were + -ing → Hintergrund; simple past (hit, fell, pulled) → die Ereignisse, die passieren.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "Hintergrund (war gerade im Gange)",
+     "neue Handlung (passierte dann)"
+    ],
+    "elemente": [
+     {
+      "text": "the wind was getting stronger",
+      "gruppe": 0
+     },
+     {
+      "text": "two boys were fishing from a rock",
+      "gruppe": 0
+     },
+     {
+      "text": "their dog was sitting next to them",
+      "gruppe": 0
+     },
+     {
+      "text": "a big wave hit the rock",
+      "gruppe": 1
+     },
+     {
+      "text": "one of the boys fell into the sea",
+      "gruppe": 1
+     },
+     {
+      "text": "his friend pulled him out",
+      "gruppe": 1
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Achte auf die Zeitangabe und wähle die passende Form.",
+    "satz": "Last year Ben ___ go into town on his own.",
+    "loesungen": [
+     "was allowed to"
+    ],
+    "optionen": [
+     "was allowed to",
+     "is allowed to",
+     "will be allowed to"
+    ],
+    "erklaerung": "Signal: last year → Vergangenheit: was allowed to.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch?",
+    "satz": "Yesterday we weren't allowed to use our phones during the session.",
+    "loesungen": [
+     "Yesterday we weren't allowed to use our phones during the session."
+    ],
+    "erklaerung": "Richtig: yesterday → weren't allowed to (Vergangenheit, Plural).",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Satzanfang die passende Fortsetzung zu. Achte auf die Zeit.",
+    "satz": "",
+    "loesungen": [
+     "Last Friday during the test, we weren't allowed to talk. | At our school we usually are allowed to bring our phones. | Next year at the academy, we will be allowed to choose our clubs. | Since last September, we have been allowed to use the computer room."
+    ],
+    "erklaerung": "last Friday → were; usually → are; next year → will be; since → have been.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "Last Friday during the test, we",
+      "rechts": "weren't allowed to talk."
+     },
+     {
+      "links": "At our school we usually",
+      "rechts": "are allowed to bring our phones."
+     },
+     {
+      "links": "Next year at the academy, we",
+      "rechts": "will be allowed to choose our clubs."
+     },
+     {
+      "links": "Since last September, we",
+      "rechts": "have been allowed to use the computer room."
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Sortiere die Sätze nach der Zeit.",
+    "satz": "",
+    "loesungen": [
+     "Vergangenheit: We weren't allowed to leave., Were you allowed to go? | Gegenwart: She is allowed to stay., Am I allowed to sit here? | Zukunft: They'll be allowed to come., Will he be allowed to join?"
+    ],
+    "erklaerung": "was/were → Vergangenheit; am/is/are → Gegenwart; will be → Zukunft.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "Vergangenheit",
+     "Gegenwart",
+     "Zukunft"
+    ],
+    "elemente": [
+     {
+      "text": "We weren't allowed to leave.",
+      "gruppe": 0
+     },
+     {
+      "text": "Were you allowed to go?",
+      "gruppe": 0
+     },
+     {
+      "text": "She is allowed to stay.",
+      "gruppe": 1
+     },
+     {
+      "text": "Am I allowed to sit here?",
+      "gruppe": 1
+     },
+     {
+      "text": "They'll be allowed to come.",
+      "gruppe": 2
+     },
+     {
+      "text": "Will he be allowed to join?",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze be allowed to in der richtigen Zeit ein.",
+    "satz": "Last weekend Emma ___ to the concert with her friends.",
+    "vorgabe": "(be allowed to / go)",
+    "loesungen": [
+     "was allowed to go"
+    ],
+    "erklaerung": "Signal: last weekend → was allowed to go.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die passende Frage zu dieser Antwort.",
+    "satz": "Yes, he was. Leon was allowed to attend the summer camp last year.",
+    "vorgabe": "(Was …?)",
+    "loesungen": [
+     "Was Leon allowed to attend the summer camp last year?",
+     "Was he allowed to attend the summer camp last year?"
+    ],
+    "erklaerung": "Frage in der Vergangenheit: Was + Person + allowed to …?",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze be allowed to in der richtigen Zeit ein.",
+    "satz": "Last summer he ___ out on his bike alone for the first time.",
+    "vorgabe": "(be allowed to / go)",
+    "loesungen": [
+     "was allowed to go"
+    ],
+    "erklaerung": "Signal: last summer → was allowed to go.",
+    "uebung": "anwenden",
+    "kontext": "Two years ago, Jack's family moved from the city to a small village.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz in der Zukunft. Beginne mit „Next year“.",
+    "satz": "We are allowed to use the big sports hall.",
+    "vorgabe": "will-future",
+    "loesungen": [
+     "Next year we will be allowed to use the big sports hall.",
+     "Next year we'll be allowed to use the big sports hall."
+    ],
+    "erklaerung": "Zukunft: are allowed to → will be allowed to.",
+    "uebung": "anwenden",
+    "anfang": "Next year",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze den Dialog mit be allowed to in der richtigen Zeit.",
+    "satz": "A: Were you at Sam's party last Saturday?\nB: No, I ___. I had to look after my little brother.\nA: Oh, that's sad. Can you come to the concert in the park tonight?\nB: Yes! Since my birthday I ___ out until ten, so I can come.\nA: Great. But don't forget your phone. At my house we ___ our phones after nine – it's a family rule.",
+    "loesungen": [
+     "wasn't allowed to go | have been allowed to stay | aren't allowed to use"
+    ],
+    "erklaerung": "last Saturday → wasn't; since → have been; Familienregel heute → aren't.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(not be allowed to / go)",
+      "loesungen": [
+       "wasn't allowed to go",
+       "was not allowed to go"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / stay)",
+      "loesungen": [
+       "have been allowed to stay",
+       "'ve been allowed to stay"
+      ]
+     },
+     {
+      "vorgabe": "(not be allowed to / use)",
+      "loesungen": [
+       "aren't allowed to use",
+       "are not allowed to use"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "He ___ play outside after dark.",
+    "loesungen": [
+     "wasn't allowed to"
+    ],
+    "optionen": [
+     "wasn't allowed to",
+     "can't",
+     "won't be allowed to"
+    ],
+    "erklaerung": "Die Situation liegt in der Vergangenheit; can't ist nur Gegenwart → wasn't allowed to.",
+    "uebung": "unterscheiden",
+    "kontext": "When Ravi was little, his family lived on a council estate. His mum was very strict.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Achte auf das Signalwort und wähle die richtige Form.",
+    "satz": "Since Mr Patel became our coach, we ___ listen to music in the changing rooms.",
+    "loesungen": [
+     "have been allowed to"
+    ],
+    "optionen": [
+     "have been allowed to",
+     "were allowed to",
+     "will be allowed to",
+     "are allowed to"
+    ],
+    "erklaerung": "Signal: since → present perfect: have been allowed to.",
+    "uebung": "erkennen",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Next year we will are allowed to attend the evening sessions.",
+    "loesungen": [
+     "be"
+    ],
+    "erklaerung": "Nach will steht die Grundform: will be allowed to.",
+    "uebung": "erkennen",
+    "korrekt": false,
+    "fehlerWort": "are",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jeder Frage die passende Kurzantwort zu.",
+    "satz": "",
+    "loesungen": [
+     "Were you allowed to go to Ali's party yesterday? No, I wasn't. | Will you be allowed to go to the concert next week? Yes, I will. | Are you allowed to go out on school nights? No, I'm not. | Have you been allowed to stay out late since your birthday? Yes, I have."
+    ],
+    "erklaerung": "Die Kurzantwort nimmt die Form von be bzw. will/have aus der Frage auf.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "Were you allowed to go to Ali's party yesterday?",
+      "rechts": "No, I wasn't."
+     },
+     {
+      "links": "Will you be allowed to go to the concert next week?",
+      "rechts": "Yes, I will."
+     },
+     {
+      "links": "Are you allowed to go out on school nights?",
+      "rechts": "No, I'm not."
+     },
+     {
+      "links": "Have you been allowed to stay out late since your birthday?",
+      "rechts": "Yes, I have."
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze be allowed to in der richtigen Zeit ein.",
+    "satz": "Since last summer my big brother ___ the family car on his own.",
+    "vorgabe": "(be allowed to / drive)",
+    "loesungen": [
+     "has been allowed to drive",
+     "'s been allowed to drive"
+    ],
+    "erklaerung": "Signal: since → has been allowed to drive.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde aus den Teilen eine Frage.",
+    "satz": "",
+    "loesungen": [
+     "Will you be allowed to use your phones during the trip?"
+    ],
+    "teile": [
+     "Will",
+     "you",
+     "be allowed",
+     "to use",
+     "your phones",
+     "during the trip?"
+    ],
+    "erklaerung": "Frage in der Zukunft: Will + Person + be allowed to …?",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Mach aus dem Aussagesatz eine Frage.",
+    "satz": "The new students have been allowed to use the library since Monday.",
+    "vorgabe": "Frage",
+    "loesungen": [
+     "Have the new students been allowed to use the library since Monday?"
+    ],
+    "erklaerung": "Im present perfect rückt have nach vorn: Have … been allowed to …?",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze be allowed to in der richtigen Zeit ein.",
+    "satz": "Since then, she ___ in the school choir.",
+    "vorgabe": "(be allowed to / sing)",
+    "loesungen": [
+     "has been allowed to sing",
+     "'s been allowed to sing"
+    ],
+    "erklaerung": "Signal: since then → has been allowed to sing.",
+    "uebung": "anwenden",
+    "kontext": "Priya won a scholarship last spring. Now she goes to a big academy in the city.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz mit be allowed to in der Zukunft. Beginne mit „At the camp next week“.",
+    "satz": "We can't swim in the lake.",
+    "vorgabe": "will-future mit be allowed to",
+    "loesungen": [
+     "At the camp next week we won't be allowed to swim in the lake.",
+     "At the camp next week we will not be allowed to swim in the lake."
+    ],
+    "erklaerung": "can't hat keine Zukunft → won't be allowed to.",
+    "uebung": "anwenden",
+    "anfang": "At the camp next week",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze den Text mit be allowed to in der richtigen Zeit.",
+    "satz": "Last September I started at a new academy. In my first week, I ___ the building at lunch because I was new. But after a month, I ___ into town with my friends. Since Christmas, I ___ the music room after school. And next year, when I'm in Year 9, I ___ the school choir on its trip to Paris.",
+    "loesungen": [
+     "wasn't allowed to leave | was allowed to go | have been allowed to use | will be allowed to join"
+    ],
+    "erklaerung": "in my first week / after a month → was; since → have been; next year → will be.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(not be allowed to / leave)",
+      "loesungen": [
+       "wasn't allowed to leave",
+       "was not allowed to leave"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / go)",
+      "loesungen": [
+       "was allowed to go"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / use)",
+      "loesungen": [
+       "have been allowed to use",
+       "'ve been allowed to use"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / join)",
+      "loesungen": [
+       "will be allowed to join",
+       "'ll be allowed to join"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "She ___ wear her favourite jeans to school.",
+    "loesungen": [
+     "was allowed to"
+    ],
+    "optionen": [
+     "was allowed to",
+     "had to",
+     "will be allowed to"
+    ],
+    "erklaerung": "Ohne Uniform durfte sie Jeans tragen (Erlaubnis, Vergangenheit) → was allowed to.",
+    "uebung": "unterscheiden",
+    "kontext": "At Ruby's old school there was no uniform.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die Form, die in den Satz passt.",
+    "satz": "My cousin, who has always lived in a rural village, ___ go to the city on her own since she was fourteen.",
+    "loesungen": [
+     "has been allowed to"
+    ],
+    "optionen": [
+     "has been allowed to",
+     "was allowed to",
+     "is allowed to",
+     "will be allowed to"
+    ],
+    "erklaerung": "since she was fourteen → present perfect: has been allowed to.",
+    "uebung": "erkennen",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "If his school report is good this year, he ___ go on the trip to Ireland next summer.",
+    "loesungen": [
+     "will be allowed to"
+    ],
+    "optionen": [
+     "will be allowed to",
+     "would be allowed to",
+     "was allowed to",
+     "has been allowed to"
+    ],
+    "erklaerung": "if-Satz Typ 1 (is) → Hauptsatz mit will be allowed to.",
+    "uebung": "erkennen",
+    "kontext": "Dev's parents are very strict, but they have made him an offer.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Were you allowed to went out with your friends when you lived on the council estate?",
+    "loesungen": [
+     "go"
+    ],
+    "erklaerung": "Nach allowed to steht die Grundform: go, nicht went.",
+    "uebung": "erkennen",
+    "korrekt": false,
+    "fehlerWort": "went",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Erlaubnis, Verbot oder keine Pflicht? Sortiere die Sätze.",
+    "satz": "",
+    "loesungen": [
+     "Erlaubnis: We were allowed to leave early., You'll be allowed to stay up. | Verbot: We weren't allowed to switch on the lights., You won't be allowed to take photos. | keine Pflicht: We didn't have to wear a uniform., You won't need to bring food., She doesn't have to pay."
+    ],
+    "erklaerung": "be allowed to = Erlaubnis; not be allowed to = Verbot; not have to / not need to = keine Pflicht.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "Erlaubnis",
+     "Verbot",
+     "keine Pflicht"
+    ],
+    "elemente": [
+     {
+      "text": "We were allowed to leave early.",
+      "gruppe": 0
+     },
+     {
+      "text": "You'll be allowed to stay up.",
+      "gruppe": 0
+     },
+     {
+      "text": "We weren't allowed to switch on the lights.",
+      "gruppe": 1
+     },
+     {
+      "text": "You won't be allowed to take photos.",
+      "gruppe": 1
+     },
+     {
+      "text": "We didn't have to wear a uniform.",
+      "gruppe": 2
+     },
+     {
+      "text": "You won't need to bring food.",
+      "gruppe": 2
+     },
+     {
+      "text": "She doesn't have to pay.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze be allowed to in der passenden Zeit ein.",
+    "satz": "Because the weather was so bad, the children ___ outside during the break.",
+    "vorgabe": "(not be allowed to / play)",
+    "loesungen": [
+     "weren't allowed to play",
+     "were not allowed to play"
+    ],
+    "erklaerung": "the weather was → Vergangenheit: weren't allowed to play.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die passende Frage mit be allowed to.",
+    "satz": "No, they weren't. The teachers said no to music on the bus.",
+    "vorgabe": "(the students / play music on the bus)",
+    "loesungen": [
+     "Were the students allowed to play music on the bus?"
+    ],
+    "erklaerung": "Antwort „No, they weren't.“ → Were the students allowed to …?",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Setze den Satz in die Vergangenheit und verneine ihn. Beginne mit „Last year“.",
+    "satz": "Pupils in Year 7 are allowed to use the computer room at lunch.",
+    "vorgabe": "Vergangenheit, verneint",
+    "loesungen": [
+     "Last year pupils in Year 7 weren't allowed to use the computer room at lunch.",
+     "Last year pupils in Year 7 were not allowed to use the computer room at lunch."
+    ],
+    "erklaerung": "Vergangenheit + Verneinung: are allowed to → weren't allowed to.",
+    "uebung": "bilden",
+    "anfang": "Last year",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze den Text mit be allowed to in der richtigen Zeit.",
+    "satz": "When Ravi lived on a rough council estate, he ___ out after dark because there was a lot of crime. Then he won a scholarship to an academy in the countryside. Since then, he ___ the forest with his new friends. Next year, if his school report stays good, he ___ the school's trip to Scotland. “I can't help the fact that I love it here,” he says. At the academy, students ___ their phones in class, but Ravi doesn't mind.",
+    "loesungen": [
+     "wasn't allowed to go | has been allowed to explore | will be allowed to join | aren't allowed to use"
+    ],
+    "erklaerung": "When Ravi lived → wasn't; since then → has been; if + present → will be; Regel heute → aren't.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(not be allowed to / go)",
+      "loesungen": [
+       "wasn't allowed to go",
+       "was not allowed to go"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / explore)",
+      "loesungen": [
+       "has been allowed to explore",
+       "'s been allowed to explore"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / join)",
+      "loesungen": [
+       "will be allowed to join",
+       "'ll be allowed to join"
+      ]
+     },
+     {
+      "vorgabe": "(not be allowed to / use)",
+      "loesungen": [
+       "aren't allowed to use",
+       "are not allowed to use"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze be allowed to in der richtigen Zeit ein.",
+    "satz": "So she ___ to the party, and she had a great time.",
+    "vorgabe": "(be allowed to / go)",
+    "loesungen": [
+     "was allowed to go"
+    ],
+    "erklaerung": "Die Geschichte spielt letzten Freitag → was allowed to go.",
+    "uebung": "anwenden",
+    "kontext": "Last Friday Anna's mum said: “You can go to Ella's party if you finish your project first.” Anna finished it just in time.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "We ___ go to every session, so I often read a book by the lake instead.",
+    "loesungen": [
+     "didn't have to"
+    ],
+    "optionen": [
+     "didn't have to",
+     "weren't allowed to",
+     "mustn't",
+     "haven't been allowed to"
+    ],
+    "erklaerung": "Die Sessions waren keine Pflicht und nicht verboten → didn't have to (nicht müssen).",
+    "uebung": "unterscheiden",
+    "kontext": "At the summer camp there were only two rules: no phones at dinner and no swimming without a teacher.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Im Satz ist ein Wort falsch. Finde es und berichtige es.",
+    "satz": "Since Christmas, my little sister has be allowed to feed the horses on her own.",
+    "loesungen": [
+     "been"
+    ],
+    "fehlerWort": "be",
+    "erklaerung": "since → present perfect: has been allowed to.",
+    "uebung": "fehler",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/must-have-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze must in der richtigen Zeit ein.",
+    "satz": "So Lucy ___ the shopping for the whole family.",
+    "vorgabe": "(must / do)",
+    "loesungen": [
+     "had to do"
+    ],
+    "erklaerung": "must hat keine Vergangenheit → had to do.",
+    "uebung": "anwenden",
+    "kontext": "Last Saturday Lucy's mum was ill.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/must-have-to",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die passende Frage zu der Antwort.",
+    "satz": "Yes, she did. At the summer academy everybody had to get up at six.",
+    "vorgabe": "(Maya / get up at six)",
+    "loesungen": [
+     "Did Maya have to get up at six?",
+     "Did she have to get up at six?"
+    ],
+    "erklaerung": "Frage in der Vergangenheit: Did … have to …? (must hat keine Frageform mit did).",
+    "uebung": "anwenden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Satz mit Modalverb die Ersatzform mit gleicher Bedeutung zu.",
+    "satz": "",
+    "loesungen": [
+     "You must go. You have to go. | You can go – your mum said yes. You are allowed to go. | You needn't go. You don't have to go. | You mustn't go. You aren't allowed to go."
+    ],
+    "erklaerung": "must = have to; can (Erlaubnis) = be allowed to; needn't = don't have to; mustn't = not be allowed to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "You must go.",
+      "rechts": "You have to go."
+     },
+     {
+      "links": "You can go – your mum said yes.",
+      "rechts": "You are allowed to go."
+     },
+     {
+      "links": "You needn't go.",
+      "rechts": "You don't have to go."
+     },
+     {
+      "links": "You mustn't go.",
+      "rechts": "You aren't allowed to go."
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Achte auf die Zeitangabe und wähle die richtige Form.",
+    "satz": "Yesterday the bus didn't come, so we ___ walk to school.",
+    "loesungen": [
+     "had to"
+    ],
+    "optionen": [
+     "had to",
+     "have to",
+     "will have to"
+    ],
+    "erklaerung": "Signal: yesterday → had to.",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze be able to in der richtigen Zeit ein.",
+    "satz": "Last summer my little sister ___ 100 metres for the first time.",
+    "vorgabe": "(be able to / swim)",
+    "loesungen": [
+     "was able to swim"
+    ],
+    "erklaerung": "Signal: last summer → was able to swim.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "You ___ pay, but you can give some money if you want.",
+    "loesungen": [
+     "don't have to"
+    ],
+    "optionen": [
+     "don't have to",
+     "mustn't",
+     "aren't allowed to"
+    ],
+    "erklaerung": "Kostenlos = keine Pflicht → don't have to, kein Verbot.",
+    "uebung": "unterscheiden",
+    "kontext": "The museum is free for students.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "For six weeks she ___ play the piano.",
+    "loesungen": [
+     "wasn't able to"
+    ],
+    "optionen": [
+     "wasn't able to",
+     "didn't have to",
+     "won't be able to"
+    ],
+    "erklaerung": "Mit gebrochenem Arm konnte sie nicht spielen (Fähigkeit, Vergangenheit) → wasn't able to.",
+    "uebung": "erkennen",
+    "kontext": "Last year Ella broke her arm.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze be able to in der richtigen Zeit ein.",
+    "satz": "By the end of the course, you ___ simple songs on the guitar.",
+    "vorgabe": "(be able to / play)",
+    "loesungen": [
+     "will be able to play",
+     "'ll be able to play"
+    ],
+    "erklaerung": "by the end of the course → Zukunft: will be able to play.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze be able to in der richtigen Zeit ein.",
+    "satz": "So we ___ the famous pictures.",
+    "vorgabe": "(not be able to / see)",
+    "loesungen": [
+     "weren't able to see",
+     "were not able to see"
+    ],
+    "erklaerung": "Die Reise war letzten Monat → weren't able to see.",
+    "uebung": "anwenden",
+    "kontext": "Our class went on a trip to London last month. On that day the museum was closed.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde die Sätze mit so. Benutze be able to in der passenden Zeit.",
+    "satz": "Sam broke his leg yesterday. He can't play in the match next Saturday.",
+    "vorgabe": "(so)",
+    "loesungen": [
+     "Sam broke his leg yesterday, so he won't be able to play in the match next Saturday.",
+     "Sam broke his leg yesterday, so he will not be able to play in the match next Saturday."
+    ],
+    "erklaerung": "next Saturday → Zukunft: can't wird zu won't be able to.",
+    "uebung": "anwenden",
+    "anfang": "Sam broke his leg yesterday",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib die neue Regel in der Zukunft (will). Beginne mit „From next week“.",
+    "satz": "Pupils need to wear sports shoes in the hall.",
+    "vorgabe": "will-future",
+    "loesungen": [
+     "From next week pupils will need to wear sports shoes in the hall.",
+     "From next week pupils will have to wear sports shoes in the hall."
+    ],
+    "erklaerung": "Zukunft von need to → will need to.",
+    "uebung": "anwenden",
+    "anfang": "From next week",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Although she had a bad cold, Mia was able to finished the race in second place.",
+    "loesungen": [
+     "finish"
+    ],
+    "erklaerung": "Nach was able to steht die Grundform: finish.",
+    "uebung": "erkennen",
+    "korrekt": false,
+    "fehlerWort": "finished",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze be allowed to in der passenden Form ein.",
+    "satz": "If my parents weren't so strict, I ___ to the concert with my friends next weekend.",
+    "vorgabe": "(be allowed to / go)",
+    "loesungen": [
+     "would be allowed to go",
+     "'d be allowed to go"
+    ],
+    "erklaerung": "if-Satz Typ 2 (weren't) → would be allowed to go.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Ergänze den Text mit den Ersatzformen in der passenden Form.",
+    "satz": "Aoife grew up in Northern Ireland. When she was young, Catholic and Protestant children mostly went to separate schools, and she ___ the boundary into the other part of town. Since the peace, many young people ___ friends in both communities. Today Aoife's daughter goes to a school for children from both communities, so she ___ between them. If there were more schools like this, more children ___ friends from the other community.",
+    "loesungen": [
+     "wasn't allowed to cross | have been able to make | doesn't have to choose | would be able to make"
+    ],
+    "erklaerung": "when she was young → wasn't allowed to; since → have been able to; today → doesn't have to; if + were → would be able to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(not be allowed to / cross)",
+      "loesungen": [
+       "wasn't allowed to cross",
+       "was not allowed to cross"
+      ]
+     },
+     {
+      "vorgabe": "(be able to / make)",
+      "loesungen": [
+       "have been able to make",
+       "'ve been able to make"
+      ]
+     },
+     {
+      "vorgabe": "(not have to / choose)",
+      "loesungen": [
+       "doesn't have to choose",
+       "does not have to choose"
+      ]
+     },
+     {
+      "vorgabe": "(be able to / make)",
+      "loesungen": [
+       "would be able to make",
+       "'d be able to make"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Satzanfang die passende Fortsetzung zu.",
+    "satz": "",
+    "loesungen": [
+     "When I was six, I wasn't allowed to cross the road alone. | Next year Tom and Ella will be allowed to go to the cinema on their own. | Since my last birthday, I have been allowed to stay up until ten. | At our school, everybody is allowed to wear their own clothes on Fridays."
+    ],
+    "erklaerung": "when I was six → wasn't allowed to, next year → will be allowed to, since → have been allowed to, Gegenwart → is allowed to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "When I was six, I",
+      "rechts": "wasn't allowed to cross the road alone."
+     },
+     {
+      "links": "Next year Tom and Ella",
+      "rechts": "will be allowed to go to the cinema on their own."
+     },
+     {
+      "links": "Since my last birthday, I",
+      "rechts": "have been allowed to stay up until ten."
+     },
+     {
+      "links": "At our school, everybody",
+      "rechts": "is allowed to wear their own clothes on Fridays."
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "Since September we ___ use our phones in the lessons.",
+    "loesungen": [
+     "haven't been allowed to"
+    ],
+    "optionen": [
+     "haven't been allowed to",
+     "weren't allowed to",
+     "won't be allowed to",
+     "aren't allowed to"
+    ],
+    "erklaerung": "since September → present perfect: haven't been allowed to.",
+    "uebung": "erkennen",
+    "kontext": "Our new head teacher is very strict.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere die drei Wörter, die zusammen die Ersatzform für „durfte nicht“ bilden.",
+    "satz": "Last year I wasn't allowed to stay out late. Now I can come home at nine.",
+    "loesungen": [
+     "wasn't | allowed | to"
+    ],
+    "erklaerung": "wasn't allowed to ist die Vergangenheit von can't im Sinn von „nicht dürfen“.",
+    "uebung": "erkennen",
+    "ziele": [
+     3,
+     4,
+     5
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Tomorrow we will be allowed to switch on our phones after the test.",
+    "loesungen": [
+     "Tomorrow we will be allowed to switch on our phones after the test."
+    ],
+    "erklaerung": "Richtig: tomorrow → will be allowed to + Grundform.",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze can (dürfen) als Ersatzform mit be allowed to in der richtigen Zeit ein.",
+    "satz": "Last Saturday I ___ to my friend's party.",
+    "vorgabe": "(can / not / go)",
+    "loesungen": [
+     "wasn't allowed to go",
+     "was not allowed to go"
+    ],
+    "erklaerung": "last Saturday → Vergangenheit: wasn't allowed to + Grundform.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz in der Vergangenheit mit be allowed to.",
+    "satz": "We can't use our phones in class.",
+    "vorgabe": "Vergangenheit",
+    "loesungen": [
+     "Last year we weren't allowed to use our phones in class.",
+     "Last year we were not allowed to use our phones in class."
+    ],
+    "erklaerung": "Vergangenheit von can't (nicht dürfen): weren't allowed to.",
+    "uebung": "bilden",
+    "anfang": "Last year we",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze can (dürfen) als Ersatzform mit be allowed to ein.",
+    "satz": "Since then he ___ football in the garden.",
+    "vorgabe": "(can / not / play)",
+    "loesungen": [
+     "hasn't been allowed to play",
+     "has not been allowed to play"
+    ],
+    "erklaerung": "since then → present perfect: hasn't been allowed to + Grundform.",
+    "uebung": "anwenden",
+    "kontext": "Last week Ravi broke a window with his football.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz in der Zukunft und bejahe ihn. Verwende be allowed to.",
+    "satz": "I can't stay out late.",
+    "vorgabe": "Zukunft (will)",
+    "loesungen": [
+     "When I'm sixteen, I will be allowed to stay out late.",
+     "When I'm sixteen, I'll be allowed to stay out late."
+    ],
+    "erklaerung": "Zukunft: will be allowed to + Grundform.",
+    "uebung": "anwenden",
+    "anfang": "When I'm sixteen, I",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze can (dürfen) als Ersatzform mit be allowed to in der richtigen Zeit ein.",
+    "satz": "Last summer Mia went to a camp in the country. The kids ___ their phones, so they switched them off on the first day. They ___ in the lake, but only with a teacher. Mia had a great time there. Since she came home, she ___ her new friends at the weekend. Next summer she ___ to the camp for two weeks.",
+    "loesungen": [
+     "weren't allowed to use | were allowed to swim | has been allowed to visit | will be allowed to go"
+    ],
+    "erklaerung": "last summer → were(n't) allowed to, since → has been allowed to, next summer → will be allowed to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(can / not / use)",
+      "loesungen": [
+       "weren't allowed to use",
+       "were not allowed to use"
+      ]
+     },
+     {
+      "vorgabe": "(can / swim)",
+      "loesungen": [
+       "were allowed to swim"
+      ]
+     },
+     {
+      "vorgabe": "(can / visit)",
+      "loesungen": [
+       "has been allowed to visit",
+       "'s been allowed to visit"
+      ]
+     },
+     {
+      "vorgabe": "(can / go)",
+      "loesungen": [
+       "will be allowed to go",
+       "'ll be allowed to go"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Form.",
+    "satz": "From next week on, we ___ eat in the classrooms.",
+    "loesungen": [
+     "won't be allowed to"
+    ],
+    "optionen": [
+     "won't be allowed to",
+     "won't allowed to",
+     "weren't allowed to",
+     "didn't allowed to"
+    ],
+    "erklaerung": "Zukunft (from next week) → won't be allowed to; be darf nicht fehlen.",
+    "uebung": "unterscheiden",
+    "kontext": "There's a new rule at our school.",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Finde das falsche Wort und berichtige es.",
+    "satz": "When I was little, I wasn't allowed to went to the park alone.",
+    "loesungen": [
+     "go"
+    ],
+    "fehlerWort": "went",
+    "erklaerung": "Nach be allowed to steht die Grundform: allowed to go.",
+    "uebung": "fehler",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "Last Thursday the kids ___ play games for an hour after the session.",
+    "loesungen": [
+     "were allowed to"
+    ],
+    "optionen": [
+     "were allowed to",
+     "will be allowed to",
+     "have been allowed to",
+     "are allowed to"
+    ],
+    "erklaerung": "last Thursday → Vergangenheit: were allowed to.",
+    "uebung": "erkennen",
+    "kontext": "At the youth centre there's a computer session every Thursday.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere die zwei Wörter, die zeigen, dass jemand etwas DURFTE (nicht: konnte).",
+    "satz": "Last year I wasn't able to swim very well. This summer I was allowed to swim in the sea alone for the first time.",
+    "loesungen": [
+     "was | allowed"
+    ],
+    "erklaerung": "was allowed to = durfte; wasn't able to = konnte nicht.",
+    "uebung": "erkennen",
+    "ziele": [
+     12,
+     13
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Since the community centre opened, local teenagers have been allowed to use the music room for free.",
+    "loesungen": [
+     "Since the community centre opened, local teenagers have been allowed to use the music room for free."
+    ],
+    "erklaerung": "Richtig: since → present perfect: have been allowed to + Grundform.",
+    "uebung": "erkennen",
+    "korrekt": true,
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze can (dürfen) als Ersatzform mit be allowed to in der richtigen Zeit ein.",
+    "satz": "When I was in Year 4, we ___ in the classroom at break.",
+    "vorgabe": "(can / not / stay)",
+    "loesungen": [
+     "weren't allowed to stay",
+     "were not allowed to stay"
+    ],
+    "erklaerung": "when I was in Year 4 → Vergangenheit: weren't allowed to + Grundform.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde einen Satz aus den Teilen.",
+    "satz": "",
+    "loesungen": [
+     "My little brother has never been allowed to have a pet."
+    ],
+    "teile": [
+     "My little brother",
+     "has",
+     "never",
+     "been",
+     "allowed",
+     "to",
+     "have",
+     "a pet."
+    ],
+    "erklaerung": "present perfect: has never been allowed to + Grundform.",
+    "uebung": "bilden",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die passende Frage mit be allowed to zur Antwort.",
+    "satz": "No, I haven't. I've never been allowed to have my own phone.",
+    "vorgabe": "(ever / have your own phone)",
+    "loesungen": [
+     "Have you ever been allowed to have your own phone?"
+    ],
+    "erklaerung": "Antwort mit haven't → present perfect-Frage: Have you ever been allowed to …?",
+    "uebung": "bilden",
+    "kontext": "Most of your friends have their own phones.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze can (dürfen) als Ersatzform mit be allowed to ein.",
+    "satz": "His parents are worried, so since last year he ___ outside after dark.",
+    "vorgabe": "(can / not / go)",
+    "loesungen": [
+     "hasn't been allowed to go",
+     "has not been allowed to go"
+    ],
+    "erklaerung": "since last year → present perfect: hasn't been allowed to + Grundform.",
+    "uebung": "anwenden",
+    "kontext": "Jamal lives on a council estate where there is a lot of crime.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz in der Zukunft und bejahe ihn. Verwende be allowed to.",
+    "satz": "This year I can't choose my own subjects.",
+    "vorgabe": "Zukunft (will)",
+    "loesungen": [
+     "Next year I will be allowed to choose my own subjects.",
+     "Next year I'll be allowed to choose my own subjects."
+    ],
+    "erklaerung": "next year → Zukunft: will be allowed to + Grundform.",
+    "uebung": "anwenden",
+    "anfang": "Next year I",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze can (dürfen) als Ersatzform mit be allowed to in der richtigen Zeit ein.",
+    "satz": "A: Did you have a good time at your grandma's farm?\nB: Yes! On Sunday I ___ Grandpa's old car across the field!\nA: Wow! My parents are very strict. Last month I ___ to the school party.\nB: Oh no! And what about this year?\nA: Since my birthday I ___ with my friends on Saturdays. And next year I ___ until ten.",
+    "loesungen": [
+     "was allowed to drive | wasn't allowed to go | have been allowed to go out | will be allowed to stay out"
+    ],
+    "erklaerung": "on Sunday / last month → was(n't) allowed to, since → have been allowed to, next year → will be allowed to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(can / drive)",
+      "loesungen": [
+       "was allowed to drive"
+      ]
+     },
+     {
+      "vorgabe": "(can / not / go)",
+      "loesungen": [
+       "wasn't allowed to go",
+       "was not allowed to go"
+      ]
+     },
+     {
+      "vorgabe": "(can / go out)",
+      "loesungen": [
+       "have been allowed to go out",
+       "'ve been allowed to go out"
+      ]
+     },
+     {
+      "vorgabe": "(can / stay out)",
+      "loesungen": [
+       "will be allowed to stay out",
+       "'ll be allowed to stay out"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "He ___ swim in the sea today.",
+    "loesungen": [
+     "isn't allowed to"
+    ],
+    "optionen": [
+     "isn't allowed to",
+     "isn't able to",
+     "won't be able to",
+     "wasn't allowed to"
+    ],
+    "erklaerung": "Tim kann schwimmen, aber er darf heute nicht (rote Flagge) → isn't allowed to.",
+    "uebung": "unterscheiden",
+    "kontext": "Tim is a very good swimmer, but today there's a red flag on the beach because the water is dangerous.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Welche Form von be allowed to passt in die Lücke? Sortiere die Sätze.",
+    "satz": "",
+    "loesungen": [
+     "was / were (not) allowed to: In the 1950s, girls at many schools ___ wear trousers only on very cold days., When my mum went to school in Ireland, the pupils ___ speak Irish in class. | has / have (not) been allowed to: Ever since the new head came, pupils ___ use the library at lunch., Lily ___ have a party at home since she broke Mum's favourite lamp. | would be allowed to: If we lived closer to the city, I ___ go to concerts on my own., My little brother ___ watch that film if he were a bit older."
+    ],
+    "erklaerung": "Vergangenheit (in the 1950s, when my mum went) → was/were, since → has/have been, if + simple past → would be allowed to.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "was / were (not) allowed to",
+     "has / have (not) been allowed to",
+     "would be allowed to"
+    ],
+    "elemente": [
+     {
+      "text": "In the 1950s, girls at many schools ___ wear trousers only on very cold days.",
+      "gruppe": 0
+     },
+     {
+      "text": "When my mum went to school in Ireland, the pupils ___ speak Irish in class.",
+      "gruppe": 0
+     },
+     {
+      "text": "Ever since the new head came, pupils ___ use the library at lunch.",
+      "gruppe": 1
+     },
+     {
+      "text": "Lily ___ have a party at home since she broke Mum's favourite lamp.",
+      "gruppe": 1
+     },
+     {
+      "text": "If we lived closer to the city, I ___ go to concerts on my own.",
+      "gruppe": 2
+     },
+     {
+      "text": "My little brother ___ watch that film if he were a bit older.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle richtigen Sätze aus.",
+    "satz": "",
+    "loesungen": [
+     "If you finished your homework, you would be allowed to come with us.",
+     "Since we came to live in the village, we have been allowed to keep chickens.",
+     "Will you be allowed to stay at the youth hostel without an adult?"
+    ],
+    "erklaerung": "Nach allowed steht to + Grundform; verneint wird mit be (weren't allowed), nicht mit didn't.",
+    "uebung": "erkennen",
+    "optionen": [
+     "If you finished your homework, you would be allowed to come with us.",
+     "Since we came to live in the village, we have been allowed to keep chickens.",
+     "My parents say I'm not allowed going to the party.",
+     "We didn't allowed to visit the other side of the town.",
+     "Will you be allowed to stay at the youth hostel without an adult?"
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Have you been allowed to go to the concert in the park last Saturday?",
+    "loesungen": [
+     "Were"
+    ],
+    "erklaerung": "last Saturday ist ein abgeschlossener Zeitpunkt → simple past: Were you allowed to …?",
+    "uebung": "erkennen",
+    "korrekt": false,
+    "fehlerWort": "Have",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze can (dürfen) als Ersatzform mit be allowed to in der richtigen Zeit ein.",
+    "satz": "Although our school is very strict, last year we ___ our own clothes on the last day before the holidays.",
+    "vorgabe": "(can / wear)",
+    "loesungen": [
+     "were allowed to wear"
+    ],
+    "erklaerung": "last year → Vergangenheit: were allowed to + Grundform.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "frage",
+    "anweisung": "Bilde die passende Frage mit be allowed to zur Antwort.",
+    "satz": "No, he won't. His parents think he's too young to travel alone.",
+    "vorgabe": "(travel to Scotland alone)",
+    "loesungen": [
+     "Will Sam be allowed to travel to Scotland alone?",
+     "Will he be allowed to travel to Scotland alone?",
+     "Will Sam be allowed to travel to Scotland alone next summer?",
+     "Will he be allowed to travel to Scotland alone next summer?"
+    ],
+    "erklaerung": "Antwort mit won't → Frage in der Zukunft: Will … be allowed to + Grundform?",
+    "uebung": "bilden",
+    "kontext": "Sam wants to visit his cousin in Scotland next summer.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze can (dürfen) als Ersatzform mit be allowed to in der richtigen Zeit ein.",
+    "satz": "My grandma grew up on a farm in rural Northern Ireland. Life was very different then. She ___ TV on Sundays, and she and her brothers ___ outside only when they finished their work. When she was sixteen, she ___ to her first dance in the village. Today she often says: 'You young people are lucky. Since your mum was a girl, kids ___ much more. And when you're older, you ___ anywhere you like.'",
+    "loesungen": [
+     "wasn't allowed to watch | were allowed to play | was allowed to go | have been allowed to do | will be allowed to travel"
+    ],
+    "erklaerung": "früher → was/were allowed to, since → have been allowed to, when you're older → will be allowed to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(can / not / watch)",
+      "loesungen": [
+       "wasn't allowed to watch",
+       "was not allowed to watch"
+      ]
+     },
+     {
+      "vorgabe": "(can / play)",
+      "loesungen": [
+       "were allowed to play"
+      ]
+     },
+     {
+      "vorgabe": "(can / go)",
+      "loesungen": [
+       "was allowed to go"
+      ]
+     },
+     {
+      "vorgabe": "(can / do)",
+      "loesungen": [
+       "have been allowed to do"
+      ]
+     },
+     {
+      "vorgabe": "(can / travel)",
+      "loesungen": [
+       "will be allowed to travel",
+       "'ll be allowed to travel"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Gib Mums Worte in indirekter Rede wieder (ohne Zeitverschiebung). Verwende be allowed to.",
+    "satz": "Mum says, 'From next month you can go to the youth centre on Fridays.'",
+    "vorgabe": "Zukunft (will)",
+    "loesungen": [
+     "Mum says that from next month I will be allowed to go to the youth centre on Fridays.",
+     "Mum says that from next month I'll be allowed to go to the youth centre on Fridays."
+    ],
+    "erklaerung": "from next month → Zukunft: will be allowed to; you wird zu I.",
+    "uebung": "anwenden",
+    "anfang": "Mum says that from next month I",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde die Sätze mit although. Verwende be allowed to.",
+    "satz": "Ben is fifteen. His parents don't let him stay out after nine.",
+    "vorgabe": "(although)",
+    "loesungen": [
+     "Although Ben is fifteen, he isn't allowed to stay out after nine.",
+     "Although Ben is fifteen, he is not allowed to stay out after nine.",
+     "Although he is fifteen, Ben isn't allowed to stay out after nine.",
+     "Although he is fifteen, Ben is not allowed to stay out after nine.",
+     "Ben isn't allowed to stay out after nine although he is fifteen.",
+     "Ben is not allowed to stay out after nine although he is fifteen."
+    ],
+    "erklaerung": "don't let him = er darf nicht → isn't allowed to + Grundform.",
+    "uebung": "anwenden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "Now we ___ use our phones at break, but we have to switch them off in the lessons.",
+    "loesungen": [
+     "are allowed to"
+    ],
+    "optionen": [
+     "are allowed to",
+     "weren't allowed to",
+     "have to",
+     "will be allowed to"
+    ],
+    "erklaerung": "now → Gegenwart, und es geht um eine Erlaubnis (nicht um eine Pflicht) → are allowed to.",
+    "uebung": "unterscheiden",
+    "kontext": "At my old school, we could never use our phones. At my new academy the rules are different.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/be-allowed-to",
+   "aufgabe": {
+    "art": "fehler",
+    "anweisung": "Finde das falsche Wort und berichtige es.",
+    "satz": "Even though she is only fourteen, Ruby has been allowed to taking part in the community music group since last year.",
+    "loesungen": [
+     "take"
+    ],
+    "fehlerWort": "taking",
+    "erklaerung": "Nach be allowed to steht die Grundform: allowed to take part.",
+    "uebung": "fehler",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne jedem Modalverb seine Ersatzform zu.",
+    "satz": "",
+    "loesungen": [
+     "must have to | can (= dürfen) be allowed to | can (= können) be able to | needn't don't need to"
+    ],
+    "erklaerung": "must → have to, can (Erlaubnis) → be allowed to, can (Fähigkeit) → be able to, needn't → don't need to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "must",
+      "rechts": "have to"
+     },
+     {
+      "links": "can (= dürfen)",
+      "rechts": "be allowed to"
+     },
+     {
+      "links": "can (= können)",
+      "rechts": "be able to"
+     },
+     {
+      "links": "needn't",
+      "rechts": "don't need to"
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "In welcher Zeit steht die Ersatzform? Sortiere.",
+    "satz": "",
+    "loesungen": [
+     "simple past: had to, were allowed to | present perfect: has had to, have been able to | will-future: will need to, won't be allowed to"
+    ],
+    "erklaerung": "had/were = simple past, has/have + been/had = present perfect, will/won't = will-future.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "simple past",
+     "present perfect",
+     "will-future"
+    ],
+    "elemente": [
+     {
+      "text": "had to",
+      "gruppe": 0
+     },
+     {
+      "text": "were allowed to",
+      "gruppe": 0
+     },
+     {
+      "text": "has had to",
+      "gruppe": 1
+     },
+     {
+      "text": "have been able to",
+      "gruppe": 1
+     },
+     {
+      "text": "will need to",
+      "gruppe": 2
+     },
+     {
+      "text": "won't be allowed to",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz in der Vergangenheit. Verwende eine Ersatzform von can.",
+    "satz": "Mia can't come to the party because she is ill.",
+    "vorgabe": "Vergangenheit",
+    "loesungen": [
+     "Last week Mia wasn't able to come to the party because she was ill.",
+     "Last week Mia was not able to come to the party because she was ill.",
+     "Last week Mia wasn't allowed to come to the party because she was ill.",
+     "Last week Mia was not allowed to come to the party because she was ill."
+    ],
+    "erklaerung": "Vergangenheit: can't → wasn't able to, is → was.",
+    "uebung": "anwenden",
+    "anfang": "Last week Mia",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze die Ersatzformen in der richtigen Zeit ein.",
+    "satz": "Last summer we spent two weeks on a farm in the country. On the first day it was very wet, so we ___ inside. Later in the week we ___ with the animals. It was great! Next summer we ___ there again, but first we ___ some money.",
+    "loesungen": [
+     "had to stay | were allowed to help | will be able to go | will have to save"
+    ],
+    "erklaerung": "last summer → had to / were allowed to, next summer → will be able to / will have to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(must / stay)",
+      "loesungen": [
+       "had to stay"
+      ]
+     },
+     {
+      "vorgabe": "(can / help)",
+      "loesungen": [
+       "were allowed to help",
+       "were able to help"
+      ]
+     },
+     {
+      "vorgabe": "(can / go)",
+      "loesungen": [
+       "will be able to go",
+       "'ll be able to go",
+       "will be allowed to go",
+       "'ll be allowed to go",
+       "are going to be able to go"
+      ]
+     },
+     {
+      "vorgabe": "(must / save)",
+      "loesungen": [
+       "will have to save",
+       "'ll have to save",
+       "are going to have to save"
+      ]
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Was bedeutet der Satz? Sortiere: Pflicht, keine Pflicht oder Verbot.",
+    "satz": "",
+    "loesungen": [
+     "Pflicht: Last year we had to wear a tie., Next week I will have to get up at five. | keine Pflicht: We didn't need to bring any food – there was enough., You won't have to pay – it's free. | Verbot: We weren't allowed to talk during the session., Kids won't be allowed to swim here after June."
+    ],
+    "erklaerung": "have to = Pflicht, not have/need to = keine Pflicht, not allowed to = Verbot – in jeder Zeit.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "Pflicht",
+     "keine Pflicht",
+     "Verbot"
+    ],
+    "elemente": [
+     {
+      "text": "Last year we had to wear a tie.",
+      "gruppe": 0
+     },
+     {
+      "text": "Next week I will have to get up at five.",
+      "gruppe": 0
+     },
+     {
+      "text": "We didn't need to bring any food – there was enough.",
+      "gruppe": 1
+     },
+     {
+      "text": "You won't have to pay – it's free.",
+      "gruppe": 1
+     },
+     {
+      "text": "We weren't allowed to talk during the session.",
+      "gruppe": 2
+     },
+     {
+      "text": "Kids won't be allowed to swim here after June.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere die Ersatzform im present perfect (vier Wörter).",
+    "satz": "Since Christmas my brother has been allowed to use Dad's laptop. Before that, he couldn't.",
+    "loesungen": [
+     "has | been | allowed | to"
+    ],
+    "erklaerung": "since → present perfect: has been allowed to.",
+    "uebung": "erkennen",
+    "ziele": [
+     4,
+     5,
+     6,
+     7
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle richtigen Sätze aus.",
+    "satz": "",
+    "loesungen": [
+     "I'm afraid you'll have to wait – the doctor is still busy.",
+     "Since the gang left the estate, children have been allowed to play outside again.",
+     "Did you have to show your ticket on the train?"
+    ],
+    "erklaerung": "must hat keine Vergangenheit (→ had to); im present perfect steht das Partizip: haven't needed to.",
+    "uebung": "erkennen",
+    "optionen": [
+     "I'm afraid you'll have to wait – the doctor is still busy.",
+     "Since the gang left the estate, children have been allowed to play outside again.",
+     "When I lived in the country, I must take the bus at half past six.",
+     "We haven't need to buy new books this year.",
+     "Did you have to show your ticket on the train?"
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "verbinden",
+    "anweisung": "Verbinde die Sätze mit although. Ersetze could durch eine Ersatzform.",
+    "satz": "Max didn't have much money. He could go on the school trip.",
+    "vorgabe": "(although)",
+    "loesungen": [
+     "Although Max didn't have much money, he was able to go on the school trip.",
+     "Although he didn't have much money, Max was able to go on the school trip.",
+     "Max was able to go on the school trip although he didn't have much money.",
+     "Although Max didn't have much money, he was allowed to go on the school trip.",
+     "Although he didn't have much money, Max was allowed to go on the school trip.",
+     "Max was allowed to go on the school trip although he didn't have much money."
+    ],
+    "erklaerung": "Vergangenheit von can (es war möglich) → was able to.",
+    "uebung": "anwenden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/zeiten",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "We ___ go anywhere alone.",
+    "loesungen": [
+     "weren't allowed to"
+    ],
+    "optionen": [
+     "weren't allowed to",
+     "didn't have to",
+     "mustn't",
+     "haven't had to"
+    ],
+    "erklaerung": "Eine Regel = Verbot, und die Reise ist vorbei → weren't allowed to; mustn't hat keine Vergangenheit.",
+    "uebung": "unterscheiden",
+    "kontext": "On our school exchange in France the rules were quite relaxed, but there was one important rule.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/must-have-to",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Was bedeutet der Satz? Ordne ihn der richtigen Gruppe zu.",
+    "satz": "",
+    "loesungen": [
+     "Pflicht (müssen): We have to attend assembly on Mondays., You must be on time for the first lesson. | keine Pflicht (nicht müssen): You don't have to bring lunch – the school gives you some., Ben needn't come to the extra session. | Verbot (nicht dürfen): Students mustn't use their phones in class., Younger students aren't allowed to leave the school in the lunch break."
+    ],
+    "erklaerung": "have to/must = müssen; don't have to/needn't = nicht müssen; mustn't/not allowed to = nicht dürfen.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "Pflicht (müssen)",
+     "keine Pflicht (nicht müssen)",
+     "Verbot (nicht dürfen)"
+    ],
+    "elemente": [
+     {
+      "text": "We have to attend assembly on Mondays.",
+      "gruppe": 0
+     },
+     {
+      "text": "You must be on time for the first lesson.",
+      "gruppe": 0
+     },
+     {
+      "text": "You don't have to bring lunch – the school gives you some.",
+      "gruppe": 1
+     },
+     {
+      "text": "Ben needn't come to the extra session.",
+      "gruppe": 1
+     },
+     {
+      "text": "Students mustn't use their phones in class.",
+      "gruppe": 2
+     },
+     {
+      "text": "Younger students aren't allowed to leave the school in the lunch break.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/need-to",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Was bedeutet der Satz? Ordne ihn der richtigen Gruppe zu.",
+    "satz": "",
+    "loesungen": [
+     "nötig: You need to bring a pen., We have to wear a tie. | nicht nötig: You don't need to bring any money., Sam needn't come to the session., We don't have to pay for the bus. | verboten: You mustn't run in the corridor., You aren't allowed to eat in class."
+    ],
+    "erklaerung": "need to/have to = nötig; don't need to/needn't/don't have to = nicht nötig; mustn't/not allowed to = verboten.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "nötig",
+     "nicht nötig",
+     "verboten"
+    ],
+    "elemente": [
+     {
+      "text": "You need to bring a pen.",
+      "gruppe": 0
+     },
+     {
+      "text": "We have to wear a tie.",
+      "gruppe": 0
+     },
+     {
+      "text": "You don't need to bring any money.",
+      "gruppe": 1
+     },
+     {
+      "text": "Sam needn't come to the session.",
+      "gruppe": 1
+     },
+     {
+      "text": "We don't have to pay for the bus.",
+      "gruppe": 1
+     },
+     {
+      "text": "You mustn't run in the corridor.",
+      "gruppe": 2
+     },
+     {
+      "text": "You aren't allowed to eat in class.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "en.verb.modals_subst/need-to",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Nötig, nicht nötig oder verboten? Ordne die Sätze zu.",
+    "satz": "",
+    "loesungen": [
+     "nötig: We'll need to leave before six if we want a good seat., Last year Amira needed to change buses twice on her way to school. | nicht nötig: You won't need to bring a towel – the pool gives you one., Josh hasn't needed to ask for help since he joined the team. | verboten: Visitors mustn't give food to the animals on the farm., Players weren't allowed to use their phones during the match."
+    ],
+    "erklaerung": "need to (jede Zeit) = nötig; won't/hasn't needed to = nicht nötig; mustn't/not allowed to = verboten.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "nötig",
+     "nicht nötig",
+     "verboten"
+    ],
+    "elemente": [
+     {
+      "text": "We'll need to leave before six if we want a good seat.",
+      "gruppe": 0
+     },
+     {
+      "text": "Last year Amira needed to change buses twice on her way to school.",
+      "gruppe": 0
+     },
+     {
+      "text": "You won't need to bring a towel – the pool gives you one.",
+      "gruppe": 1
+     },
+     {
+      "text": "Josh hasn't needed to ask for help since he joined the team.",
+      "gruppe": 1
+     },
+     {
+      "text": "Visitors mustn't give food to the animals on the farm.",
+      "gruppe": 2
+     },
+     {
+      "text": "Players weren't allowed to use their phones during the match.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Was bedeutet der Satz? Ordne die passende Ersatzform zu.",
+    "satz": "",
+    "loesungen": [
+     "I can't go to the party – I'm ill. I'm not able to go to the party. | I can't go to the party – my mum says no. I'm not allowed to go to the party. | I must go to the party – it's my best friend's birthday. I have to go to the party. | I needn't go to the party – it isn't important. I don't need to go to the party."
+    ],
+    "erklaerung": "can't = nicht können (not able to) oder nicht dürfen (not allowed to); must = have to; needn't = don't need to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "I can't go to the party – I'm ill.",
+      "rechts": "I'm not able to go to the party."
+     },
+     {
+      "links": "I can't go to the party – my mum says no.",
+      "rechts": "I'm not allowed to go to the party."
+     },
+     {
+      "links": "I must go to the party – it's my best friend's birthday.",
+      "rechts": "I have to go to the party."
+     },
+     {
+      "links": "I needn't go to the party – it isn't important.",
+      "rechts": "I don't need to go to the party."
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "sortieren",
+    "anweisung": "Fähigkeit, Erlaubnis oder Pflicht? Ordne die Sätze zu.",
+    "satz": "",
+    "loesungen": [
+     "können (Fähigkeit): Tom is able to speak three languages., Will you be able to come tomorrow? | dürfen (Erlaubnis): We aren't allowed to eat in class., Were you allowed to stay up late? | müssen (Pflicht): Ella has to look after her brother., I needed to buy a new pen."
+    ],
+    "erklaerung": "be able to = können, be allowed to = dürfen, have to / need to = müssen.",
+    "uebung": "erkennen",
+    "gruppen": [
+     "können (Fähigkeit)",
+     "dürfen (Erlaubnis)",
+     "müssen (Pflicht)"
+    ],
+    "elemente": [
+     {
+      "text": "Tom is able to speak three languages.",
+      "gruppe": 0
+     },
+     {
+      "text": "Will you be able to come tomorrow?",
+      "gruppe": 0
+     },
+     {
+      "text": "We aren't allowed to eat in class.",
+      "gruppe": 1
+     },
+     {
+      "text": "Were you allowed to stay up late?",
+      "gruppe": 1
+     },
+     {
+      "text": "Ella has to look after her brother.",
+      "gruppe": 2
+     },
+     {
+      "text": "I needed to buy a new pen.",
+      "gruppe": 2
+     }
+    ],
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "richtigfalsch",
+    "anweisung": "Ist der Satz richtig oder falsch? Wenn er falsch ist, berichtige das falsche Wort.",
+    "satz": "Last year we are allowed to wear trainers at school.",
+    "loesungen": [
+     "were"
+    ],
+    "erklaerung": "Last year → Vergangenheit: were allowed to.",
+    "uebung": "erkennen",
+    "korrekt": false,
+    "fehlerWort": "are",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ersetze das Modalverb durch die passende Ersatzform in der Zukunft.",
+    "satz": "Tomorrow I ___ to the cinema with you, because my aunt is coming.",
+    "vorgabe": "(can't / come)",
+    "loesungen": [
+     "won't be able to come",
+     "will not be able to come",
+     "won't be allowed to come",
+     "will not be allowed to come"
+    ],
+    "erklaerung": "Zukunft von can't → won't be able to.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Schreib den Satz in der Vergangenheit mit be allowed to.",
+    "satz": "I can't use my phone after nine.",
+    "vorgabe": "Vergangenheit mit be allowed to",
+    "loesungen": [
+     "When I was younger, I wasn't allowed to use my phone after nine.",
+     "When I was younger, I was not allowed to use my phone after nine."
+    ],
+    "erklaerung": "can't (Erlaubnis) in der Vergangenheit → wasn't allowed to.",
+    "uebung": "anwenden",
+    "anfang": "When I was younger, I",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Lies die Situation und wähle die passende Form.",
+    "satz": "So we ___ go home early today.",
+    "loesungen": [
+     "are allowed to"
+    ],
+    "optionen": [
+     "are allowed to",
+     "are able to",
+     "have to"
+    ],
+    "erklaerung": "Der Lehrer erlaubt es → are allowed to (dürfen), nicht able to (Fähigkeit).",
+    "uebung": "unterscheiden",
+    "kontext": "Mr Brown says: “It's OK – you can go home early today.”",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne die Satzhälften so zu, dass sie inhaltlich passen.",
+    "satz": "",
+    "loesungen": [
+     "Ella's parents said yes, so last night she was allowed to stay up late. | Ella practised a lot, so last night she was able to play the whole song. | Ella's bus didn't come, so last night she had to walk home. | Ella's homework was easy, so last night she didn't need to ask for help."
+    ],
+    "erklaerung": "Erlaubnis → allowed to, Fähigkeit → able to, Pflicht → had to, nicht nötig → didn't need to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "Ella's parents said yes, so last night she",
+      "rechts": "was allowed to stay up late."
+     },
+     {
+      "links": "Ella practised a lot, so last night she",
+      "rechts": "was able to play the whole song."
+     },
+     {
+      "links": "Ella's bus didn't come, so last night she",
+      "rechts": "had to walk home."
+     },
+     {
+      "links": "Ella's homework was easy, so last night she",
+      "rechts": "didn't need to ask for help."
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere in jeder Ersatzform von can das Hilfsverb, das die Zeit zeigt.",
+    "satz": "Ravi comes from a British-Indian family. At five he was able to speak two languages. Since last year he has been allowed to help at the community centre, and next year he will be able to lead a group.",
+    "loesungen": [
+     "was | has | will"
+    ],
+    "erklaerung": "was able to (Vergangenheit), has been allowed to (present perfect), will be able to (Zukunft).",
+    "uebung": "erkennen",
+    "ziele": [
+     9,
+     19,
+     32
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze die passenden Ersatzformen ein. Achte auf Zeit und Bedeutung.",
+    "satz": "Last summer my family moved from a rural village to a big city. At first it was hard. I ___ because of the noise, and I ___ new friends. At my old school we ___ phones, but at my new academy we ___ them in the break. Next month I ___ the drama club.",
+    "loesungen": [
+     "wasn't able to sleep | had to find | weren't allowed to use | are allowed to use | will be able to join"
+    ],
+    "erklaerung": "Vergangenheit: wasn't able to, had to, weren't allowed to; Gegenwart: are allowed to; Zukunft: will be able to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(can't / sleep)",
+      "loesungen": [
+       "wasn't able to sleep",
+       "was not able to sleep",
+       "couldn't sleep",
+       "could not sleep"
+      ]
+     },
+     {
+      "vorgabe": "(must / find)",
+      "loesungen": [
+       "had to find"
+      ]
+     },
+     {
+      "vorgabe": "(not be allowed to / use)",
+      "loesungen": [
+       "weren't allowed to use",
+       "were not allowed to use"
+      ]
+     },
+     {
+      "vorgabe": "(be allowed to / use)",
+      "loesungen": [
+       "are allowed to use",
+       "'re allowed to use"
+      ]
+     },
+     {
+      "vorgabe": "(can / join)",
+      "loesungen": [
+       "will be able to join",
+       "'ll be able to join",
+       "will be allowed to join",
+       "'ll be allowed to join"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Wähle für jede Lücke die passende Form.",
+    "satz": "A: Can I come to the art session at the community centre on Saturday?\nB: Sure. You ___ bring anything – we have all the paint.\nA: Does it start at nine?\nB: Yes, and you ___ be late, because we close the door at nine.\nA: Last time I ___ come because I was ill.\nB: No problem! This time you ___ take your picture home.",
+    "loesungen": [
+     "needn't | mustn't | wasn't able to | will be allowed to"
+    ],
+    "erklaerung": "nicht nötig → needn't; Verbot → mustn't; Vergangenheit, konnte nicht → wasn't able to; Erlaubnis in der Zukunft → will be allowed to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "loesungen": [
+       "needn't"
+      ],
+      "optionen": [
+       "needn't",
+       "mustn't",
+       "weren't allowed to"
+      ]
+     },
+     {
+      "loesungen": [
+       "mustn't"
+      ],
+      "optionen": [
+       "mustn't",
+       "don't need to",
+       "weren't able to"
+      ]
+     },
+     {
+      "loesungen": [
+       "wasn't able to"
+      ],
+      "optionen": [
+       "wasn't able to",
+       "mustn't",
+       "don't have to"
+      ]
+     },
+     {
+      "loesungen": [
+       "will be allowed to"
+      ],
+      "optionen": [
+       "will be allowed to",
+       "were allowed to",
+       "mustn't"
+      ]
+     }
+    ],
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Lies die Situation und setze die passende Form ein.",
+    "satz": "Now she ___ home on her own after school.",
+    "vorgabe": "(be allowed to / come)",
+    "loesungen": [
+     "is allowed to come",
+     "'s allowed to come"
+    ],
+    "erklaerung": "Now + Erlaubnis → is allowed to + Grundform.",
+    "uebung": "anwenden",
+    "kontext": "Ellie's parents have just given her a key to the house.",
+    "niveau": "m"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "zuordnen",
+    "anweisung": "Ordne die Satzhälften so zu, dass Zeit und Bedeutung passen.",
+    "satz": "",
+    "loesungen": [
+     "Since my brother got his own room, he hasn't had to share with me. | If the youth club opened on Sundays, we would be able to meet there at the weekend. | Before the new head came, students were allowed to wear trainers. | When the new bus line starts next month, we won't need to walk to the station."
+    ],
+    "erklaerung": "since → present perfect; Typ 2 → would be able to; Vergangenheit → were allowed to; Zukunft → won't need to.",
+    "uebung": "erkennen",
+    "paare": [
+     {
+      "links": "Since my brother got his own room,",
+      "rechts": "he hasn't had to share with me."
+     },
+     {
+      "links": "If the youth club opened on Sundays,",
+      "rechts": "we would be able to meet there at the weekend."
+     },
+     {
+      "links": "Before the new head came,",
+      "rechts": "students were allowed to wear trainers."
+     },
+     {
+      "links": "When the new bus line starts next month,",
+      "rechts": "we won't need to walk to the station."
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "markieren",
+    "anweisung": "Markiere in jedem Verbot das verneinte Wort (drei Wörter).",
+    "satz": "My cousin goes to a strict academy. Students aren't allowed to use phones in the building, and they mustn't leave during the day. They don't have to wear a tie, but last year they weren't allowed to wear trainers.",
+    "loesungen": [
+     "aren't | mustn't | weren't"
+    ],
+    "erklaerung": "aren't/weren't allowed to und mustn't = Verbot; don't have to heißt nur „nicht müssen“.",
+    "uebung": "erkennen",
+    "ziele": [
+     8,
+     18,
+     34
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "mehrfach",
+    "anweisung": "Wähle alle richtigen Sätze.",
+    "satz": "",
+    "loesungen": [
+     "If I lived in the city, I would be able to walk to school.",
+     "Since January, Mia has been allowed to stay out until nine."
+    ],
+    "erklaerung": "Nach would/will und mit since brauchst du die Ersatzform: would be able to, has been allowed to, will have to.",
+    "uebung": "erkennen",
+    "optionen": [
+     "If I lived in the city, I would be able to walk to school.",
+     "If I lived in the city, I would can walk to school.",
+     "Since January, Mia has been allowed to stay out until nine.",
+     "Since January, Mia can stay out until nine.",
+     "Tomorrow we will must get up early."
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "satzbau",
+    "anweisung": "Bilde eine Frage aus den Teilen.",
+    "satz": "",
+    "loesungen": [
+     "Would you be allowed to stay at Ella's if you asked?"
+    ],
+    "teile": [
+     "Would",
+     "you",
+     "be",
+     "allowed",
+     "to",
+     "stay",
+     "at Ella's",
+     "if you asked?"
+    ],
+    "erklaerung": "Typ 2-Frage: Would + Subjekt + be allowed to + Grundform.",
+    "uebung": "bilden",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "lueckentext",
+    "anweisung": "Setze die passenden Ersatzformen ein. Achte auf Zeit und Bedeutung.",
+    "satz": "Erin lives in a city in Northern Ireland. When her grandparents were young, Catholic and Protestant children ___ to the same schools, and in some streets people ___ after dark. Since the peace came, a lot has changed: Erin ___ friends from both sides. Her school is near her home, so she ___ far. Erin thinks that if more schools were for both sides, children ___ long journeys every day.",
+    "loesungen": [
+     "weren't able to go | weren't allowed to walk | has been able to make | doesn't need to travel | wouldn't have to make"
+    ],
+    "erklaerung": "Früher → weren't able to / weren't allowed to; since → has been able to; heute → doesn't need to; Typ 2 → wouldn't have to.",
+    "uebung": "anwenden",
+    "luecken": [
+     {
+      "vorgabe": "(can't / go)",
+      "loesungen": [
+       "weren't able to go",
+       "were not able to go",
+       "couldn't go",
+       "could not go",
+       "weren't allowed to go",
+       "were not allowed to go"
+      ]
+     },
+     {
+      "vorgabe": "(not be allowed to / walk)",
+      "loesungen": [
+       "weren't allowed to walk",
+       "were not allowed to walk"
+      ]
+     },
+     {
+      "vorgabe": "(can / make)",
+      "loesungen": [
+       "has been able to make",
+       "'s been able to make"
+      ]
+     },
+     {
+      "vorgabe": "(not need / travel)",
+      "loesungen": [
+       "doesn't need to travel",
+       "does not need to travel",
+       "needn't travel",
+       "doesn't have to travel",
+       "does not have to travel"
+      ]
+     },
+     {
+      "vorgabe": "(not have to / make)",
+      "loesungen": [
+       "wouldn't have to make",
+       "would not have to make",
+       "wouldn't need to make",
+       "would not need to make"
+      ]
+     }
+    ],
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:en.verb.modals_subst",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Gib wieder, was der Trainer sagt.",
+    "satz": "Coach: “You won't be allowed to play if you're late.”",
+    "vorgabe": "Indirekte Rede ohne Zeitverschiebung",
+    "loesungen": [
+     "The coach says that we won't be allowed to play if we're late.",
+     "The coach says that we won't be allowed to play if we are late.",
+     "The coach says that we will not be allowed to play if we are late.",
+     "The coach says that we will not be allowed to play if we're late."
+    ],
+    "erklaerung": "Indirekte Rede ohne Zeitverschiebung: you → we, you're → we're; won't be allowed to bleibt.",
+    "uebung": "anwenden",
+    "anfang": "The coach says that we",
+    "niveau": "a"
+   }
+  }
+ ]
+}

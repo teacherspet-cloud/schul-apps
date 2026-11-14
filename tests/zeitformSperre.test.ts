@@ -86,6 +86,9 @@ describe('Erkennung im Text', () => {
     'Would you like a cup of tea?',
     'I can swim. Open the door!',
     'There are a hundred books.',
+    // be allowed to / be supposed to sind Ersatzformen, kein Passiv (14.11.2026)
+    'You are allowed to use your phone.',
+    "We aren't supposed to leave early.",
     "I won't"
   ])('kein Treffer: %s', (t) => {
     // „won't" ist will-future, aber kein simple past

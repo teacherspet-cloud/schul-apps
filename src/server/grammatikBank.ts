@@ -575,7 +575,9 @@ const EINSPIELEN: [string, string][] = [
   // Nachtrag zu Runde 1–3 (14.11.2026): question tags mit Vorgabe, present perfect Erfahrung als Aussagen, Einzelfelder
   ['grammatik-bank-greenline-nachtrag-2026-11-14', 'greenline-nachtrag-2026-11-14.json'],
   // Runde 6 (14.11.2026): Green Line Transition Topic 1–5 (Klasse 11) – gleicher Ablauf
-  ['grammatik-bank-greenline-runde6-2026-11-14', 'greenline-transition-2026-11-14.json']
+  ['grammatik-bank-greenline-runde6-2026-11-14', 'greenline-transition-2026-11-14.json'],
+  // Nachtrag 2 (14.11.2026): be allowed to / Ersatzformen (bisher von der Zeitform-Sperre als Passiv gestrichen) und Restfelder
+  ['grammatik-bank-greenline-nachtrag2-2026-11-14', 'greenline-nachtrag2-2026-11-14.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
