@@ -573,7 +573,9 @@ const EINSPIELEN: [string, string][] = [
   // Bedingungssätze Typ 3, Gerundium/Infinitiv, make/let) – gleicher Ablauf
   ['grammatik-bank-greenline-runde5-2026-11-14', 'greenline4-2026-11-14.json'],
   // Nachtrag zu Runde 1–3 (14.11.2026): question tags mit Vorgabe, present perfect Erfahrung als Aussagen, Einzelfelder
-  ['grammatik-bank-greenline-nachtrag-2026-11-14', 'greenline-nachtrag-2026-11-14.json']
+  ['grammatik-bank-greenline-nachtrag-2026-11-14', 'greenline-nachtrag-2026-11-14.json'],
+  // Runde 6 (14.11.2026): Green Line Transition Topic 1–5 (Klasse 11) – gleicher Ablauf
+  ['grammatik-bank-greenline-runde6-2026-11-14', 'greenline-transition-2026-11-14.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
