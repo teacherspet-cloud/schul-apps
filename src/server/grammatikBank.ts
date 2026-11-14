@@ -562,7 +562,10 @@ const EINSPIELEN: [string, string][] = [
   ['grammatik-bank-greenline-runde1-2026-11-13', 'greenline1-unit4-greenline2-unit1-2-2026-11-13.json'],
   // Runde 2 (13.11.2026): Green Line 5 Unit 2/3 (future progressive/perfect, Wahrnehmungsverben, Zustandsverben, Satzadverbien,
   // Partizipien, past perfect progressive) und Mischformen aus GL5 Unit 1 / GL6 Unit 1 – gleicher Ablauf
-  ['grammatik-bank-greenline-runde2-2026-11-13', 'greenline5-unit2-3-2026-11-13.json']
+  ['grammatik-bank-greenline-runde2-2026-11-13', 'greenline5-unit2-3-2026-11-13.json'],
+  // Runde 3 (14.11.2026): Green Line 2 Unit 3–5 und Trailer 5 (present perfect, Indefinitpronomen, will/going to, Bindewörter,
+  // Adverbien, Demonstrativa, one/ones, question tags, Modalverben, Wortbildung, indirekte Rede) – gleicher Ablauf
+  ['grammatik-bank-greenline-runde3-2026-11-14', 'greenline2-unit3-5-2026-11-14.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
