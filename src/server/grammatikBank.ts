@@ -568,7 +568,10 @@ const EINSPIELEN: [string, string][] = [
   ['grammatik-bank-greenline-runde3-2026-11-14', 'greenline2-unit3-5-2026-11-14.json'],
   // Runde 4 (14.11.2026): Green Line 3 (Relativsätze, past progressive, Ersatzformen, Reflexivpronomen, Wahrnehmungsverben,
   // past perfect, Gradadverbien, Bedingungssätze Typ 2) – gleicher Ablauf
-  ['grammatik-bank-greenline-runde4-2026-11-14', 'greenline3-2026-11-14.json']
+  ['grammatik-bank-greenline-runde4-2026-11-14', 'greenline3-2026-11-14.json'],
+  // Runde 5 (14.11.2026): Green Line 4 (Gegenwartsformen, AmE/BrE, present perfect (progressive), indirekte Rede, Relativsätze,
+  // Bedingungssätze Typ 3, Gerundium/Infinitiv, make/let) – gleicher Ablauf
+  ['grammatik-bank-greenline-runde5-2026-11-14', 'greenline4-2026-11-14.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
