@@ -229,6 +229,9 @@ export function formWoerter(schluessel: string): string[] {
  */
 const SELF = ['myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'yourselves', 'themselves', 'oneself']
 const FORM_ZUSATZ: Record<string, string[]> = {
+  // amerikanische Formen sind beim AmE/BrE-Vergleich der Lernstoff (14.11.2026, Handbetrieb Green Line 4: Erzeuger mussten
+  // gotten, favorite, theater … meiden, weil die Vokabelliste nur britische Schreibungen führt)
+  'en.var.ame': ['gotten', 'favorite', 'favorites', 'theater', 'theaters', 'gray', 'neighborhood', 'colorful', 'meter', 'meters', 'center', 'centers', 'color', 'colors', 'neighbor', 'neighbors', 'honor', 'program', 'programs', 'defense', 'offense', 'traveled', 'traveling', 'canceled', 'labeled', 'organize', 'organized', 'realize', 'realized', 'apologize', 'recognize', 'learned', 'learnt', 'dreamed', 'dreamt', 'burned', 'burnt', 'spelled', 'spelt', 'smelled', 'smelt', 'fall', 'apartment', 'cookie', 'cookies', 'vacation', 'movie', 'movies', 'truck', 'elevator', 'sidewalk', 'gas', 'candy', 'fries', 'subway', 'garbage', 'trash', 'mall'],
   'en.pron.emphatic': SELF,
   'en.pron.reflexive': SELF,
   'en.focus.emphasis': SELF,
