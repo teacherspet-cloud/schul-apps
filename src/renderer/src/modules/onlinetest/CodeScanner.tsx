@@ -10,10 +10,15 @@ import { Alert, Button, Modal, Stack, Text } from '@mantine/core'
 import jsQR from 'jsqr'
 import { useEffect, useRef, useState } from 'react'
 
-/** Aus dem Inhalt eines QR-Codes den Code lesen (Link auf /s/t/<CODE> bzw. /s/f/<CODE> oder der Code selbst) */
+/**
+ * Aus dem Inhalt eines QR-Codes den Code lesen: Link auf eine Code-Seite der Lernenden oder der Code selbst.
+ * 15.11.2026 (Befund der Lehrkraft: angemeldete Lernende kamen per Scanner nicht ins Klassenspiel, „Code falsch"): außer
+ * Onlinetest (/s/t/) und Aufgabe (/s/f/) auch Klassenspiel (/s/ks/), Spielrunde (/s/sp/), Arbeitsblatt (/s/w/), Reihe
+ * (/s/rq/), Vokabel- und Grammatiktraining (/s/vt/, /s/gt/) – `oeffneCode` findet das Ziel.
+ */
 export function codeAus(inhalt: string): string | null {
   const t = inhalt.trim()
-  const ausLink = /\/s\/[tf]\/([A-Za-z0-9]{4,12})\/?(?:[?#].*)?$/.exec(t)?.[1]
+  const ausLink = /\/s\/(?:t|f|ks|sp|w|rq|vt|gt)\/([A-Za-z0-9]{4,12})\/?(?:[?#].*)?$/.exec(t)?.[1]
   if (ausLink) return ausLink.toUpperCase()
   return /^[A-Za-z0-9]{4,12}$/.test(t) ? t.toUpperCase() : null
 }
@@ -81,7 +86,7 @@ export function CodeScanner({ schliessen, gefunden }: { schliessen: () => void; 
         )}
         {fremd && (
           <Text size="sm" c="orange.8">
-            Dieser QR-Code gehört nicht zu einem Onlinetest.
+            Diesen QR-Code kennt die App nicht – bitte den Code an der Tafel eintippen.
           </Text>
         )}
         <Text size="sm" c="dimmed">

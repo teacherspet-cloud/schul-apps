@@ -207,6 +207,11 @@ describe('QR-Code in der Web-App (02.10.2026)', () => {
     expect(codeAus('https://x/s/t/AB3X9K/?a=1')).toBe('AB3X9K')
     expect(codeAus(' AB3X9K ')).toBe('AB3X9K')
     expect(codeAus('https://example.com/irgendwas')).toBeNull()
+    // Klassenspiel und andere Code-Seiten (15.11.2026: angemeldete Lernende scannten den Klassenspiel-QR vergeblich)
+    expect(codeAus('https://meineschulapps.de/s/ks/482913')).toBe('482913')
+    expect(codeAus('https://meineschulapps.de/s/sp/123456')).toBe('123456')
+    expect(codeAus('https://x/s/w/AB3X9K')).toBe('AB3X9K')
+    expect(codeAus('https://x/s/v/abc123def')).toBeNull()
   })
 })
 
