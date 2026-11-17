@@ -83,23 +83,29 @@ function rundeBeenden(z: Turnier, jetzt: number): void {
     }
   })
   meldung(z, kt(z.sprache, 'tuRundeVorbei', z.runde), 'info')
-  z.tische = umsetzen(z.tische, rang)
+  // Nach der letzten Runde nicht mehr umsetzen (17.11.2026: sonst passten Tische und Tischrunde nicht mehr zusammen –
+  // der Beamer stürzte mit „filter of undefined" ab, sobald das Turnier per Zeit endete)
   if (z.runde >= z.runden) {
     z.ende = true
     return
   }
+  z.tische = umsetzen(z.tische, rang)
   z.runde++
   z.level = Math.min(6, z.runde * 2 - 1)
   rundeStarten(z, jetzt)
 }
 
 const tischFertig = (z: Turnier, i: number): boolean =>
-  z.tische[i].filter((id) => z.personen[id]).every((id) => (z.tischRunde[i]?.stand[id]?.idx ?? 0) >= (z.tischRunde[i]?.fragen.length ?? 0))
+  (z.tische[i] ?? []).filter((id) => z.personen[id]).every((id) => (z.tischRunde[i]?.stand[id]?.idx ?? 0) >= (z.tischRunde[i]?.fragen.length ?? 0))
 
 export const teamStand = (z: Turnier, t: number): number => Math.round(((z.punkte[t] ?? 0) / teamGroesse(z, t)) * 10) / 10
 
 export const turnier: KlassenRegeln<Turnier> = {
   id: 'turnier',
+  // Stufenleiter: Mindeststufe je Runde (die Tischfragen selbst bleiben für alle am Tisch gleich)
+  fortschritt(z) {
+    return Math.min(1, (z.runde - 1) / Math.max(1, z.runden - 1))
+  },
   start(z, jetzt) {
     const t = Object.assign(z, { runde: 1, runden: rundenFuer(z), rundeBis: 0, tischRunde: [], punkte: z.teams.map(() => 0), tischSiege: {} }) as Turnier
     rundeStarten(t, jetzt)
@@ -180,8 +186,9 @@ export const turnier: KlassenRegeln<Turnier> = {
         // Nach Namen sortiert – nie nach Stärke
         tische: z.tischRunde
           .map((t, i) => {
-            const fertig = z.tische[i].filter((id) => (t.stand[id]?.idx ?? 0) >= t.fragen.length).length
-            return { name: t.name, fertig, gesamt: z.tische[i].length, text: kt(z.sprache, 'tuTischFertig', t.name, fertig, z.tische[i].length) }
+            const tisch = z.tische[i] ?? []
+            const fertig = tisch.filter((id) => (t.stand[id]?.idx ?? 0) >= t.fragen.length).length
+            return { name: t.name, fertig, gesamt: tisch.length, text: kt(z.sprache, 'tuTischFertig', t.name, fertig, tisch.length) }
           })
           .sort((a, b) => a.name.localeCompare(b.name))
       }

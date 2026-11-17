@@ -26,6 +26,10 @@ export const schritteJeLager = (z: KBasis): number =>
 
 export const expedition: KlassenRegeln<Expedition> = {
   id: 'expedition',
+  // Stufenleiter: Mindeststufe steigt mit den erreichten Lagern
+  fortschritt(z) {
+    return Math.min(1, z.lager / LAGER)
+  },
   start(z) {
     return Object.assign(z, { lager: 0, fort: 0, gebremst: false, level: 1 })
   },

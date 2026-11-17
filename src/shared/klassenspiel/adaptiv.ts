@@ -52,7 +52,7 @@ export function startTheta(baender: (Band | null)[]): number {
 }
 
 /** Erlaubte Stufen je Modus (fest: nach Stufe; level: nach Level 1–6) */
-export function stufenFuer(art: 'adaptiv' | 'fest' | 'level', feste: 'leicht' | 'mittel' | 'schwer', level: number): Stufe[] {
+export function stufenFuer(art: 'leiter' | 'adaptiv' | 'fest' | 'level', feste: 'leicht' | 'mittel' | 'schwer', level: number): Stufe[] {
   if (art === 'fest') return feste === 'leicht' ? [1, 2] : feste === 'mittel' ? [2, 3] : [3, 4]
   if (art === 'level') {
     const l = Math.max(1, Math.min(6, Math.round(level)))

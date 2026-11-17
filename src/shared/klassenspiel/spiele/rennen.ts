@@ -29,6 +29,10 @@ const fuehrend = (z: Rennen): number[] => {
 
 export const rennen: KlassenRegeln<Rennen> = {
   id: 'rennen',
+  // Stufenleiter: Mindeststufe nach der Strecke des führenden Teams
+  fortschritt(z) {
+    return z.teams.length ? Math.min(1, Math.max(...z.teams.map((_, i) => stand(z, i))) / Math.max(1, z.ziel)) : 0
+  },
   start(z) {
     return Object.assign(z, { schritte: z.teams.map(() => 0), ziel: zielFuer(z), fuehrung: -1 })
   },

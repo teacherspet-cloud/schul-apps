@@ -138,6 +138,7 @@ try {
   pruefe(!/Mia|Ben|Lea|Noah/.test(arenaText), 'Keine Namen in der Arena')
   pruefe((await p.locator('[data-boss-figur="magier"]').count()) === 2, 'Magier zweimal vorne (Mehrfachwahl mit Farbring)')
   pruefe(await da(mp.locator('[data-klasse-eigene-figur="magier"]')), 'Mia sieht ihre Figur am Gerät')
+  pruefe(await da(mp.locator('[data-klasse-leiter]')), 'Mia sieht ihre Stufe der Stufenleiter (Vorgabe)')
   const bild = await p.locator('[data-boss-arena] img').first().evaluate((i) => i.naturalWidth > 0)
   pruefe(bild, 'Figurenbilder laden')
 

@@ -135,6 +135,21 @@ export const KT = {
   uiFigurGewaehlt: t('Deine Figur steht vorne bereit.', 'Your character is ready at the front.', 'Ton personnage est prêt devant.', 'Tu personaje está listo delante.', 'Il tuo personaggio è pronto davanti.', 'Persona tua ante omnes parata est.'),
   uiZuSchnell: t('Zu schnell! Lies erst die Frage – weiter in {0} s.', 'Too fast! Read the question first – go on in {0} s.', 'Trop vite ! Lis d’abord la question – reprise dans {0} s.', '¡Demasiado rápido! Lee primero la pregunta: sigues en {0} s.', 'Troppo veloce! Leggi prima la domanda – riprendi tra {0} s.', 'Nimis celeriter! Prius quaestionem lege – post {0} s perge.'),
   uiLoesungLesen: t('Lies die Lösung …', 'Read the answer …', 'Lis la solution …', 'Lee la solución …', 'Leggi la soluzione …', 'Responsum lege …'),
+  // Stufenleiter (17.11.2026)
+  leHoeren: t('Hör genau hin: Was bedeutet das Wort?', 'Listen carefully: what does the word mean?', 'Écoute bien : que veut dire ce mot ?', 'Escucha bien: ¿qué significa la palabra?', 'Ascolta bene: che cosa significa la parola?', 'Diligenter audi: quid verbum significat?'),
+  leDiktat: t('Schreib das Wort, das du hörst.', 'Write the word you hear.', 'Écris le mot que tu entends.', 'Escribe la palabra que oyes.', 'Scrivi la parola che senti.', 'Scribe verbum quod audis.'),
+  leStufe: t('Stufe {0}/{1} · {2}', 'Level {0}/{1} · {2}', 'Niveau {0}/{1} · {2}', 'Nivel {0}/{1} · {2}', 'Livello {0}/{1} · {2}', 'Gradus {0}/{1} · {2}'),
+  leAufstieg: t('⬆ Stufe {0}: {1}!', '⬆ Level {0}: {1}!', '⬆ Niveau {0} : {1} !', '⬆ ¡Nivel {0}: {1}!', '⬆ Livello {0}: {1}!', '⬆ Gradus {0}: {1}!'),
+  le_wahl3: t('Bedeutung wählen', 'Choose the meaning', 'Choisis le sens', 'Elige el significado', 'Scegli il significato', 'Significationem elige'),
+  le_wahl4: t('Bedeutung wählen (4)', 'Choose the meaning (4)', 'Choisis le sens (4)', 'Elige el significado (4)', 'Scegli il significato (4)', 'Significationem elige (4)'),
+  le_hoerwahl: t('Hören und wählen', 'Listen and choose', 'Écoute et choisis', 'Escucha y elige', 'Ascolta e scegli', 'Audi et elige'),
+  le_rueckwahl: t('Wort wählen', 'Choose the word', 'Choisis le mot', 'Elige la palabra', 'Scegli la parola', 'Verbum elige'),
+  le_salat: t('Buchstabensalat', 'Letter jumble', 'Lettres mélangées', 'Letras revueltas', 'Lettere mescolate', 'Litterae mixtae'),
+  le_schreiben: t('Wort schreiben', 'Write the word', 'Écris le mot', 'Escribe la palabra', 'Scrivi la parola', 'Verbum scribe'),
+  le_diktat: t('Diktat', 'Dictation', 'Dictée', 'Dictado', 'Dettato', 'Dictatum'),
+  le_satz: t('Im Satz schreiben', 'Write it in the sentence', 'Écris-le dans la phrase', 'Escríbelo en la frase', 'Scrivilo nella frase', 'In sententia scribe'),
+  uiLeiter: t('Stufenleiter: es wird immer schwerer', 'Level ladder: it gets harder and harder', 'Échelle de niveaux : de plus en plus difficile', 'Escalera de niveles: cada vez más difícil', 'Scala di livelli: sempre più difficile', 'Scala graduum: semper difficilius'),
+  uiSalatLoeschen: t('Zurück', 'Undo', 'Annuler', 'Deshacer', 'Annulla', 'Retro'),
   uiDuBist: t('Deine Figur', 'Your character', 'Ton personnage', 'Tu personaje', 'Il tuo personaggio', 'Persona tua'),
 
   // ---------------------------------------------------------------- Rennen

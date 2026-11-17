@@ -279,6 +279,11 @@ export interface Frage {
   /** Schreiben statt antippen */
   tippen?: boolean
   alternativen?: string[]
+  /** Buchstabensalat (Klassenspiele, 17.11.2026): Kacheln, die zur Antwort gelegt werden, und ihr Trenner */
+  salat?: string[]
+  salatTrenner?: string
+  /** Hören: dieser Text wird am Gerät vorgelesen (nicht angezeigt) */
+  hoeren?: string
 }
 
 /** Rückmeldung nach einem Zug – erst jetzt kommt die Lösung auf die Geräte */

@@ -62,6 +62,10 @@ export function zielFeld(z: Gebiet, team: number, sterne: number): number | null
 
 export const gebiet: KlassenRegeln<Gebiet> = {
   id: 'gebiet',
+  // Stufenleiter: Mindeststufe nach dem Anteil eroberter Felder
+  fortschritt(z) {
+    return z.felder.length ? z.felder.filter((f) => f.team !== null).length / z.felder.length : 0
+  },
   start(z) {
     const felder = Array.from({ length: SPALTEN * ZEILEN }, () => {
       const r = zufall(z)

@@ -14,6 +14,7 @@ import { eloSchritt, schwierigkeitVon, startTheta, stufenFuer, wahrscheinlichkei
 import { kleineTeams, teamFuerNeue, teamsBilden, tischeBilden, type Team } from './teams'
 import { klassenspielInfo, type KlassenEinstellungen, type KlassenspielId } from './typen'
 import { farbName, kt } from './texte'
+import { AUFSTIEG_NACH, ELO_STUFE, formatFuer, leiterVon, mindestStufe, salatKacheln, startLeiter, type LeiterFormat } from './leiter'
 
 // ---------------------------------------------------------------- Inhalt
 
@@ -50,6 +51,9 @@ export interface KAufgabe {
   frage: Frage
   b: number
   seit: number
+  /** Stufenleiter: Format und Stufe dieser Aufgabe */
+  format?: LeiterFormat
+  leiter?: number
 }
 
 export interface KPerson {
@@ -80,6 +84,12 @@ export interface KPerson {
   /** Zu schnelle Antworten innerhalb einer Minute (die Sperre wächst) und Zeitpunkt der letzten */
   zuSchnell?: number
   zuSchnellZeit?: number
+  /** Stufenleiter (17.11.2026): eigene Stufe (1-basiert, nie abwärts), richtige in Folge, letzter Aufstieg */
+  leiter?: number
+  leiterSerie?: number
+  leiterAuf?: { nr: number; stufe: number }
+  /** Im Spiel schon richtig beantwortete Items (gelten für die Stufenleiter nicht mehr als „neu") */
+  gekonnt?: string[]
 }
 
 export interface BBlockTeam {
@@ -141,7 +151,7 @@ export interface BBlockBoss {
 }
 export interface BossEreignis {
   nr: number
-  art: 'treffer' | 'abwehr' | 'fehler' | 'schlag' | 'phase' | 'spezial'
+  art: 'treffer' | 'abwehr' | 'fehler' | 'schlag' | 'phase' | 'spezial' | 'aufstieg'
   wert?: number
   slot?: number
   krit?: boolean
@@ -177,6 +187,8 @@ export interface KBasis {
   nr: number
   /** Bisheriger Klassenrekord dieses Spiels (vom Server beim Start gesetzt) */
   rekordBisher: { wert: number; text: string } | null
+  /** Stufenleiter: Mindeststufe für alle (aus dem Spielfortschritt) */
+  leiterMindest?: number
   /** Boss-Kampf: gewählte Figur je Person (im Wartebereich, vom Server gesetzt) und Ausrüstungsstufe */
   figuren?: Record<string, { figur: string; stufe: number }>
 }
@@ -220,6 +232,8 @@ export interface KlassenRegeln<Z extends KBasis = KBasis> {
   beamer(z: Z, jetzt: number): BBlock[]
   /** Kopf am Gerät (Stand des Spiels, eigenes Team) */
   geraet(z: Z, wer: string, jetzt: number): Block[]
+  /** Spielfortschritt 0–1 für die Mindeststufe der Stufenleiter (sonst die verstrichene Zeit) */
+  fortschritt?(z: Z, jetzt: number): number
   /** Zusatz für das Gerät außerhalb der Bausteine (Boss: eigene Figur, Schlag- und Rückmeldungsnummern für Effekte) */
   geraetExtra?(z: Z, wer: string, jetzt: number): Record<string, unknown> | null
   ergebnis(z: Z): KErgebnis
@@ -282,7 +296,8 @@ export function personDazu(z: KBasis, id: string, name: string, band: Record<str
     zuletzt: [],
     wieder: [],
     serie: 0,
-    beitritt: jetzt
+    beitritt: jetzt,
+    ...(z.einst.schwierigkeit === 'leiter' ? { leiter: startLeiter(theta), leiterSerie: 0 } : {})
   }
   z.personen[id] = p
   if (z.teams.length) {
@@ -341,6 +356,36 @@ export function erlaubteStufen(z: KBasis): Stufe[] {
   return stufenFuer(z.einst.schwierigkeit, z.einst.feste, z.level)
 }
 
+/**
+ * Frage im Format der Stufenleiter (leiter.ts). Hören/Diktat: das Wort wird am Gerät vorgelesen, der Text bleibt verdeckt.
+ */
+export function leiterFrage(z: KBasis, item: SpielItem, bereich: 'vok' | 'gram', format: LeiterFormat): Frage {
+  const inhalt = bereich === 'vok' ? z.inhalt.vok : z.inhalt.gram
+  const pb = pseudoBasis(z, inhalt)
+  const tippen = format === 'salat' || format === 'schreiben' || format === 'diktat' || format === 'satz'
+  const optionen = format === 'wahl3' ? 3 : 4
+  let art: FragenArt = 'standard'
+  if (bereich === 'vok') art = format === 'wahl3' || format === 'wahl4' || format === 'hoerwahl' ? 'erkennen' : format === 'satz' && item.vok?.luecke ? 'luecke' : 'abrufen'
+  const f = frageAus(pb, item, art, optionen, tippen)
+  z.saat = (pb as unknown as { saat: number }).saat
+  if (format === 'salat') {
+    const s = salatKacheln(f.loesung, () => zufall(z))
+    f.salat = s.kacheln
+    f.salatTrenner = s.trenner
+  }
+  if (bereich === 'vok' && item.vok && (format === 'hoerwahl' || format === 'diktat')) {
+    f.hoeren = item.vok.term
+    f.frage = kt(z.sprache, format === 'diktat' ? 'leDiktat' : 'leHoeren')
+    delete f.zusatz
+  }
+  return f
+}
+
+/** Stufe, auf der die Person gerade spielt (eigene Stufe, mindestens die Mindeststufe) */
+export function leiterStufe(z: KBasis, p: KPerson): number {
+  return Math.max(p.leiter ?? 1, z.leiterMindest ?? 1)
+}
+
 const pseudoBasis = (z: KBasis, inhalt: SpielInhalt): Basis =>
   ({ saat: z.saat, inhalt, jahrgang: z.jahrgang, tippen: false }) as unknown as Basis
 
@@ -381,7 +426,10 @@ export function naechsteAufgabe(
   const p = z.personen[wer]
   if (!p) return null
   const ziel = opt.zielP ?? ZIEL_P
-  const erlaubt = opt.stufen?.length ? opt.stufen : erlaubteStufen(z)
+  // Stufenleiter: das Format steht fest (eigene Stufe), gewählt wird nur das Item (Elo-Ziel wie adaptiv)
+  const leiter = z.einst.schwierigkeit === 'leiter' && !opt.stufen?.length ? leiterVon(z.einst) : null
+  const stufeL = leiter ? leiterStufe(z, p) : 0
+  const erlaubt = opt.stufen?.length ? opt.stufen : leiter ? [ELO_STUFE[leiter[stufeL - 1]]] : erlaubteStufen(z)
   const band = z.band[wer] ?? {}
   const vorrang = new Set(z.inhalt.vorrang)
   const zuletzt = new Set([...p.zuletzt, ...(opt.meiden ?? [])])
@@ -389,6 +437,11 @@ export function naechsteAufgabe(
   const bauen = (id: string, wunsch?: Stufe): KAufgabe | null => {
     const g = itemSuchen(z, id)
     if (!g) return null
+    if (leiter) {
+      const { format, stufe: ls } = formatFuer(leiter, stufeL, g.item, band[id] == null && !p.gekonnt?.includes(id))
+      const st = ELO_STUFE[format]
+      return { nr: ++z.nr, item: id, bereich: g.bereich, stufe: st, frage: leiterFrage(z, g.item, g.bereich, format), b: schwierigkeitVon(band[id], st), seit: jetzt, format, leiter: ls }
+    }
     const moeglich = stufenDesItems(g.item).filter((s) => erlaubt.includes(s))
     const stufen = moeglich.length ? moeglich : stufenDesItems(g.item)
     if (!stufen.length) return null
@@ -462,6 +515,13 @@ export function neueAufgabe<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, we
     const a = regeln.aufgabeFuer(z, wer, jetzt)
     if (a) return a
   }
+  if (z.einst.schwierigkeit === 'leiter') {
+    // Mindeststufe aus dem Spielfortschritt (Boss: Phasen, Expedition: Lager …; sonst Zeit) – hebt die eigene Stufe mit
+    const f = regeln.fortschritt?.(z, jetzt) ?? Math.max(0, Math.min(1, (jetzt - z.start) / Math.max(1, z.bis - z.start)))
+    z.leiterMindest = Math.max(z.leiterMindest ?? 1, mindestStufe(f, leiterVon(z.einst)))
+    const p = z.personen[wer]
+    if (p && (p.leiter ?? 1) < z.leiterMindest) p.leiter = z.leiterMindest
+  }
   return naechsteAufgabe(z, wer, jetzt, regeln.vorschlag?.(z, wer), { zielP: regeln.zielP?.(z, wer) ?? null })
 }
 
@@ -530,6 +590,7 @@ export function verbuchen<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer:
   if (richtig) {
     p.richtig++
     p.serie++
+    if (!p.gekonnt?.includes(a.item)) p.gekonnt = [...(p.gekonnt ?? []), a.item].slice(-500)
     p.punkte += punkteFuer(prob)
     s.r++
     p.wieder = p.wieder.filter((w) => w.item !== a.item)
@@ -539,6 +600,16 @@ export function verbuchen<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer:
     s.f++
     if (!p.fehler.includes(a.item)) p.fehler.push(a.item)
     if (!p.wieder.some((w) => w.item === a.item)) p.wieder.push({ item: a.item, ab: p.n + 3 + Math.floor(zufall(z) * 3) })
+  }
+  // Stufenleiter: 3 richtige in Folge → eine Stufe höher; ein Fehler setzt nur den Zähler zurück (nie abwärts)
+  if (z.einst.schwierigkeit === 'leiter' && a.leiter) {
+    const von = leiterVon(z.einst).length
+    p.leiterSerie = richtig ? (p.leiterSerie ?? 0) + 1 : 0
+    if (p.leiterSerie >= AUFSTIEG_NACH && (p.leiter ?? 1) < von) {
+      p.leiter = (p.leiter ?? 1) + 1
+      p.leiterSerie = 0
+      p.leiterAuf = { nr: ++z.nr, stufe: p.leiter }
+    }
   }
   p.rueck = { nr: a.nr, richtig, ...(richtig ? {} : { loesung: a.frage.loesung }) }
   p.zuletzt = [...p.zuletzt, a.item].slice(-8)
@@ -595,6 +666,8 @@ export function geraetSicht<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, we
   if (eigene) return [...aus, ...eigene]
   if (regeln.frageZeigen && !regeln.frageZeigen(z, wer)) return aus
   if (!p.aufgabe) p.aufgabe = neueAufgabe(z, regeln, wer, jetzt)
+  // Hören/Diktat: erst vorlesen (der Text bleibt verdeckt), dann die Frage
+  if (p.aufgabe?.frage.hoeren && !z.ende) aus.push({ typ: 'vorlesen', text: p.aufgabe.frage.hoeren, sprache: z.sprache })
   if (p.aufgabe && !z.ende) aus.push(frageBlock(p.aufgabe.frage, 'antwort', false, p.aufgabe.bereich === 'vok' && p.aufgabe.stufe !== 1 ? z.sprache : undefined))
   return aus
 }

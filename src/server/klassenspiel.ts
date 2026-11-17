@@ -42,6 +42,7 @@ import {
 import { grammatikFuerSpiel as G } from './grammatik'
 import { achievementKlasse, achievementZusammen, bossDatenVon, bossFigurMerken } from './achievementsDaten'
 import { ausruestungStufe, figurenFuer } from '../shared/klassenspiel/bossBestand'
+import { leiterVon } from '../shared/klassenspiel/leiter'
 import { figurZuteilen } from '../shared/klassenspiel/spiele/boss'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
@@ -56,6 +57,7 @@ import {
   antworten,
   bereitAb,
   geraetSicht,
+  leiterStufe,
   gramKennung,
   kennungAus,
   kNeu,
@@ -434,6 +436,18 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     name: r.namen.get(wer) ?? '',
     // Nummer der laufenden Aufgabe – die Antwort nennt sie (doppelt getippt zählt nicht zweimal)
     ...(r.phase === 'spiel' && p?.aufgabe ? { aufgabeNr: p.aufgabe.nr } : {}),
+    // Stufenleiter: eigene Stufe, Format der laufenden Aufgabe, letzter Aufstieg (für die Meldung am Gerät)
+    ...(r.phase === 'spiel' && p && r.einst.schwierigkeit === 'leiter'
+      ? {
+          leiter: {
+            stufe: leiterStufe(z, p),
+            von: leiterVon(r.einst).length,
+            format: p.aufgabe?.format ?? leiterVon(r.einst)[leiterStufe(z, p) - 1],
+            formatStufe: p.aufgabe?.leiter ?? leiterStufe(z, p),
+            auf: p.leiterAuf ?? null
+          }
+        }
+      : {}),
     // Tempo-Schutz: ab wann wieder geantwortet werden darf (Server-Zeit) und warum gesperrt
     ...(r.phase === 'spiel' && p ? { bereitAb: bereitAb(p), sperre: (p.sperreBis ?? 0) > jetzt ? { bis: p.sperreBis, grund: p.sperreGrund ?? 'fehler' } : null } : {}),
     bis: z.bis,

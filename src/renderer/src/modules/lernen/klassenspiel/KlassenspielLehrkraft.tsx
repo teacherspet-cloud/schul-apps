@@ -345,14 +345,25 @@ function StartFenster({ kursId, schliessen, gestartet }: { kursId: string; schli
                 value={e.schwierigkeit}
                 onChange={(v) => setze({ schwierigkeit: v as KlassenEinstellungen['schwierigkeit'] })}
                 data={[
+                  { value: 'leiter', label: 'Stufenleiter' },
                   { value: 'adaptiv', label: 'Adaptiv' },
                   { value: 'level', label: 'Level steigen' },
                   { value: 'fest', label: 'Feste Stufe' }
                 ]}
                 data-klassenspiel-schwierigkeit
               />
+              {e.schwierigkeit === 'leiter' && (
+                <Switch
+                  label="Hören erlaubt (Wort wird vorgelesen – Kopfhörer nötig): Stufen „Hören und wählen“ und „Diktat“"
+                  checked={e.hoeren}
+                  onChange={(x) => setze({ hoeren: x.currentTarget.checked })}
+                  data-klassenspiel-hoeren
+                />
+              )}
               <Text size="sm" c="dimmed">
-                {e.schwierigkeit === 'adaptiv'
+                {e.schwierigkeit === 'leiter'
+                  ? 'Jede:r steigt nach 3 richtigen Antworten in Folge eine Stufe auf (nie wieder ab): Bedeutung wählen → Wort wählen → Buchstabensalat → Wort schreiben → im Satz schreiben. Start nach Lernstand (höchstens Stufe 3); mit dem Spielfortschritt steigt die Mindeststufe für alle.'
+                  : e.schwierigkeit === 'adaptiv'
                   ? 'Jede:r bekommt Aufgaben auf dem eigenen Niveau (aus dem Lernstand, laufend nachgeregelt – etwa 3 von 4 gelingen). Leichtes zum Auswählen, Schweres zum Schreiben.'
                   : e.schwierigkeit === 'level'
                   ? 'Alle beginnen mit Erkennen und Auswählen; mit jedem Level wird es schwerer – bis zum Schreiben im Satz.'
@@ -638,7 +649,13 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                       {s.inhalt.gram ? kt(s.sprache, 'uiGrammatik', s.inhalt.gram) : ''}
                     </Badge>
                     <Badge size="lg" variant="light" color="grape" tt="none">
-                      {s.einst.schwierigkeit === 'adaptiv' ? kt(s.sprache, 'uiAdaptiv') : s.einst.schwierigkeit === 'level' ? kt(s.sprache, 'uiLevel') : kt(s.sprache, 'uiFest')}
+                      {s.einst.schwierigkeit === 'leiter'
+                        ? kt(s.sprache, 'uiLeiter')
+                        : s.einst.schwierigkeit === 'adaptiv'
+                        ? kt(s.sprache, 'uiAdaptiv')
+                        : s.einst.schwierigkeit === 'level'
+                        ? kt(s.sprache, 'uiLevel')
+                        : kt(s.sprache, 'uiFest')}
                     </Badge>
                     <Badge size="lg" variant="light" color="gray" tt="none">
                       {kt(s.sprache, 'uiMinuten', s.einst.dauer)}

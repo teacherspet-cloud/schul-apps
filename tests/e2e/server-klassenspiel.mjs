@@ -267,9 +267,12 @@ try {
         const frage = await antwortApi(c, n.code, i)
         if (typeof frage === 'string' && /Yesterday/.test(frage)) gram = true
       }
-    const sicht = (await api(lk).get(`/server/klassenspiel/${n.code}/zustand`)).sicht
+    const zu = await api(lk).get(`/server/klassenspiel/${n.code}/zustand`)
+    const sicht = zu.sicht
+    if (!sicht) console.log(`     (Zustand ${spiel}: ${zu.status} ${zu.fehler ?? ''})`)
     // Turnier: nach allen Runden regulär zu Ende
-    pruefe(st.status === 200 && (sicht?.phase === 'spiel' || (spiel === 'turnier' && sicht?.phase === 'ende')) && sicht.bloecke?.length > 0, `${spiel} (${schwierigkeit}): läuft, Beamer-Bausteine ${sicht?.bloecke?.map((b) => b.typ).join('/')}`)
+    // Turnier endet nach allen Runden, der Boss kann gewinnen (Niederlage der Klasse) – beides regulär
+    pruefe(st.status === 200 && (sicht?.phase === 'spiel' || (['turnier', 'boss'].includes(spiel) && sicht?.phase === 'ende')) && sicht.bloecke?.length > 0, `${spiel} (${schwierigkeit}): läuft, Beamer-Bausteine ${sicht?.bloecke?.map((b) => b.typ).join('/')}`)
     // Team-Puzzle stellt eine Teamfrage – Grammatik kommt dort nicht zwingend in 10 Zügen
     if (spiel !== 'puzzle') pruefe(gram, `${spiel}: Grammatik kommt mit Vokabeln gemischt dran`)
     const n2 = sicht?.personen?.reduce((x, p) => x + p.n, 0) ?? 0

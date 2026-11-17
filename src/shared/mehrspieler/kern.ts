@@ -27,7 +27,7 @@ export interface Kachel {
 export type Block =
   | { typ: 'titel'; text: string; klein?: string }
   | { typ: 'text'; text: string; ton?: Ton; gross?: boolean }
-  | { typ: 'frage'; frage: string; zusatz?: string; optionen: string[]; tippen?: boolean; aktion: string; gesperrt?: boolean; sprache?: string }
+  | { typ: 'frage'; frage: string; zusatz?: string; optionen: string[]; tippen?: boolean; aktion: string; gesperrt?: boolean; sprache?: string; salat?: string[]; salatTrenner?: string }
   | { typ: 'kacheln'; titel?: string; kacheln: Kachel[]; aktion?: string; spalten?: number; mehrfach?: number; senden?: string }
   | { typ: 'reihe'; titel?: string; teile: string[]; leer?: number }
   | { typ: 'seil'; wert: number; ziel: number; links: string; rechts: string }
@@ -302,6 +302,7 @@ export const frageBlock = (f: Frage, aktion = 'antwort', gesperrt = false, sprac
   ...(f.zusatz ? { zusatz: f.zusatz } : {}),
   optionen: f.optionen,
   ...(f.tippen ? { tippen: true } : {}),
+  ...(f.salat ? { salat: f.salat, salatTrenner: f.salatTrenner ?? '' } : {}),
   aktion,
   ...(gesperrt ? { gesperrt: true } : {}),
   ...(sprache ? { sprache } : {})

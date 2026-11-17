@@ -3,8 +3,8 @@
  * kern.ts `Block`), diese Datei zeichnet sie – für alle Mehrspieler-Spiele gleich. Groß und antippbar (iPad), Schreiben
  * nur, wo die Schwierigkeit es verlangt.
  */
-import { Alert, Badge, Button, Card, Group, Image, Progress, SimpleGrid, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
-import { IconArrowsShuffle, IconCheck, IconClock, IconRotateClockwise2, IconVolume } from '@tabler/icons-react'
+import { ActionIcon, Alert, Badge, Button, Card, Group, Image, Progress, SimpleGrid, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
+import { IconArrowsShuffle, IconCheck, IconClock, IconRotateClockwise2, IconVolume, IconBackspace } from '@tabler/icons-react'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { spielText, type TextSchluessel } from '@shared/spielSprache'
 import type { Block, Kachel } from '@shared/mehrspieler/kern'
@@ -64,6 +64,48 @@ function Vorlesen({ text, sprache }: { text: string; sprache: string }): React.J
   )
 }
 
+/**
+ * Buchstabensalat (Stufenleiter der Klassenspiele, 17.11.2026): Kacheln antippen legt sie in die Antwort, ⌫ nimmt die
+ * letzte zurück; sind alle gelegt, geht die Antwort ab.
+ */
+function Salat({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Senden }): React.JSX.Element {
+  const [gelegt, setGelegt] = useState<number[]>([])
+  const kacheln = b.salat ?? []
+  useEffect(() => setGelegt([]), [b.frage, kacheln.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
+  const legen = (i: number): void => {
+    if (b.gesperrt || gelegt.includes(i)) return
+    const neu = [...gelegt, i]
+    setGelegt(neu)
+    if (neu.length === kacheln.length) {
+      senden(b.aktion, neu.map((k) => kacheln[k]).join(b.salatTrenner ?? ''))
+      setGelegt([])
+    }
+  }
+  return (
+    <Stack gap="sm" mt="sm" data-mehr-salat>
+      <Group gap={4} justify="center" mih={48} style={{ borderBottom: '2px dashed var(--mantine-color-default-border)', paddingBottom: 6 }} data-mehr-salat-antwort>
+        {gelegt.map((k, n) => (
+          <Badge key={n} size="xl" radius="sm" variant="light" tt="none">
+            {kacheln[k]}
+          </Badge>
+        ))}
+        {gelegt.length > 0 && (
+          <ActionIcon variant="subtle" size="lg" onClick={() => setGelegt(gelegt.slice(0, -1))} aria-label="⌫" data-mehr-salat-zurueck>
+            <IconBackspace size={20} />
+          </ActionIcon>
+        )}
+      </Group>
+      <Group gap={6} justify="center">
+        {kacheln.map((k, i) => (
+          <Button key={i} size="lg" variant="default" radius="md" disabled={b.gesperrt || gelegt.includes(i)} onClick={() => legen(i)} data-mehr-salat-kachel={k} miw={48}>
+            {k}
+          </Button>
+        ))}
+      </Group>
+    </Stack>
+  )
+}
+
 function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Senden }): React.JSX.Element {
   const t = useT()
   const [text, setText] = useState('')
@@ -78,7 +120,9 @@ function Frage({ b, senden }: { b: Extract<Block, { typ: 'frage' }>; senden: Sen
           {b.zusatz}
         </Text>
       )}
-      {b.tippen ? (
+      {b.salat ? (
+        <Salat b={b} senden={senden} />
+      ) : b.tippen ? (
         <Group mt="sm" wrap="nowrap">
           <TextInput
             style={{ flex: 1 }}

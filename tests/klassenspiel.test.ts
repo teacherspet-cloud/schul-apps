@@ -100,7 +100,7 @@ describe('Klassenspiele – Elo', () => {
   it('adaptiv: die Trefferquote pendelt sich bei etwa 78 % ein – für schwache, mittlere und starke Kinder', () => {
     // p1 hat lauter „mittlere" Wörter: Aufgaben reichen von b = −1,2 (erkennen) bis +1,0 (im Satz schreiben)
     for (const f of [-0.6, 0.5, 1.6]) {
-      const z = spiel('expedition', 2, { dauer: 30 })
+      const z = spiel('expedition', 2, { dauer: 30, schwierigkeit: 'adaptiv' })
       delete z.personen.p0
       ;(z as unknown as { lager: number }).lager = -99 // nie fertig
       simuliere(z, 'expedition', 200, () => f)
@@ -274,6 +274,75 @@ describe('Klassenspiele – Tempo-Schutz (Hämmern auf dem iPad)', () => {
   })
 })
 
+describe('Klassenspiele – Stufenleiter je Kind', () => {
+  const richtigAntworten = (z: KBasis, r: NonNullable<(typeof KLASSEN_REGELN)['boss']>, wer: string, n: number, t0: number): number => {
+    let t = t0
+    for (let i = 0; i < n; i++) {
+      geraetSicht(z, r, wer, t)
+      t += 4000
+      antworten(z, r, wer, z.personen[wer].aufgabe!.frage.loesung, t)
+    }
+    return t
+  }
+  it('3 richtige in Folge → eine Stufe höher; Fehler senken nie; Formate werden schwerer', () => {
+    const z = spiel('rekord', 1, { dauer: 30 })
+    const r = KLASSEN_REGELN.rekord!
+    const p = z.personen.p0
+    const start = p.leiter!
+    expect(start).toBeGreaterThanOrEqual(1)
+    expect(start).toBeLessThanOrEqual(3)
+    let t = richtigAntworten(z, r, 'p0', 3, 1000)
+    expect(p.leiter).toBe(start + 1)
+    // Fehler: Stufe bleibt
+    geraetSicht(z, r, 'p0', t)
+    antworten(z, r, 'p0', '###', (t += 4000))
+    expect(p.leiter).toBe(start + 1)
+    t = richtigAntworten(z, r, 'p0', 12, t + 4000)
+    expect(p.leiter).toBeGreaterThanOrEqual(5)
+    geraetSicht(z, r, 'p0', t)
+    expect(['schreiben', 'satz', 'salat']).toContain(p.aufgabe!.format)
+    expect(p.aufgabe!.stufe).toBeGreaterThanOrEqual(2)
+  })
+  it('Buchstabensalat: Kacheln ergeben die Lösung; Hören nur mit Schalter und ohne sichtbaren Text', () => {
+    const z = spiel('rekord', 1, { dauer: 30, hoeren: true })
+    const r = KLASSEN_REGELN.rekord!
+    const p = z.personen.p0
+    p.leiter = 2
+    p.gekonnt = z.inhalt.vok.items.map((i) => i.id)
+    geraetSicht(z, r, 'p0', 0)
+    expect(p.aufgabe!.format).toBe('hoerwahl')
+    const sicht = geraetSicht(z, r, 'p0', 0)
+    const vor = sicht.find((b) => b.typ === 'vorlesen') as { text: string } | undefined
+    expect(vor?.text).toBeTruthy()
+    const fr = sicht.find((b) => b.typ === 'frage') as { frage: string }
+    expect(fr.frage).not.toContain(vor!.text)
+    // Salat
+    p.leiter = 4
+    p.aufgabe = null
+    geraetSicht(z, r, 'p0', 10_000)
+    expect(p.aufgabe!.format).toBe('salat')
+    const f = p.aufgabe!.frage
+    expect([...f.salat!].sort().join(f.salatTrenner)).toBe([...(f.salatTrenner ? f.loesung.split(' ') : [...f.loesung])].sort().join(f.salatTrenner))
+    // Ohne Hören: keine Hör-Formate
+    const ohne = spiel('rekord', 1, { dauer: 30 })
+    ohne.personen.p0.leiter = 2
+    ohne.personen.p0.gekonnt = ohne.inhalt.vok.items.map((i) => i.id)
+    geraetSicht(ohne, r, 'p0', 0)
+    expect(ohne.personen.p0.aufgabe!.format).toBe('wahl4')
+  })
+  it('Mindeststufe: Boss-Phase 3 hebt alle auf „schreiben"; neue Wörter bleiben höchstens bei Stufe 3', () => {
+    const z = spiel('boss', 1, { dauer: 30 }) as KBasis & { hp: number; max: number }
+    const r = KLASSEN_REGELN.boss!
+    const p = z.personen.p0
+    p.leiter = 1
+    z.hp = z.max * 0.2
+    p.gekonnt = z.inhalt.vok.items.map((i) => i.id)
+    geraetSicht(z, r, 'p0', 0)
+    expect(p.leiter).toBe(5)
+    expect(p.aufgabe!.format).toBe('schreiben')
+  })
+})
+
 describe('Klassenspiele – Kennungen und Einstellungen', () => {
   it('Kennungen hin und zurück', () => {
     expect(kennungAus('v:abc')).toEqual({ bereich: 'vok', orig: 'abc' })
@@ -285,7 +354,8 @@ describe('Klassenspiele – Kennungen und Einstellungen', () => {
     expect(e.dauer).toBe(30)
     expect(e.teams).toBe(2)
     expect(e.vok).toBe(true)
-    expect(e.schwierigkeit).toBe('adaptiv')
+    expect(e.schwierigkeit).toBe('leiter')
+    expect(e.hoeren).toBe(false)
   })
   it('naechsteAufgabe meidet gerade Gesehenes', () => {
     const z = spiel('expedition', 1)

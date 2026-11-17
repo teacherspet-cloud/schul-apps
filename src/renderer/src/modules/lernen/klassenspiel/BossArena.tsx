@@ -239,6 +239,12 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
     } else if (e.art === 'abwehr') {
       const p = e.slot !== undefined ? plaetze[e.slot] : null
       effekt('schild', p ? p.x + 4 : 40, p ? 100 - p.b - p.h / 2 : 60, p ? 12 : 20, 600)
+    } else if (e.art === 'aufstieg') {
+      if (e.slot !== undefined) {
+        blitz(figurBilder.current[e.slot], 'ba-gold', 900)
+        const p = plaetze[e.slot]
+        if (p) zahl('⬆', p.x, 100 - p.b - p.h - 2, '#fde047', false)
+      }
     } else if (e.art === 'fehler') {
       if (e.slot !== undefined) {
         figurPose(e.slot, 'getroffen', 450)

@@ -16,12 +16,14 @@
  * FAUSTREGELN: Boss-LP = Personen × Minuten × 3,2 (Boss fällt bei ≈ 4 richtigen Antworten je Kind und Minute nach etwa
  * 70 % der Zeit); Schaden je Kugel = 100 ÷ (Personen × Minuten × 0,8), höchstens 8. Simulation (tests/klassenspiel.test.ts,
  * 17.11.2026): bei 78 % Quote bleiben der Klasse 63–69 % Leben, bei 55 % 0–6 % (Niederlage bzw. knapp), bei 70 % 25–44 %.
+ * Mit Stufenleiter (Boss-Leben × 1,3): 78 % → 61–63 % Leben, Boss fällt nach 6–6,5 von 10 min; 55 % → Niederlage.
  * Takt 12/10/8 s je Phase; Kugel trifft erst ab 6 s Alter.
  */
 import { zufall } from '../../mehrspieler/kern'
 import { klassenwertVon, meldung, type BBlock, type BossEreignis, type KBasis, type KlassenRegeln } from '../kern'
 import { kt } from '../texte'
 import { figurenFuer, hintergrundFuer, monsterFuer, monsterName } from '../bossBestand'
+import type { LeiterFormat } from '../leiter'
 
 export const TAKT_MS = [12_000, 10_000, 8_000]
 export const KUGEL_REIF_MS = 6_000
@@ -53,10 +55,15 @@ export interface Boss extends KBasis {
   ereignisse: BossEreignis[]
   /** Je Person: letzter Schlag/Abwehr/Krit (Nummern für die Effekte am Gerät) */
   schlag: { nr: number; schaden: number }
-  eigen: Record<string, { abwehr?: number; krit?: number }>
+  eigen: Record<string, { abwehr?: number; krit?: number; auf?: number }>
 }
 
-export const lebenFuer = (z: KBasis): number => Math.max(30, Math.round(Object.keys(z.personen).length * z.einst.dauer * 3.2))
+/** Schaden je Format der Stufenleiter (FAUSTREGEL: Auswählen 1, Hören/Wort wählen/Salat 1,5, Schreiben 2, Diktat/Satz 2,5) */
+export const FORMAT_SCHADEN: Record<LeiterFormat, number> = { wahl3: 1, wahl4: 1, hoerwahl: 1.5, rueckwahl: 1.5, salat: 1.5, schreiben: 2, diktat: 2.5, satz: 2.5 }
+
+/** Stufenleiter: schwerere Formate schaden mehr – der Boss hat dort 30 % mehr Leben (Simulation 17.11.2026) */
+export const lebenFuer = (z: KBasis): number =>
+  Math.max(30, Math.round(Object.keys(z.personen).length * z.einst.dauer * 3.2 * (z.einst.schwierigkeit === 'leiter' ? 1.3 : 1)))
 export const schadenJeKugel = (z: KBasis): number => Math.min(8, 100 / (Math.max(1, Object.keys(z.personen).length) * z.einst.dauer * 0.8))
 export const phaseVon = (z: Boss): number => (z.hp > z.max * 0.66 ? 1 : z.hp > z.max * 0.33 ? 2 : 3)
 
@@ -140,11 +147,19 @@ export const boss: KlassenRegeln<Boss> = {
     const p = z.personen[wer]
     const krit = Boolean(p && p.serie > 0 && p.serie % 5 === 0)
     const ruestung = vorher > 1
-    const schaden = (a.stufe >= 3 ? 2 : 1) * (ruestung && a.stufe <= 2 ? 0.5 : 1) * (krit ? 3 : 1)
+    // Stufenleiter: schwerere Formate schaden mehr (FAUSTREGEL); sonst wie bisher Schreiben doppelt
+    const grund = a.format ? FORMAT_SCHADEN[a.format] : a.stufe >= 3 ? 2 : 1
+    const schaden = grund * (ruestung && a.stufe <= 2 ? 0.5 : 1) * (krit ? 3 : 1)
     z.hp = Math.max(0, z.hp - schaden)
     z.treffer++
     ereignis(z, { art: 'treffer', wert: schaden, slot: slotFuer(z, wer, false), krit })
     if (krit) z.eigen[wer] = { ...z.eigen[wer], krit: z.nr }
+    // Aufstieg auf der Stufenleiter (kern.ts verbuchen) – vorne leuchtet die Figur
+    if (p?.leiterAuf && p.leiterAuf.nr > (z.eigen[wer]?.auf ?? 0)) {
+      z.eigen[wer] = { ...z.eigen[wer], auf: p.leiterAuf.nr }
+      const slot = slotFuer(z, wer, false)
+      if (slot !== undefined) ereignis(z, { art: 'aufstieg', slot, wert: p.leiterAuf.stufe })
+    }
     // Abwehr nur durch andere (17.11.2026: eigene Wiederholung wehrte die eigene Kugel ab, bevor sie traf);
     // die eigene richtige Wiederholung räumt nur bereits getroffene Kugeln des Worts ab
     const i = z.angriffe.findIndex((x) => x.item === a.item && !x.getroffen && x.von !== wer)
@@ -179,6 +194,10 @@ export const boss: KlassenRegeln<Boss> = {
       z.ende = true
       meldung(z, kt(z.sprache, 'boBesiegt', z.boss.name), 'gut')
     }
+  },
+  // Mindeststufe der Stufenleiter: je Phase (1 → keine, 2 → Wort wählen, 3 → Schreiben)
+  fortschritt(z) {
+    return (phaseVon(z) - 1) / 2
   },
   tick(z, jetzt) {
     if (z.ende) return false

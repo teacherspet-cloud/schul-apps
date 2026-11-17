@@ -110,7 +110,7 @@ export const istKlassenspielId = (x: unknown): x is KlassenspielId => typeof x =
 
 /** Woher die Inhalte kommen (abgestimmt: alle vier wählbar, kombinierbar) */
 export type InhaltQuelle = 'auswahl' | 'behandelt'
-export type SchwierigkeitArt = 'adaptiv' | 'fest' | 'level'
+export type SchwierigkeitArt = 'leiter' | 'adaptiv' | 'fest' | 'level'
 
 export interface KlassenEinstellungen {
   spiel: KlassenspielId
@@ -137,6 +137,8 @@ export interface KlassenEinstellungen {
    * welche Figur gehört – darum stellt die Lehrkraft das ein: nur Erfolge (Vorgabe), auch Fehler, nur gemeinsam.
    */
   bossReaktion: BossReaktion
+  /** Stufenleiter (17.11.2026): Formate mit Hören erlaubt (Kopfhörer) – sonst ohne „Hören" und „Diktat" */
+  hoeren: boolean
 }
 
 export type BossReaktion = 'erfolge' | 'alle' | 'gemeinsam'
@@ -147,12 +149,14 @@ export const STANDARD_EINSTELLUNGEN: Omit<KlassenEinstellungen, 'spiel'> = {
   vok: true,
   gram: true,
   schwaechen: false,
-  schwierigkeit: 'adaptiv',
+  // Stufenleiter je Kind als Vorgabe (17.11.2026, Wunsch der Lehrkraft: Schwierigkeit steigt sichtbar)
+  schwierigkeit: 'leiter',
   feste: 'mittel',
   dauer: 10,
   teams: 2,
   top3: true,
-  bossReaktion: 'erfolge'
+  bossReaktion: 'erfolge',
+  hoeren: false
 }
 
 const zahl = (x: unknown, min: number, max: number, std: number): number => {
@@ -173,12 +177,13 @@ export function einstellungenBereinigt(roh: Record<string, unknown>): KlassenEin
     vok: vok || !gram,
     gram,
     schwaechen: roh.schwaechen === true,
-    schwierigkeit: roh.schwierigkeit === 'fest' || roh.schwierigkeit === 'level' ? roh.schwierigkeit : 'adaptiv',
+    schwierigkeit: roh.schwierigkeit === 'fest' || roh.schwierigkeit === 'level' || roh.schwierigkeit === 'adaptiv' ? roh.schwierigkeit : 'leiter',
     feste: roh.feste === 'leicht' || roh.feste === 'schwer' ? roh.feste : 'mittel',
     dauer: zahl(roh.dauer, 3, 30, s.dauer),
     teams: zahl(roh.teams, 2, 6, s.teams),
     top3: roh.top3 !== false,
-    bossReaktion: roh.bossReaktion === 'alle' || roh.bossReaktion === 'gemeinsam' ? roh.bossReaktion : 'erfolge'
+    bossReaktion: roh.bossReaktion === 'alle' || roh.bossReaktion === 'gemeinsam' ? roh.bossReaktion : 'erfolge',
+    hoeren: roh.hoeren === true
   }
 }
 

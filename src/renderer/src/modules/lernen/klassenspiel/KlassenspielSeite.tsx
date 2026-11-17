@@ -26,6 +26,8 @@ interface Sicht {
   dabei: boolean
   name: string
   aufgabeNr?: number
+  /** Stufenleiter: eigene Stufe, Format der Aufgabe, letzter Aufstieg */
+  leiter?: { stufe: number; von: number; format: string; formatStufe: number; auf: { nr: number; stufe: number } | null }
   /** Tempo-Schutz: ab wann wieder geantwortet werden darf (Server-Zeit) und laufende Sperre */
   bereitAb?: number
   sperre?: { bis: number; grund: 'fehler' | 'schnell' } | null
@@ -211,6 +213,23 @@ function useTempo(s: Sicht | null): { gesperrt: 'fehler' | 'schnell' | null; res
   }
 }
 
+/** Stufenleiter am Gerät: „Stufe 3/6 · Wort wählen" und beim Aufstieg ein goldener Hinweis */
+function useLeiterAufstieg(s: Sicht | null): string {
+  const [meldung, setMeldung] = useState('')
+  const vorher = useRef<number | null>(null)
+  const auf = s?.leiter?.auf
+  useEffect(() => {
+    if (!s?.leiter) return
+    const nr = auf?.nr ?? 0
+    if (vorher.current !== null && nr > vorher.current && auf) {
+      setMeldung(kt(s.sprache, 'leAufstieg', auf.stufe, kt(s.sprache, `le_${s.leiter.format}` as never)))
+      setTimeout(() => setMeldung(''), 3500)
+    }
+    vorher.current = nr
+  }, [auf?.nr]) // eslint-disable-line react-hooks/exhaustive-deps
+  return meldung
+}
+
 export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element {
   const vorher = useCallback(() => senden('/s/api/klassenspiel/beitreten', { code }), [code])
   const { sicht: s, fehler, setSicht, setFehler } = useLiveSicht<Sicht>({
@@ -230,6 +249,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
   const figurWaehlen = useCallback((figur: string): void => void liveSenden<Sicht>('/s/api/klassenspiel/figur', { code, figur }, setSicht, setFehler, 15000), [code, setSicht, setFehler])
   const effekte = useBossEffekte(s ?? null)
   const tempo = useTempo(s ?? null)
+  const aufstieg = useLeiterAufstieg(s ?? null)
   const karte = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = karte.current
@@ -296,6 +316,23 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                     {kt(s.sprache, 'uiDuBist')}
                   </Text>
                 </Group>
+              )}
+              {s.leiter && (
+                <Group gap="xs" justify="space-between" wrap="nowrap" data-klasse-leiter={s.leiter.stufe}>
+                  <Badge size="lg" variant="light" color="grape" tt="none">
+                    {kt(s.sprache, 'leStufe', s.leiter.formatStufe, s.leiter.von, kt(s.sprache, `le_${s.leiter.format}` as never))}
+                  </Badge>
+                  <Group gap={3} aria-hidden>
+                    {Array.from({ length: s.leiter.von }, (_, i) => (
+                      <div key={i} style={{ width: 10, height: 6 + i * 3, borderRadius: 2, background: i < s.leiter!.stufe ? 'var(--mantine-color-grape-5)' : 'var(--mantine-color-default-border)' }} />
+                    ))}
+                  </Group>
+                </Group>
+              )}
+              {aufstieg && (
+                <Alert color="yellow" variant="filled" py={6} data-klasse-aufstieg>
+                  {aufstieg}
+                </Alert>
               )}
               {s.pause ? (
                 <Card withBorder radius="lg" padding="xl" ta="center">
