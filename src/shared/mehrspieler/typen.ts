@@ -265,6 +265,11 @@ export interface SpielItem {
   }
   /** Umformen (Grammatik): Ausgangssatz, Vorgabe, Lösung */
   umformen?: { satz: string; vorgabe: string; loesung: string }
+  /**
+   * Nur mit Möglichkeiten lösbar (17.11.2026, Befund der Lehrkraft: Lückensätze, bei denen aus dem Zusammenhang nicht zu
+   * erschließen war, was hineingehört): Grammatik-Lücke ohne Grundwort/Vorgabe – ohne die Möglichkeiten passt Vieles.
+   */
+  nurWahl?: boolean
   /** Übersetzung: deutscher Satz und die Teile der Lösung */
   uebersetzung?: { de: string; teile: string[] }
 }

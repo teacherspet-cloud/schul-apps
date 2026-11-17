@@ -248,6 +248,8 @@ export function ablenkerFuer(
 
 /** Frage zu einem Item (mit Möglichkeiten bzw. zum Schreiben) */
 export function frageAus(z: Basis, item: SpielItem, art: FragenArt = 'standard', optionen = 4, tippen = z.tippen): Frage {
+  // Lücke ohne Grundwort (17.11.2026): nur mit Möglichkeiten eindeutig – in keinem Spiel frei schreiben
+  if (item.nurWahl && art === 'standard') tippen = false
   const v = item.vok
   let frage = item.frage
   // Vokabel-Items: Fragezusatz in der Zielsprache (Grammatik behält die Anweisung der Aufgabe)
@@ -269,7 +271,9 @@ export function frageAus(z: Basis, item: SpielItem, art: FragenArt = 'standard',
     eigene = []
   } else if (v && art === 'luecke' && v.luecke) {
     frage = `${v.luecke.vor}___${v.luecke.nach}`
-    zusatz = tx(z, 'welchesFehlt')
+    // Beim Schreiben die Bedeutung dazu (17.11.2026, Befund der Lehrkraft: aus dem Satz allein war oft nicht zu
+    // erschließen, welches Wort fehlt – beim Auswählen grenzen die Möglichkeiten es ein)
+    zusatz = tippen ? `${tx(z, 'welchesFehlt')} (${v.translation})` : tx(z, 'welchesFehlt')
     loesung = v.luecke.loesung
     feld = (i) => i.vok?.term
     eigene = []

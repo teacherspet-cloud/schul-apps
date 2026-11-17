@@ -27,6 +27,9 @@ import type { LeiterFormat } from '../leiter'
 
 export const TAKT_MS = [12_000, 10_000, 8_000]
 export const KUGEL_REIF_MS = 6_000
+/** Kugeln von Lernenden mit „Spiele mit Zeitdruck" aus treffen später (17.11.2026, Entscheidung der Lehrkraft) */
+export const KUGEL_REIF_RUHIG_MS = 12_000
+const reifAb = (z: KBasis, k: Kugel): number => k.seit + (z.personen[k.von]?.ruhig ? KUGEL_REIF_RUHIG_MS : KUGEL_REIF_MS)
 export const WARNUNG_MS = 3_000
 
 export interface Kugel {
@@ -201,7 +204,7 @@ export const boss: KlassenRegeln<Boss> = {
   },
   tick(z, jetzt) {
     if (z.ende) return false
-    const reif = z.angriffe.filter((k) => !k.getroffen && jetzt - k.seit >= KUGEL_REIF_MS)
+    const reif = z.angriffe.filter((k) => !k.getroffen && jetzt >= reifAb(z, k))
     let geaendert = false
     // Vorwarnung: nur wenn wirklich etwas trifft
     const warnen = reif.length > 0 && z.naechster - jetzt <= WARNUNG_MS
@@ -247,7 +250,7 @@ export const boss: KlassenRegeln<Boss> = {
         abgewehrt: z.abgewehrt,
         held: Math.round(z.held * 10) / 10,
         heldMax: 100,
-        kugeln: z.angriffe.filter((k) => !k.getroffen).map((k) => ({ id: k.id, reif: jetzt - k.seit >= KUGEL_REIF_MS })),
+        kugeln: z.angriffe.filter((k) => !k.getroffen).map((k) => ({ id: k.id, reif: jetzt >= reifAb(z, k) })),
         warnung: z.gewarnt,
         naechsterIn: Math.max(0, z.naechster - jetzt),
         spezial: Math.min(1, z.spezial),

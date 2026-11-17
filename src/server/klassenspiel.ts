@@ -245,6 +245,16 @@ function baenderFuer(r: Raum, n: NutzerInfo): Record<string, Band | null> {
   return aus
 }
 
+/** Einstellung der Lernenden „Spiele mit Zeitdruck" (Darstellung, /s/api/darstellung) – aus = ruhiger (17.11.2026) */
+function ohneZeitdruck(nutzerId: string): boolean {
+  try {
+    const z = db().prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(nutzerId) as { daten: string } | undefined
+    return z ? (JSON.parse(z.daten) as { zeitdruck?: boolean }).zeitdruck === false : false
+  } catch {
+    return false
+  }
+}
+
 // ---------------------------------------------------------------- Boss-Kampf: eigene Figuren
 
 /**
@@ -661,6 +671,7 @@ function nochmal(r: Raum, jetzt: number): void {
     // Was im ersten Spiel gelernt wurde, bleibt als Startwert
     q.theta = p.theta
     q.theta0 = p.theta
+    q.ruhig = p.ruhig
   }
   // Gewählte Figuren bleiben (Ausrüstung neu, falls gerade ein Sieg dazukam)
   if (alt.figuren) {
@@ -726,7 +737,10 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
           r.namen = kurzNamenVon([...r.nutzer.values()])
         }
         if (r.phase !== 'ende' && !r.zustand.personen[ich.id]) personDazu(r.zustand, ich.id, r.namen.get(ich.id) ?? ich.name, baenderFuer(r, ich), jetzt)
-        if (r.phase !== 'ende' && r.zustand.personen[ich.id]) figurSetzen(r, ich)
+        if (r.phase !== 'ende' && r.zustand.personen[ich.id]) {
+          figurSetzen(r, ich)
+          r.zustand.personen[ich.id].ruhig = ohneZeitdruck(ich.id)
+        }
         r.lernende.abgefragt(ich.id, jetzt)
         verteilen(r, jetzt)
         return json(res, 200, { ok: true }), true

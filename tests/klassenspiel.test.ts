@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { vokItems, leererInhalt } from '../src/shared/mehrspieler/inhalt'
+import { gramItems, vokItems, leererInhalt } from '../src/shared/mehrspieler/inhalt'
+import { frageAus } from '../src/shared/mehrspieler/kern'
+import { formatFuer, leiterVon } from '../src/shared/klassenspiel/leiter'
 import type { Band } from '../src/shared/mehrspieler/typen'
 import type { Vokabel } from '../src/shared/vokabeltrainer'
 import { eloSchritt, startTheta, stufenFuer, wahrscheinlichkeit } from '../src/shared/klassenspiel/adaptiv'
@@ -237,27 +239,46 @@ describe('Klassenspiele – Spiele mit 30 Kindern', () => {
 })
 
 describe('Klassenspiele – Tempo-Schutz (Hämmern auf dem iPad)', () => {
-  it('zu schnell zählt nicht und sperrt wachsend; nach einem Fehler Zeit für die Lösung', () => {
+  it('schnell und richtig zählt; schnell und falsch zählt nicht und sperrt wachsend; nach Fehlern Zeit für die Lösung', () => {
     const z = spiel('boss', 1)
     const r = KLASSEN_REGELN.boss!
+    const p = z.personen.p0
     geraetSicht(z, r, 'p0', 0)
-    const a = z.personen.p0.aufgabe!
-    expect(antworten(z, r, 'p0', a.frage.loesung, 300)).toBeNull()
-    expect(z.personen.p0.n).toBe(0)
-    expect(z.personen.p0.sperreBis).toBe(3300)
-    // Während der Sperre zählt nichts
-    expect(antworten(z, r, 'p0', a.frage.loesung, 3000)).toBeNull()
-    // Nach der Sperre gilt die (inzwischen gelesene) Antwort; ein Fehler lässt Zeit für die Lösung
-    expect(antworten(z, r, 'p0', '###', 3400)).toEqual({ richtig: false })
-    expect(z.personen.p0.sperreGrund).toBe('fehler')
-    expect(antworten(z, r, 'p0', 'x', 4000)).toBeNull()
-    // Neue Aufgabe sofort nach der Fehlersperre angetippt (vor ihrer Lesezeit) → längere Sperre (6 s), weil binnen einer Minute
-    const neu = z.personen.p0.aufgabe!
-    neu.seit = 5900
-    expect(antworten(z, r, 'p0', 'x', 6000)).toBeNull()
-    expect(z.personen.p0.sperreGrund).toBe('schnell')
-    expect(z.personen.p0.sperreBis).toBe(12_000)
-    expect(z.personen.p0.n).toBe(1)
+    // Starke Lernende: richtig nach 300 ms zählt
+    expect(antworten(z, r, 'p0', p.aufgabe!.frage.loesung, 300)).toEqual({ richtig: true })
+    expect(p.n).toBe(1)
+    // Hämmern: falsch vor der Lesezeit → verworfen, 3 s Sperre
+    expect(antworten(z, r, 'p0', '###', 500)).toBeNull()
+    expect(p.n).toBe(1)
+    expect(p.sperreGrund).toBe('schnell')
+    expect(p.sperreBis).toBe(3500)
+    // Während der Sperre zählt nichts – auch nichts Richtiges
+    expect(antworten(z, r, 'p0', p.aufgabe!.frage.loesung, 3000)).toBeNull()
+    // Wieder schnell und falsch binnen einer Minute → 6 s
+    p.aufgabe!.seit = 3600
+    expect(antworten(z, r, 'p0', '###', 3700)).toBeNull()
+    expect(p.sperreBis).toBe(3700 + 6000)
+    // Nach der Lesezeit falsch → zählt, dann 2,5 s für die Lösung
+    expect(antworten(z, r, 'p0', '###', 20_000)).toEqual({ richtig: false })
+    expect(p.sperreGrund).toBe('fehler')
+    expect(p.sperreBis).toBe(22_500)
+  })
+  it('„Spiele mit Zeitdruck" aus: Sperre steigt nicht, eigene Kugeln treffen erst nach 12 s', () => {
+    const z = spiel('boss', 1) as KBasis & { angriffe: { id: number; item: string; von: string; seit: number }[]; held: number }
+    const r = KLASSEN_REGELN.boss!
+    const p = z.personen.p0
+    p.ruhig = true
+    geraetSicht(z, r, 'p0', 0)
+    antworten(z, r, 'p0', '###', 100)
+    p.aufgabe!.seit = 3200
+    antworten(z, r, 'p0', '###', 3300)
+    expect(p.sperreBis).toBe(3300 + 3000)
+    z.angriffe.push({ id: 99, item: z.inhalt.vok.items[0].id, von: 'p0', seit: 10_000 })
+    r.tick!(z, 12_000)
+    r.tick!(z, 18_000)
+    expect(z.held).toBe(100)
+    r.tick!(z, 30_000)
+    expect(z.held).toBeLessThan(100)
   })
   it('Boss: jede falsche Antwort lädt eine Kugel, die eigene Wiederholung wehrt sie nicht ab', () => {
     const z = spiel('boss', 1) as KBasis & { angriffe: { item: string; getroffen?: boolean }[]; held: number }
@@ -340,6 +361,32 @@ describe('Klassenspiele – Stufenleiter je Kind', () => {
     geraetSicht(z, r, 'p0', 0)
     expect(p.leiter).toBe(5)
     expect(p.aufgabe!.format).toBe('schreiben')
+  })
+})
+
+describe('Lückensätze: aus dem Zusammenhang lösbar (Befund 17.11.2026)', () => {
+  it('Vokabel-Lücke zum Schreiben nennt die Bedeutung, beim Auswählen nicht', () => {
+    const z = spiel('rekord', 1)
+    const item = z.inhalt.vok.items.find((i) => i.vok?.luecke)!
+    const pb = { saat: 3, inhalt: z.inhalt.vok, jahrgang: 7, tippen: false } as never
+    const schreiben = frageAus(pb, item, 'luecke', 4, true)
+    expect(schreiben.zusatz).toContain(item.vok!.translation)
+    const waehlen = frageAus(pb, item, 'luecke', 4, false)
+    expect(waehlen.zusatz).not.toContain(item.vok!.translation)
+  })
+  it('Grammatik-Lücke ohne Grundwort: nie frei schreiben (nur Möglichkeiten oder Buchstabensalat)', () => {
+    const [ohne, mit] = gramItems([
+      { id: 'a1', art: 'auswahl', anweisung: 'Wähle die richtige Form.', satz: 'She ___ to school every day.', optionen: ['goes', 'go', 'went'], loesungen: ['goes'] },
+      { id: 'a2', art: 'luecke', anweisung: 'Setze ein.', satz: 'She ___ to school every day.', vorgabe: '(go)', loesungen: ['goes'] }
+    ] as never)
+    expect(ohne.nurWahl).toBe(true)
+    expect(mit.nurWahl).toBeUndefined()
+    const pb = { saat: 3, inhalt: { items: [ohne, mit] }, jahrgang: 7, tippen: true } as never
+    expect(frageAus(pb, ohne, 'standard', 4, true).tippen).toBeFalsy()
+    expect(frageAus(pb, mit, 'standard', 4, true).tippen).toBe(true)
+    const leiter = leiterVon({ hoeren: false })
+    expect(formatFuer(leiter, 6, ohne, false).format).toBe('salat')
+    expect(formatFuer(leiter, 5, mit, false).format).toBe('schreiben')
   })
 })
 

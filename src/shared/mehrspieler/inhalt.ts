@@ -137,6 +137,8 @@ export function gramItems(aufgaben: GrammatikAufgabe[]): SpielItem[] {
       // Als Frage taugt „Satzbau" nicht (Lösung ist der ganze Satz)
       item.frage = ''
     } else if ((a.art === 'luecke' || a.art === 'auswahl') && a.satz.includes('___')) {
+      // Ohne Grundwort (Vorgabe) ist die Lücke nur mit Möglichkeiten eindeutig – Schreiben wäre Raten
+      if (!a.vorgabe?.trim()) item.nurWahl = true
       const ganz = a.satz.replace('___', loesung)
       if (woerterVon(ganz).length >= 4 && woerterVon(ganz).length <= 14) {
         item.satz = woerterVon(ganz)

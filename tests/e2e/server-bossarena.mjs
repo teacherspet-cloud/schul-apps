@@ -148,7 +148,8 @@ try {
     // Gültig antworten (nach der Lesezeit), dann die neue Frage sofort antippen. War die gültige Antwort falsch, sperrt
     // erst die Fehlerzeit (Taps zählen nicht) – dann noch einmal versuchen.
     let gesehen = false
-    for (let i = 0; i < 5 && !gesehen; i++) {
+    // Schnell und richtig zählt (17.11.2026) – nur schnelles Falsch sperrt; darum mehrere Versuche
+    for (let i = 0; i < 14 && !gesehen; i++) {
       await mp.waitForTimeout(3600)
       const text0 = await mp.locator('[data-mehr-frage-text]').innerText().catch(() => '')
       await mp.locator('[data-mehr-option]').first().click({ force: true })

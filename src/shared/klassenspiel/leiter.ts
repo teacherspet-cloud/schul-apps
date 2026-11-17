@@ -46,7 +46,8 @@ export function passt(f: LeiterFormat, i: SpielItem): boolean {
     return true
   }
   if (f === 'salat') return i.loesung.length >= 2 && i.loesung.length <= SALAT_LAENGE
-  if (f === 'schreiben' || f === 'diktat' || f === 'satz') return i.loesung.length <= SCHREIB_LAENGE
+  // Lücke ohne Grundwort: nur mit Möglichkeiten bzw. Buchstabenkacheln eindeutig, nie frei schreiben
+  if (f === 'schreiben' || f === 'diktat' || f === 'satz') return !i.nurWahl && i.loesung.length <= SCHREIB_LAENGE
   return true
 }
 

@@ -88,6 +88,8 @@ export interface KPerson {
   leiter?: number
   leiterSerie?: number
   leiterAuf?: { nr: number; stufe: number }
+  /** Einstellung der Lernenden „Spiele mit Zeitdruck" aus (17.11.2026): Sperre steigt nicht, eigene Kugeln treffen später */
+  ruhig?: boolean
   /** Im Spiel schon richtig beantwortete Items (gelten für die Stufenleiter nicht mehr als „neu") */
   gekonnt?: string[]
 }
@@ -348,6 +350,7 @@ const LANG_ZUM_SCHREIBEN = 40
 function stufenDesItems(i: SpielItem): Stufe[] {
   if (i.vok) return i.vok.luecke ? [1, 2, 3, 4] : [1, 2, 3]
   if (!istFrageItem(i)) return []
+  if (i.nurWahl) return [1, 2]
   return i.loesung.length <= LANG_ZUM_SCHREIBEN ? [1, 2, 3, 4] : [1, 2]
 }
 
@@ -369,6 +372,9 @@ export function leiterFrage(z: KBasis, item: SpielItem, bereich: 'vok' | 'gram',
   const f = frageAus(pb, item, art, optionen, tippen)
   z.saat = (pb as unknown as { saat: number }).saat
   if (format === 'salat') {
+    // Kacheln statt Möglichkeiten (auch bei Lücken ohne Grundwort – die Buchstaben machen sie eindeutig)
+    f.tippen = true
+    f.optionen = []
     const s = salatKacheln(f.loesung, () => zufall(z))
     f.salat = s.kacheln
     f.salatTrenner = s.trenner
@@ -530,8 +536,10 @@ export function neueAufgabe<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, we
 /**
  * Tempo-Schutz (17.11.2026, Befund der Lehrkraft: auf dem iPad immer an dieselbe Stelle tippen gab blitzschnell Antworten,
  * egal ob richtig oder falsch). Der Server wertet eine Antwort erst, wenn die Frage gelesen sein kann, und lässt nach einem
- * Fehler Zeit für die Lösung. Wer vorher tippt, wird kurz gesperrt (innerhalb einer Minute wachsend: 3, 6, 12, 20 s) –
- * die Antwort zählt nicht.
+ * Fehler Zeit für die Lösung. Wer vorher FALSCH tippt, wird kurz gesperrt (innerhalb einer Minute wachsend: 3, 6, 12,
+ * 20 s) – die Antwort zählt nicht. Schnell UND richtig zählt immer (17.11.2026, Entscheidung der Lehrkraft nach der
+ * Prüfung der Strenge: Starke erkennen bekannte Wörter oft in unter einer Sekunde und sollen dafür nicht büßen; Hämmern
+ * erkennt man an „schnell und falsch"). Mit „Zeitdruck aus" bleibt die Sperre bei 3 s.
  * FAUSTREGELN: Lesezeit 600 ms + 20 ms je Zeichen von Frage und Möglichkeiten, mindestens 1 s, höchstens 3 s (Schreiben:
  * 1 s, Tippen dauert ohnehin); nach einem Fehler 2,5 s für die Lösung. Das Gerät zeigt die Lesezeit als Balken.
  */
@@ -559,16 +567,16 @@ export function antworten<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer:
   if (regeln.frageZeigen && !regeln.frageZeigen(z, wer)) return null
   // Tempo-Schutz: noch gesperrt → nichts; vor der Lesezeit → wachsende Sperre, die Antwort zählt nicht
   if (jetzt < (p.sperreBis ?? 0)) return null
-  if (jetzt < a.seit + lesezeit(a)) {
-    // Zählt eine Minute lang zusammen – wer weiter hämmert, wartet 3, 6, 12, 20 s
+  const richtig = antwortRichtig(a.frage, wert)
+  if (!richtig && jetzt < a.seit + lesezeit(a)) {
+    // Zählt eine Minute lang zusammen – wer weiter hämmert, wartet 3, 6, 12, 20 s (mit „Zeitdruck aus" immer 3 s)
     if (jetzt - (p.zuSchnellZeit ?? -Infinity) > 60_000) p.zuSchnell = 0
     p.zuSchnell = (p.zuSchnell ?? 0) + 1
     p.zuSchnellZeit = jetzt
-    p.sperreBis = jetzt + SCHNELL_SPERRE_MS[Math.min(SCHNELL_SPERRE_MS.length - 1, p.zuSchnell - 1)]
+    p.sperreBis = jetzt + SCHNELL_SPERRE_MS[p.ruhig ? 0 : Math.min(SCHNELL_SPERRE_MS.length - 1, p.zuSchnell - 1)]
     p.sperreGrund = 'schnell'
     return null
   }
-  const richtig = antwortRichtig(a.frage, wert)
   verbuchen(z, regeln, wer, a, richtig, jetzt)
   p.aufgabe = z.ende ? null : neueAufgabe(z, regeln, wer, jetzt)
   // Nach einem Fehler: Zeit, die Lösung zu lesen
