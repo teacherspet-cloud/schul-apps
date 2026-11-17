@@ -3,7 +3,7 @@
  * shared/grammatiktrainer.ts): Bestimmen (alle Lesarten, Teilpunkte), Mehrfachauswahl, Paradigma-Tabelle, Übersetzen
  * mit Selbstvergleich. Groß und antippbar (Handy, iPad); Längenzeichen werden angezeigt, bei der Eingabe nicht verlangt.
  */
-import { auswahlSpalten, UMBRUCH } from './GrammatikFormate'
+import { auswahlSpalten, UMBRUCH, type EingabeStandRef } from './GrammatikFormate'
 import { Button, Chip, Group, Paper, SimpleGrid, Stack, Table, Text, Textarea, TextInput } from '@mantine/core'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
@@ -159,10 +159,13 @@ const zelleRichtig = (loesung: string, antwort: string): boolean =>
   normiert(loesung.replace(/\s*\/\s*/g, '/')) === normiert(antwort.replace(/\s*\/\s*/g, '/')) ||
   loesung.split('/').some((v) => normiert(v) === normiert(antwort))
 
-export function TabellenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
+export function TabellenAufgabe({ a, gesperrt, antworten, eingabeStand }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten; eingabeStand?: EingabeStandRef }): React.JSX.Element {
   const zeilen = a.zeilen ?? []
   const [zellen, setZellen] = useState<string[][]>(() => zeilen.map((z) => z.loesungen.map((l, j) => (z.vorgabe?.[j] ? l : ''))))
   const offen = zeilen.some((z, i) => z.loesungen.some((l, j) => l && !z.vorgabe?.[j] && !zellen[i]?.[j]?.trim()))
+  // „Lösung zeigen" (17.11.2026): Eingetragenes wird geprüft (Teilpunkte wie beim Prüfen)
+  const eingetragen = zeilen.some((z, i) => z.loesungen.some((_, j) => !z.vorgabe?.[j] && zellen[i]?.[j]?.trim()))
+  if (eingabeStand) eingabeStand.current = { da: eingetragen, absenden: () => !gesperrt && antworten(JSON.stringify(zellen)) }
   return (
     <Stack gap="sm" data-tabelle>
       {a.satz && (
@@ -224,7 +227,7 @@ export function TabellenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgab
   )
 }
 
-export function UebersetzenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
+export function UebersetzenAufgabe({ a, gesperrt, antworten, eingabeStand }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten; eingabeStand?: EingabeStandRef }): React.JSX.Element {
   const [text, setText] = useState('')
   const [vergleich, setVergleich] = useState(false)
   const pruefen = (): void => {
@@ -233,6 +236,8 @@ export function UebersetzenAufgabe({ a, gesperrt, antworten }: { a: GrammatikAuf
     if (a.loesungen.some((l) => normiert(l) === normiert(text))) return antworten(text)
     setVergleich(true)
   }
+  // „Lösung zeigen" (17.11.2026): Getipptes wird wie mit „Prüfen" verglichen; im Vergleich steht die Lösung schon da
+  if (eingabeStand) eingabeStand.current = { da: Boolean(text.trim()) && !vergleich, absenden: pruefen }
   return (
     <Stack gap="sm" data-uebersetzen>
       <Text fz={22} fw={700} c="var(--vt-a)">

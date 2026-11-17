@@ -1165,6 +1165,9 @@ function Aufgabe({
   /** Ansicht der Lehrkraft (28.10.2026): viele Aufgaben untereinander – keine holt sich den Eingabefokus */
   ohneFokus?: boolean
 }): React.JSX.Element {
+  // Stand der Eingabe für „Lösung zeigen" (17.11.2026): erst leeren – nur das gerade gezeichnete Format meldet sich neu.
+  // Vorher blieb der Stand der vorigen Aufgabe stehen, und der Knopf „prüfte" eine längst beantwortete Aufgabe (nichts geschah).
+  if (eingabeStand) eingabeStand.current = null
   // Latein (07.10.2026): eigene Bedienelemente
   if (a.art === 'bestimmen')
     return (
@@ -1181,26 +1184,26 @@ function Aufgabe({
   if (a.art === 'tabelle')
     return (
       <AufgabenRahmen a={a}>
-        <TabellenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+        <TabellenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} eingabeStand={eingabeStand} />
       </AufgabenRahmen>
     )
   if (a.art === 'uebersetzen')
     return (
       <AufgabenRahmen a={a}>
-        <UebersetzenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+        <UebersetzenAufgabe a={a} gesperrt={gesperrt} antworten={antworten} eingabeStand={eingabeStand} />
       </AufgabenRahmen>
     )
   // Neue Formate (28.10.2026, GrammatikFormate.tsx)
   if (a.art === 'lueckentext')
     return (
       <AufgabenRahmen a={a}>
-        <LueckentextAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+        <LueckentextAufgabe a={a} gesperrt={gesperrt} antworten={antworten} eingabeStand={eingabeStand} />
       </AufgabenRahmen>
     )
   if (a.art === 'verbinden' || a.art === 'frage')
     return (
       <AufgabenRahmen a={a}>
-        <SatzAufgabe a={a} gesperrt={gesperrt} antworten={antworten} />
+        <SatzAufgabe a={a} gesperrt={gesperrt} antworten={antworten} eingabeStand={eingabeStand} />
       </AufgabenRahmen>
     )
   if (a.art === 'markieren')

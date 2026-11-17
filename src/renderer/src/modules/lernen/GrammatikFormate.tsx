@@ -14,6 +14,12 @@ import { normiert, woerterVon, type GrammatikAufgabe, satzanfang } from '@shared
 import type { Urteil } from '@shared/vokabeltrainer'
 
 type Antworten = (antwort: string, wort?: string, selbst?: Urteil) => void
+/**
+ * Stand der Eingabe für „Lösung zeigen" (17.11.2026, Befund der Lehrkraft: Knopf tat bei einigen Aufgaben nichts – diese
+ * Formate meldeten ihren Stand nicht, der Knopf „prüfte" die vorige, längst beantwortete Aufgabe). Jedes getippte Format
+ * meldet beim Zeichnen: Ist etwas eingetragen, und wie wird es abgeschickt?
+ */
+export type EingabeStandRef = React.MutableRefObject<{ da: boolean; absenden: () => void } | null>
 const mische = <T,>(l: readonly T[]): T[] => [...l].map((x) => [Math.random(), x] as const).sort((p, q) => p[0] - q[0]).map(([, x]) => x)
 
 /** Vorlauf (Situation, Zeit) über der Aufgabe – kursiv, damit klar ist: das ist Zusammenhang, keine Aufgabe */
@@ -28,13 +34,15 @@ export function KontextZeile({ a }: { a: GrammatikAufgabe }): React.JSX.Element 
   )
 }
 
-export function LueckentextAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
+export function LueckentextAufgabe({ a, gesperrt, antworten, eingabeStand }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten; eingabeStand?: EingabeStandRef }): React.JSX.Element {
   const luecken = a.luecken ?? []
   const [werte, setWerte] = useState<string[]>(() => luecken.map(() => ''))
   const teile = a.satz.split('___')
   const optionen = useMemo(() => luecken.map((l) => (l.optionen?.length ? mische(l.optionen) : [])), [a]) // eslint-disable-line react-hooks/exhaustive-deps
   const setze = (i: number, w: string): void => setWerte((v) => v.map((x, k) => (k === i ? w : x)))
   const fertig = werte.every((w) => w.trim())
+  // „Lösung zeigen" mit teilweise ausgefüllten Lücken: prüft das Eingetragene (zählt dann richtig/fast/falsch)
+  if (eingabeStand) eingabeStand.current = { da: werte.some((w) => w.trim()), absenden: () => !gesperrt && antworten(JSON.stringify(werte)) }
   return (
     <Stack gap="sm" data-lueckentext>
       {a.wortkasten?.length ? (
@@ -97,7 +105,7 @@ export function LueckentextAufgabe({ a, gesperrt, antworten }: { a: GrammatikAuf
 }
 
 /** Sätze verbinden bzw. Frage bilden: ganze Sätze tippen; Bindewort/Fragewort und Satzanfang stehen dabei */
-export function SatzAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten }): React.JSX.Element {
+export function SatzAufgabe({ a, gesperrt, antworten, eingabeStand }: { a: GrammatikAufgabe; gesperrt: boolean; antworten: Antworten; eingabeStand?: EingabeStandRef }): React.JSX.Element {
   const [text, setText] = useState('')
   const absenden = (): void => {
     if (gesperrt || !text.trim()) return
@@ -105,6 +113,7 @@ export function SatzAufgabe({ a, gesperrt, antworten }: { a: GrammatikAufgabe; g
     const anfang = satzanfang(a.anfang)
     antworten(anfang && !normiert(text).startsWith(normiert(anfang)) ? `${anfang} ${text.trim()}` : text.trim())
   }
+  if (eingabeStand) eingabeStand.current = { da: Boolean(text.trim()), absenden }
   return (
     <form onSubmit={(e) => (e.preventDefault(), absenden())} data-satzaufgabe={a.art}>
       <Text fz={20} fw={600} style={{ whiteSpace: 'pre-wrap' }}>

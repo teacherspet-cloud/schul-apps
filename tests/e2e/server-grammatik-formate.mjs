@@ -27,6 +27,16 @@ const da = (l, ms = 15000) =>
 const THEMA = 'en.verb.past_progressive'
 const SCHLUESSEL = `${THEMA}/gleichzeitig`
 const AUFGABEN = [
+  // Einfache Lücke (17.11.2026): getippte Aufgabe vor den neuen Formaten – Voraussetzung für den „Lösung zeigen"-Befund
+  {
+    uebung: 'bilden',
+    art: 'luecke',
+    anweisung: 'Setze die richtige Form ein.',
+    satz: 'At eight o’clock I ___ TV.',
+    vorgabe: '(watch)',
+    loesungen: ['was watching'],
+    erklaerung: 'past progressive = was/were + -ing'
+  },
   {
     uebung: 'erkennen',
     art: 'markieren',
@@ -155,7 +165,7 @@ try {
   // ---------- Gast übt alle Formate
   const code = (await (await lk.request.get(`${A}/server/vokabeln`, { headers: KOPF })).json()).zuweisungen.find((k) => k.id === kurs)?.code
   const g = await browser.newContext({ viewport: { width: 430, height: 900 }, hasTouch: true, isMobile: true })
-  const h = await g.newPage()
+  let h = await g.newPage()
   await h.goto(`${A}/s/vt/${code}`)
   await h.locator('[data-gastname]').fill('Ida F.')
   await h.getByRole('button', { name: 'Mitlernen' }).click()
@@ -206,6 +216,8 @@ try {
         await h.locator('[data-luecke-nr="1"]').fill('was reading')
       } else if (art === 'verbinden') {
         await h.locator('[data-satz-eingabe]').fill('while it was raining')
+      } else if (art === 'luecke') {
+        await h.locator('[data-luecke-eingabe]').fill('was watching')
       } else {
         problems.push(`unerwartete Aufgabenart ${art}`)
         break
@@ -224,6 +236,65 @@ try {
   }
   for (const art of ['markieren', 'sortieren', 'mehrfach', 'frage', 'lueckentext', 'verbinden'])
     pruefe(gesehen.get(art) === 'richtig', `Gast: ${art} geübt und richtig gewertet (${gesehen.get(art) ?? 'nicht erschienen'})`)
+  // „Lösung zeigen" (17.11.2026, Befund der Lehrkraft: bei einigen Aufgaben passierte nichts – der Knopf „prüfte" die
+  // vorige, schon beantwortete Aufgabe). Je Format einmal: Verbinden mit getippter Antwort (wird geprüft), Frage und
+  // Lückentext leer (zeigt die Lösung) – direkt nach einer getippten Aufgabe.
+  const loesung = new Map()
+  {
+    // Frischer Gast: der erste hat schon alles geübt
+    const g2 = await browser.newContext({ viewport: { width: 430, height: 900 }, hasTouch: true, isMobile: true })
+    const h2 = await g2.newPage()
+    await h2.goto(`${A}/s/vt/${code}`)
+    await h2.locator('[data-gastname]').fill('Ole L.')
+    await h2.getByRole('button', { name: 'Mitlernen' }).click()
+    await da(h2.locator('[data-wieder-code]'))
+    h = h2
+  }
+  for (let runde = 0; runde < 4 && loesung.size < 3; runde++) {
+    await h.goto(`${A}/s/g/${zid}`)
+    await h.locator('[data-grammatik-start]').click({ timeout: 15000 })
+    await h.locator('[data-regel-vorab-los]').click({ timeout: 2500 }).catch(() => undefined)
+    await h.locator('[data-sitzung]').waitFor()
+    for (let i = 0; i < 12 && loesung.size < 3; i++) {
+      if (await h.locator('[data-sitzung-fertig]').isVisible().catch(() => false)) break
+      const art = await h.locator('[data-aufgabe]').getAttribute('data-aufgabe')
+      const knopf = h.locator('[data-loesung-zeigen]')
+      if (['frage', 'lueckentext', 'verbinden'].includes(art) && (await knopf.count())) {
+        if (art === 'verbinden') await h.locator('[data-satz-eingabe]').fill('while it was raining')
+        await knopf.click()
+        const urteil = await h.locator('[data-urteil]').first().getAttribute('data-urteil', { timeout: 6000 }).catch(() => null)
+        if (!loesung.has(art)) loesung.set(art, urteil)
+        if (art === 'lueckentext') await h.screenshot({ path: join(out, '3-loesung-zeigen.png'), fullPage: true })
+      } else {
+        // Andere Formate wie oben richtig lösen
+        if (art === 'markieren') {
+          await h.locator('[data-markier-wort="was"]').first().click()
+          await h.locator('[data-markier-wort="reading"]').click()
+          await h.locator('[data-markier-wort="was"]').nth(1).click()
+          await h.locator('[data-markier-wort="cooking"]').click()
+        } else if (art === 'sortieren') {
+          for (const [t, gr] of [['was playing', 'past progressive'], ['played', 'simple past'], ['were running', 'past progressive'], ['ran', 'simple past']]) {
+            await h.locator(`[data-sortier-element="${t}"]`).click()
+            await h.locator(`[data-sortier-gruppe="${gr}"]`).click({ position: { x: 8, y: 8 } })
+          }
+        } else if (art === 'mehrfach') {
+          await h.locator('[data-option="They were swimming."]').click()
+          await h.locator('[data-option="She was laughing."]').click()
+        } else if (art === 'frage') await h.locator('[data-satz-eingabe]').fill('was Tom doing at eight?')
+        else if (art === 'lueckentext') {
+          await h.locator('[data-luecke-nr="0"]').fill('was washing')
+          await h.locator('[data-luecke-nr="1"]').fill('was reading')
+        } else if (art === 'verbinden') await h.locator('[data-satz-eingabe]').fill('while it was raining')
+        else if (art === 'luecke') await h.locator('[data-luecke-eingabe]').fill('was watching')
+        await h.locator('[data-pruefen]').filter({ visible: true }).first().click()
+      }
+      await h.locator('[data-weiter]').click({ timeout: 8000 }).catch(() => undefined)
+      await h.waitForTimeout(400)
+    }
+  }
+  pruefe(loesung.get('verbinden') === 'richtig', `„Lösung zeigen“ bei Verbinden prüft die getippte Antwort (${loesung.get('verbinden') ?? 'nicht erschienen'})`)
+  for (const art of ['frage', 'lueckentext'])
+    pruefe(loesung.has(art) && loesung.get(art) !== null, `„Lösung zeigen“ bei ${art} wirkt (${loesung.get(art) ?? 'nichts geschah / nicht erschienen'})`)
 } catch (e) {
   problems.push(String(e?.stack ?? e))
   console.log(e)
