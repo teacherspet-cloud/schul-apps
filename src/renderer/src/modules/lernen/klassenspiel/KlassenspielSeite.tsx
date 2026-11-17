@@ -3,14 +3,15 @@
  * eigenen Niveau (Bausteine vom Server, wie „Zusammen spielen"), am Ende das Klassen-/Teamergebnis und die eigene
  * Leistung privat. Kein letzter Platz, nur Top 3 (abgestimmt).
  */
-import { Alert, Badge, Button, Card, Center, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Card, Center, Group, Loader, Paper, Stack, Text, Title, UnstyledButton } from '@mantine/core'
 import { IconHome, IconTrophy } from '@tabler/icons-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Block } from '@shared/mehrspieler/kern'
 import { liveSenden, useLiveSicht } from '../../../shared/liveSicht'
 import { senden } from '../../onlinetest/serverApi'
 import { Bloecke, SPIEL_OHNE_MARKIEREN } from '../mehrspieler/Bloecke'
 import { kt } from '@shared/klassenspiel/texte'
+import { figurBild } from './bossBilder'
 
 interface Sicht {
   code: string
@@ -31,6 +32,10 @@ interface Sicht {
   losenSeit?: number
   team: { name: string; farbe: string; symbol: string; mitglieder: string[] } | null
   bloecke?: Block[]
+  /** Boss-Kampf: Figurenwahl im Wartebereich */
+  figurWahl?: { figuren: string[]; gewaehlt: string | null }
+  /** Boss-Kampf: eigene Figur und Nummern für die Effekte (Schlag auf die Klasse, eigene Rückmeldung, Abwehr, Krit) */
+  extra?: { figur?: string | null; schlag?: { nr: number; schaden: number }; rueck?: { nr: number; richtig: boolean } | null; abwehr?: number; krit?: number } | null
   ergebnis?: {
     text: string
     sieg: boolean | null
@@ -90,6 +95,90 @@ function Losen({ s }: { s: Sicht }): React.JSX.Element | null {
   )
 }
 
+/** Figurenwahl im Wartebereich (Boss-Kampf, 17.11.2026): Mehrfachwahl erlaubt, vorne unterscheidet ein Farbring */
+function FigurWahl({ s, waehlen }: { s: Sicht; waehlen: (f: string) => void }): React.JSX.Element {
+  const w = s.figurWahl!
+  return (
+    <Card withBorder radius="lg" padding="md" data-klasse-figurwahl={w.gewaehlt ?? ''}>
+      <Text fw={800} size="lg" ta="center">
+        {kt(s.sprache, 'uiFigurWaehlen')}
+      </Text>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 10 }}>
+        {w.figuren.map((f) => (
+          <UnstyledButton
+            key={f}
+            onClick={() => waehlen(f)}
+            aria-label={f}
+            aria-pressed={w.gewaehlt === f}
+            data-klasse-figur={f}
+            style={{
+              borderRadius: 12,
+              padding: 6,
+              background: 'linear-gradient(#1e2650, #141a33)',
+              outline: w.gewaehlt === f ? '4px solid var(--mantine-color-yellow-5)' : '1px solid var(--mantine-color-default-border)',
+              display: 'flex',
+              justifyContent: 'center'
+            }}
+          >
+            <img src={figurBild(f)} alt="" aria-hidden style={{ height: 96, width: '100%', objectFit: 'contain' }} />
+          </UnstyledButton>
+        ))}
+      </div>
+      {w.gewaehlt && (
+        <Text size="sm" c="dimmed" ta="center" mt="xs">
+          {kt(s.sprache, 'uiFigurGewaehlt')}
+        </Text>
+      )}
+    </Card>
+  )
+}
+
+const BOSS_CSS = `
+@keyframes ks-wackeln { 25% { transform: translateX(-6px) } 50% { transform: translateX(5px) } 75% { transform: translateX(-3px) } }
+.ks-wackeln { animation: ks-wackeln .3s }
+@media (prefers-reduced-motion: reduce) { .ks-wackeln { animation: none } }
+.ks-rand { position: fixed; inset: 0; pointer-events: none; z-index: 300; transition: box-shadow .25s; box-shadow: inset 0 0 0 0 transparent }
+.ks-rand.rot { box-shadow: inset 0 0 40px 10px #ef4444aa } .ks-rand.gold { box-shadow: inset 0 0 40px 10px #f59e0bbb }
+`
+
+/**
+ * Spürbare Rückmeldung am Gerät (Boss-Kampf): eigene falsche Antwort → Karte rüttelt, roter Rand, kurze Vibration (Android;
+ * iPads können nicht vibrieren); Schlag des Bosses → roter Rand bei allen; eigene Abwehr / kritischer Treffer → Gold.
+ * Nie ein Fenster, nie Fokusverlust beim Tippen.
+ */
+function useBossEffekte(s: Sicht | null): { rand: string; wackeln: number; meldung: string } {
+  const [rand, setRand] = useState('')
+  const [wackeln, setWackeln] = useState(0)
+  const [meldung, setMeldung] = useState('')
+  const vorher = useRef<{ schlag: number; rueck: number; abwehr: number; krit: number } | null>(null)
+  const x = s?.spiel === 'boss' && s.phase === 'spiel' ? s.extra : null
+  useEffect(() => {
+    if (!x || !s) return
+    const jetzt = { schlag: x.schlag?.nr ?? 0, rueck: x.rueck?.nr ?? 0, abwehr: x.abwehr ?? 0, krit: x.krit ?? 0 }
+    const alt = vorher.current
+    vorher.current = jetzt
+    if (!alt) return
+    const zeigen = (farbe: string, text: string): void => {
+      setRand(farbe)
+      setMeldung(text)
+      setTimeout(() => setRand(''), 650)
+    }
+    if (jetzt.abwehr > alt.abwehr) zeigen('gold', kt(s.sprache, 'boAbgewehrtDu'))
+    else if (jetzt.krit > alt.krit) zeigen('gold', kt(s.sprache, 'boKrit'))
+    else if (jetzt.rueck > alt.rueck && x.rueck && !x.rueck.richtig) {
+      zeigen('rot', kt(s.sprache, 'boLaedt'))
+      setWackeln((w) => w + 1)
+      try {
+        navigator.vibrate?.(120)
+      } catch {
+        // nicht überall erlaubt
+      }
+    } else if (jetzt.rueck > alt.rueck) setMeldung('')
+    if (jetzt.schlag > alt.schlag && x.schlag) zeigen('rot', kt(s.sprache, 'boSchlag', x.schlag.schaden))
+  }, [x?.schlag?.nr, x?.rueck?.nr, x?.abwehr, x?.krit]) // eslint-disable-line react-hooks/exhaustive-deps
+  return { rand, wackeln, meldung }
+}
+
 export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element {
   const vorher = useCallback(() => senden('/s/api/klassenspiel/beitreten', { code }), [code])
   const { sicht: s, fehler, setSicht, setFehler } = useLiveSicht<Sicht>({
@@ -106,10 +195,21 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
     },
     [code, s?.aufgabeNr, setSicht, setFehler]
   )
+  const figurWaehlen = useCallback((figur: string): void => void liveSenden<Sicht>('/s/api/klassenspiel/figur', { code, figur }, setSicht, setFehler, 15000), [code, setSicht, setFehler])
+  const effekte = useBossEffekte(s ?? null)
+  const karte = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = karte.current
+    if (!el || !effekte.wackeln) return
+    el.classList.remove('ks-wackeln')
+    void el.offsetWidth
+    el.classList.add('ks-wackeln')
+  }, [effekte.wackeln])
 
   return (
     <Stack gap="md" maw={720} mx="auto" p="md" data-mehr-seite data-klasse-seite={s?.phase ?? 'laden'}>
-      <style>{SPIEL_OHNE_MARKIEREN}</style>
+      <style>{SPIEL_OHNE_MARKIEREN + BOSS_CSS}</style>
+      <div className={`ks-rand ${effekte.rand}`} data-klasse-rand={effekte.rand} />
       {!s ? (
         <Center h={240}>{fehler ? <Alert color="red">{fehler}</Alert> : <Loader />}</Center>
       ) : (
@@ -140,6 +240,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
               </Text>
             </Card>
           )}
+          {(s.phase === 'lobby' || s.phase === 'teams') && s.figurWahl && <FigurWahl s={s} waehlen={figurWaehlen} />}
           {s.phase === 'teams' && (
             <Stack>
               <Losen s={s} />
@@ -155,6 +256,14 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                   {s.team.symbol} {s.team.name}
                 </Badge>
               )}
+              {s.extra?.figur && (
+                <Group gap="xs" wrap="nowrap" data-klasse-eigene-figur={s.extra.figur}>
+                  <img src={figurBild(s.extra.figur)} alt="" aria-hidden style={{ height: 44, width: 'auto' }} />
+                  <Text size="sm" c="dimmed">
+                    {kt(s.sprache, 'uiDuBist')}
+                  </Text>
+                </Group>
+              )}
               {s.pause ? (
                 <Card withBorder radius="lg" padding="xl" ta="center">
                   <Text fw={900} size="2rem">
@@ -162,7 +271,14 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                   </Text>
                 </Card>
               ) : (
-                <Bloecke bloecke={s.bloecke ?? []} senden={antwort} sprache={s.sprache} jahrgang={s.jahrgang} />
+                <div ref={karte}>
+                  <Bloecke bloecke={s.bloecke ?? []} senden={antwort} sprache={s.sprache} jahrgang={s.jahrgang} />
+                </div>
+              )}
+              {s.spiel === 'boss' && effekte.meldung && (
+                <Text size="sm" fw={700} ta="center" c={effekte.rand === 'gold' ? 'yellow.7' : 'grape'} data-klasse-boss-meldung>
+                  {effekte.meldung}
+                </Text>
               )}
             </>
           )}

@@ -169,6 +169,56 @@ describe('Klassenspiele – Spiele mit 30 Kindern', () => {
     z.personen.p1.n = 2
     expect(KLASSEN_REGELN.boss!.vorschlag!(z, 'p1')).toBe(z.inhalt.vok.items[0].id)
   })
+  /** Boss-Arena (17.11.2026): feste Quote, je Kind etwa 4 Antworten pro Minute, Takt jede Sekunde */
+  function bossLauf(n: number, quote: number, minuten = 10, reaktion: 'erfolge' | 'alle' | 'gemeinsam' = 'erfolge') {
+    const z = spiel('boss', n, { dauer: minuten, bossReaktion: reaktion }) as KBasis & Record<string, unknown>
+    const r = KLASSEN_REGELN.boss!
+    let s = 11
+    const zuf = (): number => ((s = (s * 16807) % 2147483647) / 2147483647)
+    const ids = Object.keys(z.personen)
+    for (let t = 1000; t <= minuten * 60_000 && !z.ende; t += 1000) {
+      for (const wer of ids) {
+        if (z.ende || zuf() > 4 / 60) continue
+        geraetSicht(z, r, wer, t)
+        const a = z.personen[wer].aufgabe
+        if (a) antworten(z, r, wer, zuf() < quote ? a.frage.loesung : '###', t)
+      }
+      kTakt(z, r, t)
+    }
+    return z as unknown as KBasis & { held: number; hp: number; max: number; niederlage: boolean; ereignisse: { art: string; slot?: number }[] }
+  }
+  it('Boss-Arena: bei Zielquote überlebt die Klasse deutlich, bei schwacher Quote gewinnt der Boss', () => {
+    const gut = bossLauf(25, 0.78)
+    expect(gut.niederlage).toBe(false)
+    expect(gut.held).toBeGreaterThan(45)
+    const schwach = bossLauf(25, 0.45)
+    expect(schwach.niederlage).toBe(true)
+    expect(KLASSEN_REGELN.boss!.ergebnis(schwach).text).toMatch(/won/)
+  })
+  it('Boss-Arena: Beamer kennt Plätze, nie Personen; Fehler nur bei „auch Fehler" mit Platz', () => {
+    const z = bossLauf(8, 0.7, 3)
+    const b = KLASSEN_REGELN.boss!.beamer(z, 0)[0] as { figuren: unknown[]; ereignisse: { art: string; slot?: number }[] }
+    expect(b.figuren).toHaveLength(8)
+    const text = JSON.stringify(b)
+    for (const id of Object.keys(z.personen)) expect(text).not.toContain(`"${id}"`)
+    expect(text).not.toContain('Kind ')
+    expect(z.ereignisse.some((e) => e.art === 'fehler')).toBe(false)
+    expect(z.ereignisse.some((e) => e.art === 'treffer' && typeof e.slot === 'number')).toBe(true)
+    const alle = bossLauf(8, 0.7, 3, 'alle')
+    expect(alle.ereignisse.some((e) => e.art === 'fehler' && typeof e.slot === 'number')).toBe(true)
+    const gemeinsam = bossLauf(8, 0.7, 3, 'gemeinsam')
+    expect(gemeinsam.ereignisse.every((e) => e.slot === undefined)).toBe(true)
+  })
+  it('Boss-Arena: Kugel trifft erst nach 6 s, Abwehr vorher verhindert den Schaden', () => {
+    const z = spiel('boss', 2) as KBasis & { angriffe: { id: number; item: string; von: string; seit: number }[]; held: number; naechster: number }
+    const r = KLASSEN_REGELN.boss!
+    z.angriffe.push({ id: 1, item: z.inhalt.vok.items[0].id, von: 'p0', seit: 9_000 })
+    r.tick!(z, 12_000)
+    expect(z.held).toBe(100)
+    z.angriffe.push({ id: 2, item: z.inhalt.vok.items[1].id, von: 'p0', seit: 10_000 })
+    r.tick!(z, 24_000)
+    expect(z.held).toBeLessThan(100)
+  })
   it('Fehler kommen wieder (nach 3–5 Aufgaben) und landen in der Fehlerliste', () => {
     const z = spiel('expedition', 1)
     const r = KLASSEN_REGELN.expedition!

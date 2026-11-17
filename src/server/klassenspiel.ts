@@ -18,6 +18,7 @@
  *             GET  /s/api/klassenspiel/strom?code= · /zustand?code=
  *             POST /s/api/klassenspiel/antwort {code, wert, nr}
  *             POST /s/api/klassenspiel/zug {code, aktion, wert}           Einsatz (Wett-Quiz), Sterne (Gebiet)
+ *             POST /s/api/klassenspiel/figur {code, figur}                Boss-Kampf: eigene Figur (Wartebereich, 17.11.2026)
  */
 import { randomInt } from 'node:crypto'
 import { datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
@@ -39,7 +40,9 @@ import {
   zeile as vokZeile
 } from './vokabeln'
 import { grammatikFuerSpiel as G } from './grammatik'
-import { achievementKlasse, achievementZusammen } from './achievementsDaten'
+import { achievementKlasse, achievementZusammen, bossDatenVon, bossFigurMerken } from './achievementsDaten'
+import { ausruestungStufe, figurenFuer } from '../shared/klassenspiel/bossBestand'
+import { figurZuteilen } from '../shared/klassenspiel/spiele/boss'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
 import { nachSpielfehler } from '../shared/vokabelSpiele'
@@ -239,6 +242,31 @@ function baenderFuer(r: Raum, n: NutzerInfo): Record<string, Band | null> {
   return aus
 }
 
+// ---------------------------------------------------------------- Boss-Kampf: eigene Figuren
+
+/**
+ * Figur einer Person im Boss-Kampf (17.11.2026): gewünscht (Wartebereich) → zuletzt gewählt (gemerkt) → beim Start bzw.
+ * später Dazukommend zufällig. Die Ausrüstungsstufe kommt aus den gewonnenen Boss-Kämpfen (nur Schülerkonten).
+ */
+function figurSetzen(r: Raum, n: NutzerInfo, wunsch?: string): boolean {
+  if (r.einst.spiel !== 'boss') return false
+  const z = r.zustand
+  const erlaubt = new Set(figurenFuer(r.jahrgang).map((f) => f.id))
+  const daten = bossDatenVon(n)
+  const stufe = ausruestungStufe(daten.siege)
+  z.figuren ??= {}
+  if (wunsch !== undefined) {
+    if (!erlaubt.has(wunsch)) return false
+    z.figuren[n.id] = { figur: wunsch, stufe }
+    bossFigurMerken(n, wunsch)
+    return true
+  }
+  if (!z.figuren[n.id] && daten.figur && erlaubt.has(daten.figur)) z.figuren[n.id] = { figur: daten.figur, stufe }
+  if (!z.figuren[n.id] && r.phase === 'spiel') figurZuteilen(z, n.id)
+  if (z.figuren[n.id]) z.figuren[n.id].stufe = stufe
+  return true
+}
+
 // ---------------------------------------------------------------- Rekord und Auswertung
 
 function rekordLesen(vokId: string, spiel: string): { wert: number; text: string; zeit: number } | null {
@@ -389,6 +417,7 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
   const t3 = r.phase === 'ende' ? top3(z) : []
   // Erst die Sicht (legt die Aufgabe an), dann ihre Nummer
   const bloecke = r.phase === 'spiel' && p ? (geraetSicht(z, regeln, wer, jetzt) as Block[]) : null
+  const boss = r.einst.spiel === 'boss'
   return {
     code: r.code,
     phase: r.phase,
@@ -410,6 +439,11 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     ...(r.phase === 'teams' && r.losenSeit ? { losenSeit: r.losenSeit } : {}),
     team: team ? { name: kt(r.sprache, 'team', team.name), farbe: team.farbe, symbol: team.symbol, mitglieder: team.mitglieder.map((id) => r.namen.get(id) ?? '') } : null,
     ...(bloecke ? { bloecke } : {}),
+    // Boss-Kampf: Figurenwahl im Wartebereich, danach Zusatz für die Effekte am Gerät (eigene Figur, Schlag, Abwehr)
+    ...(boss && (r.phase === 'lobby' || r.phase === 'teams')
+      ? { figurWahl: { figuren: figurenFuer(r.jahrgang).map((f) => f.id), gewaehlt: z.figuren?.[wer]?.figur ?? null } }
+      : {}),
+    ...((r.phase === 'spiel' || r.phase === 'ende') && p && regeln.geraetExtra ? { extra: regeln.geraetExtra(z, wer, jetzt) } : {}),
     ...(r.phase === 'ende' && r.ergebnis
       ? {
           ergebnis: {
@@ -461,6 +495,10 @@ function lehrSicht(r: Raum, jetzt: number) {
     kurs: lernendeVon(vokZeile(r.kurs)!).length,
     teams: z.teams.map((t) => ({ name: kt(r.sprache, 'team', t.name), farbe: t.farbe, symbol: t.symbol, mitglieder: t.mitglieder.map((id) => r.namen.get(id) ?? '') })),
     losenSeit: r.losenSeit,
+    // Boss-Kampf: gewählte Figuren im Wartebereich (ohne Namen)
+    ...(r.einst.spiel === 'boss' && (r.phase === 'lobby' || r.phase === 'teams')
+      ? { figuren: Object.keys(z.personen).flatMap((id) => (z.figuren?.[id] ? [z.figuren[id].figur] : [])) }
+      : {}),
     bloecke,
     ...(r.phase === 'ende' && r.ergebnis
       ? {
@@ -584,6 +622,13 @@ function starten(r: Raum, jetzt: number): string | null {
   // „Klasse gegen den Rekord" (und die Anzeige der anderen Spiele) kennt den bisherigen Bestwert
   const rek = rekordLesen(r.kurs, r.einst.spiel)
   z.rekordBisher = rek ? { wert: rek.wert, text: rek.text } : null
+  // Boss-Kampf: wer keine Figur gewählt hat, bekommt eine zufällige (mit der eigenen Ausrüstungsstufe)
+  if (r.einst.spiel === 'boss')
+    for (const id of Object.keys(z.personen)) {
+      figurZuteilen(z, id)
+      const n = r.nutzer.get(id)
+      if (n && z.figuren?.[id]) z.figuren[id].stufe = ausruestungStufe(bossDatenVon(n).siege)
+    }
   KLASSEN_REGELN[r.einst.spiel]!.start(z, jetzt)
   r.phase = 'spiel'
   r.aktiv = jetzt
@@ -599,6 +644,14 @@ function nochmal(r: Raum, jetzt: number): void {
     // Was im ersten Spiel gelernt wurde, bleibt als Startwert
     q.theta = p.theta
     q.theta0 = p.theta
+  }
+  // Gewählte Figuren bleiben (Ausrüstung neu, falls gerade ein Sieg dazukam)
+  if (alt.figuren) {
+    z.figuren = {}
+    for (const [id, f] of Object.entries(alt.figuren)) {
+      const n = r.nutzer.get(id)
+      z.figuren[id] = { figur: f.figur, stufe: n ? ausruestungStufe(bossDatenVon(n).siege) : f.stufe }
+    }
   }
   r.zustand = z
   r.phase = 'lobby'
@@ -656,6 +709,7 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
           r.namen = kurzNamenVon([...r.nutzer.values()])
         }
         if (r.phase !== 'ende' && !r.zustand.personen[ich.id]) personDazu(r.zustand, ich.id, r.namen.get(ich.id) ?? ich.name, baenderFuer(r, ich), jetzt)
+        if (r.phase !== 'ende' && r.zustand.personen[ich.id]) figurSetzen(r, ich)
         r.lernende.abgefragt(ich.id, jetzt)
         verteilen(r, jetzt)
         return json(res, 200, { ok: true }), true
@@ -668,6 +722,12 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
       }
       if (req.method === 'GET' && teile[0] === 'zustand') {
         r.lernende.abgefragt(ich.id, jetzt)
+        return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
+      }
+      if (req.method === 'POST' && teile[0] === 'figur') {
+        if (r.phase === 'ende' || !r.zustand.personen[ich.id]) return json(res, 409, { fehler: 'Gerade kann keine Figur gewählt werden.' }), true
+        if (!figurSetzen(r, ich, String(k0.figur ?? '').slice(0, 40))) return json(res, 400, { fehler: 'Diese Figur gibt es nicht.' }), true
+        verteilen(r, jetzt)
         return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
       }
       if (req.method === 'POST' && teile[0] === 'zug') {

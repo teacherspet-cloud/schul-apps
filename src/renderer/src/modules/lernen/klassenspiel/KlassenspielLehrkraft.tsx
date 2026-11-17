@@ -47,6 +47,7 @@ import { qrDataUrl } from '../../arbeitsblatt/render/qr'
 import { auswahlZahlen, bandSchluessel, testAuswahlGliedern, unitSchluessel, type TestEintragDaten } from '../kurs/testPlanGliederung'
 import { BeamerBloecke, Podest, TeamKarten } from './BeamerBloecke'
 import { kt } from '@shared/klassenspiel/texte'
+import { figurBild } from './bossBilder'
 
 interface Angebot {
   titel: string
@@ -68,6 +69,8 @@ interface TeamSicht {
 
 export interface BeamerSicht {
   code: string
+  /** Boss-Kampf: gewählte Figuren im Wartebereich (ohne Namen) */
+  figuren?: string[]
   phase: 'lobby' | 'teams' | 'spiel' | 'ende'
   titel: string
   spiel: KlassenspielId
@@ -380,6 +383,30 @@ function StartFenster({ kursId, schliessen, gestartet }: { kursId: string; schli
                   <SegmentedControl value={String(e.teams)} onChange={(v) => setze({ teams: Number(v) })} data={['2', '3', '4', '5', '6']} data-klassenspiel-teams />
                 </div>
               )}
+              {e.spiel === 'boss' && (
+                <div>
+                  <Text size="sm" fw={600} mb={4}>
+                    Eigene Figur vorne reagiert auf …
+                  </Text>
+                  <SegmentedControl
+                    value={e.bossReaktion}
+                    onChange={(v) => setze({ bossReaktion: v as KlassenEinstellungen['bossReaktion'] })}
+                    data={[
+                      { value: 'erfolge', label: 'Nur Erfolge' },
+                      { value: 'alle', label: 'Auch Fehler' },
+                      { value: 'gemeinsam', label: 'Nur gemeinsam' }
+                    ]}
+                    data-klassenspiel-boss-reaktion
+                  />
+                  <Text size="xs" c="dimmed" mt={4}>
+                    {e.bossReaktion === 'erfolge'
+                      ? 'Bei einem eigenen Treffer greift die Figur an und leuchtet auf. Fehler erscheinen nur als namenlose Kugel am Boss.'
+                      : e.bossReaktion === 'alle'
+                      ? 'Die Figur zuckt auch bei eigenen Fehlern zusammen. Mitlernende wissen meist, wem welche Figur gehört.'
+                      : 'Alle Figuren bewegen sich gemeinsam – niemand ist einzeln zu erkennen.'}
+                  </Text>
+                </div>
+              )}
               <Switch
                 label="Am Ende die Top 3 zeigen (nach Verbesserungspunkten – nie ein letzter Platz)"
                 checked={e.top3}
@@ -633,6 +660,13 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                 </Stack>
               </Group>
               {s.phase === 'teams' && <TeamKarten teams={losen ?? s.teams} />}
+              {s.spiel === 'boss' && (s.figuren?.length ?? 0) > 0 && (
+                <Group gap={4} justify="center" align="flex-end" data-klassenspiel-figuren={s.figuren!.length}>
+                  {s.figuren!.map((f, i) => (
+                    <img key={i} src={figurBild(f)} alt="" aria-hidden style={{ height: 'min(16vh, 150px)', width: 'auto' }} />
+                  ))}
+                </Group>
+              )}
             </Stack>
           ) : (
             <Stack gap="lg" maw={1400} mx="auto">

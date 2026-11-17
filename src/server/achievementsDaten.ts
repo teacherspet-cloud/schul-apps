@@ -61,6 +61,8 @@ export interface AchDaten {
   titelWahl: TitelWahl
   /** Alte Achievements einmalig übernommen (Sprache) */
   uebernommen?: string
+  /** Boss-Kampf (17.11.2026): zuletzt gewählte Figur – wird im nächsten Spiel vorgeschlagen */
+  bossFigur?: string
 }
 
 const leer = (): AchDaten => ({
@@ -99,7 +101,8 @@ export function achDatenLesen(nutzerId: string): AchDaten {
       },
       offenAusz: Array.isArray(d.offenAusz) ? d.offenAusz : [],
       titelWahl: objekt(d.titelWahl, {}),
-      ...(typeof d.uebernommen === 'string' ? { uebernommen: d.uebernommen } : {})
+      ...(typeof d.uebernommen === 'string' ? { uebernommen: d.uebernommen } : {}),
+      ...(typeof d.bossFigur === 'string' ? { bossFigur: d.bossFigur } : {})
     }
   } catch {
     return leer()
@@ -290,6 +293,32 @@ export function achievementKlasse(
     if (e.rekord) z.klassenRekorde = (z.klassenRekorde ?? 0) + 1
     if (e.tischSiege > 0) z.klassenTische = (z.klassenTische ?? 0) + e.tischSiege
     if (e.einschaetzung) z.klassenEinschaetzung = (z.klassenEinschaetzung ?? 0) + 1
+    achDatenSchreiben(n.id, d)
+  } catch {
+    // Achievements dürfen das Spielen nie stören
+  }
+}
+
+/**
+ * Boss-Kampf (17.11.2026): gewonnene Boss-Kämpfe (für die Ausrüstung der eigenen Figur) und die zuletzt gewählte Figur.
+ * Gäste und Vorschau sammeln nichts.
+ */
+export function bossDatenVon(n: NutzerInfo): { siege: number; figur: string | null } {
+  if (!zaehlt(n)) return { siege: 0, figur: null }
+  try {
+    const d = achDatenLesen(n.id)
+    return { siege: d.zaehler.klassenBoss ?? 0, figur: d.bossFigur ?? null }
+  } catch {
+    return { siege: 0, figur: null }
+  }
+}
+
+export function bossFigurMerken(n: NutzerInfo, figur: string): void {
+  if (!zaehlt(n)) return
+  try {
+    const d = achDatenLesen(n.id)
+    if (d.bossFigur === figur) return
+    d.bossFigur = figur
     achDatenSchreiben(n.id, d)
   } catch {
     // Achievements dürfen das Spielen nie stören

@@ -6,6 +6,7 @@
 import { Badge, Group, Paper, Progress, SimpleGrid, Stack, Text } from '@mantine/core'
 import type { BBlock } from '@shared/klassenspiel/kern'
 import { kt, zahl2 } from '@shared/klassenspiel/texte'
+import { BossArena } from './BossArena'
 
 const TON: Record<string, string> = { gut: 'teal', info: 'blue', warn: 'orange' }
 
@@ -56,26 +57,6 @@ function Berg({ b }: { b: Extract<BBlock, { typ: 'berg' }> }): React.JSX.Element
           {b.hinweis}
         </Text>
       )}
-    </Paper>
-  )
-}
-
-function Boss({ b }: { b: Extract<BBlock, { typ: 'boss' }> }): React.JSX.Element {
-  const anteil = b.max ? b.hp / b.max : 0
-  return (
-    <Paper radius="lg" p="lg" withBorder ta="center" data-beamer-boss={b.hp}>
-      <Text style={{ fontSize: 'min(26vh, 220px)', lineHeight: 1.05, filter: b.ruestung ? 'drop-shadow(0 0 18px #f59e0b)' : undefined, transition: 'transform .2s' }} aria-hidden>
-        {b.symbol}
-        {b.ruestung ? '🛡️' : ''}
-      </Text>
-      <Text fw={900} size="2.2rem">
-        {b.name}
-      </Text>
-      <Progress value={anteil * 100} size={34} radius="xl" color={anteil > 0.66 ? 'red' : anteil > 0.33 ? 'orange' : 'yellow'} mt="sm" striped animated />
-      <Text fw={800} size="xl" mt={6}>
-        {b.leben ?? `${b.hp} / ${b.max}`}
-        {b.ruestung && b.ruestungText ? ` · ${b.ruestungText}` : ''}
-      </Text>
     </Paper>
   )
 }
@@ -329,7 +310,7 @@ export function BeamerBloecke({ bloecke, sprache = 'de' }: { bloecke: BBlock[]; 
           case 'berg':
             return <Berg key={i} b={b} />
           case 'boss':
-            return <Boss key={i} b={b} />
+            return <BossArena key={i} b={b} />
           case 'bahnen':
             return <Bahnen key={i} b={b} />
           case 'teams':

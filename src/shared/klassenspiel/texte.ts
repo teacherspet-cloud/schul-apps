@@ -119,6 +119,21 @@ export const KT = {
   boRuestungHinweis: t('Rüstung: Schreiben trifft doppelt!', 'Armour: writing hits double!', 'Armure : écrire frappe double !', 'Armadura: ¡escribir golpea el doble!', 'Armatura: scrivere colpisce il doppio!', 'Arma: scribere bis ferit!'),
   boRekordSieg: t('Boss besiegt', 'Boss defeated', 'Boss vaincu', 'Jefe derrotado', 'Boss sconfitto', 'Monstrum victum'),
   boRekordSchaden: t('{0} % Schaden', '{0} % damage', '{0} % de dégâts', '{0} % de daño', '{0} % di danni', '{0} centesimae damni'),
+  // Boss-Arena (17.11.2026)
+  boNiederlage: t('{0} hat gewonnen – {1} % Schaden.', '{0} won – {1} % damage.', '{0} a gagné – {1} % de dégâts.', '{0} ha ganado: {1} % de daño.', '{0} ha vinto – {1} % di danni.', '{0} vicit – {1} centesimae damni.'),
+  boHoltAus: t('{0} holt aus!', '{0} is winding up!', '{0} prépare une attaque !', '¡{0} prepara un ataque!', '{0} prepara un attacco!', '{0} impetum parat!'),
+  boKlassenangriff: t('Klassenangriff!', 'Class attack!', 'Attaque de classe !', '¡Ataque de la clase!', 'Attacco di classe!', 'Impetus classis!'),
+  boRaserei: t('{0} rast vor Wut!', '{0} is raging!', '{0} est fou de rage !', '¡{0} está furioso!', '{0} è furioso!', '{0} furit!'),
+  boKlasse: t('Klasse', 'Class', 'Classe', 'Clase', 'Classe', 'Classis'),
+  boNaechster: t('Nächster Angriff', 'Next attack', 'Prochaine attaque', 'Próximo ataque', 'Prossimo attacco', 'Proximus impetus'),
+  boSpezial: t('Klassen-Spezialangriff', 'Class special attack', 'Attaque spéciale de la classe', 'Ataque especial de la clase', 'Attacco speciale della classe', 'Impetus singularis classis'),
+  boLaedt: t('⚡ Der Boss lädt einen Angriff auf – die Klasse kann ihn abwehren.', '⚡ The boss is charging an attack – the class can block it.', '⚡ Le boss charge une attaque – la classe peut la bloquer.', '⚡ El jefe carga un ataque: la clase puede bloquearlo.', '⚡ Il boss carica un attacco – la classe può pararlo.', '⚡ Monstrum impetum parat – classis eum repellere potest.'),
+  boAbgewehrtDu: t('🛡️ Abgewehrt!', '🛡️ Blocked!', '🛡️ Bloqué !', '🛡️ ¡Bloqueado!', '🛡️ Parato!', '🛡️ Repulsum!'),
+  boKrit: t('⭐ Kritischer Treffer!', '⭐ Critical hit!', '⭐ Coup critique !', '⭐ ¡Golpe crítico!', '⭐ Colpo critico!', '⭐ Ictus gravis!'),
+  boSchlag: t('Treffer für die Klasse: −{0}', 'The class is hit: −{0}', 'La classe est touchée : −{0}', 'La clase recibe un golpe: −{0}', 'La classe è colpita: −{0}', 'Classis icta: −{0}'),
+  uiFigurWaehlen: t('Wähle deine Figur', 'Choose your character', 'Choisis ton personnage', 'Elige tu personaje', 'Scegli il tuo personaggio', 'Elige personam tuam'),
+  uiFigurGewaehlt: t('Deine Figur steht vorne bereit.', 'Your character is ready at the front.', 'Ton personnage est prêt devant.', 'Tu personaje está listo delante.', 'Il tuo personaggio è pronto davanti.', 'Persona tua ante omnes parata est.'),
+  uiDuBist: t('Deine Figur', 'Your character', 'Ton personnage', 'Tu personaje', 'Il tuo personaggio', 'Persona tua'),
 
   // ---------------------------------------------------------------- Rennen
   reZiel: t('Ziel: {0} Schritte je Teammitglied', 'Goal: {0} steps per team member', 'Objectif : {0} pas par membre', 'Meta: {0} pasos por miembro', 'Traguardo: {0} passi per membro', 'Meta: {0} gradus pro sodali'),

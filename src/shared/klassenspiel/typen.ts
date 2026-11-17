@@ -132,7 +132,14 @@ export interface KlassenEinstellungen {
   teams: number
   /** Top 3 am Ende zeigen (abgestimmt: Team + Top 3, nie ein letzter Platz) */
   top3: boolean
+  /**
+   * Boss-Kampf (17.11.2026): Wie reagiert die eigene Figur vorne auf die eigenen Antworten? Mitlernende wissen meist, wem
+   * welche Figur gehört – darum stellt die Lehrkraft das ein: nur Erfolge (Vorgabe), auch Fehler, nur gemeinsam.
+   */
+  bossReaktion: BossReaktion
 }
+
+export type BossReaktion = 'erfolge' | 'alle' | 'gemeinsam'
 
 export const STANDARD_EINSTELLUNGEN: Omit<KlassenEinstellungen, 'spiel'> = {
   quelle: 'behandelt',
@@ -144,7 +151,8 @@ export const STANDARD_EINSTELLUNGEN: Omit<KlassenEinstellungen, 'spiel'> = {
   feste: 'mittel',
   dauer: 10,
   teams: 2,
-  top3: true
+  top3: true,
+  bossReaktion: 'erfolge'
 }
 
 const zahl = (x: unknown, min: number, max: number, std: number): number => {
@@ -169,7 +177,8 @@ export function einstellungenBereinigt(roh: Record<string, unknown>): KlassenEin
     feste: roh.feste === 'leicht' || roh.feste === 'schwer' ? roh.feste : 'mittel',
     dauer: zahl(roh.dauer, 3, 30, s.dauer),
     teams: zahl(roh.teams, 2, 6, s.teams),
-    top3: roh.top3 !== false
+    top3: roh.top3 !== false,
+    bossReaktion: roh.bossReaktion === 'alle' || roh.bossReaktion === 'gemeinsam' ? roh.bossReaktion : 'erfolge'
   }
 }
 

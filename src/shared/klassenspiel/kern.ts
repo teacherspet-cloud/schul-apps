@@ -86,7 +86,7 @@ export interface BBlockTeam {
 export type BBlock =
   | { typ: 'kopf'; titel: string; untertitel?: string; level?: { nr: number; von: number } }
   | { typ: 'berg'; lager: number; von: number; anteil: number; quote: number | null; zielQuote: number; namen: string[]; titel?: string; hinweis?: string }
-  | { typ: 'boss'; name: string; symbol: string; hp: number; max: number; phase: number; ruestung: boolean; treffer: number; angriffe: number; leben?: string; ruestungText?: string }
+  | BBlockBoss
   | { typ: 'bahnen'; teams: (BBlockTeam & { wert: number; ziel: number; n: number })[]; seil: boolean; zielText?: string }
   | { typ: 'teams'; teams: (BBlockTeam & { mitglieder: string[] })[] }
   | { typ: 'ticker'; eintraege: { text: string; ton: 'gut' | 'info' | 'warn' }[] }
@@ -101,6 +101,45 @@ export type BBlock =
   | { typ: 'treffsicherheit'; stufen: { einsatz: number; anzahl: number; richtig: number; name?: string; text?: string }[]; titel?: string; erklaerung?: string }
   /** Turnier: Runde und Fortschritt der Tische (ohne Namen – die Tische sind nach Stärke gebildet) */
   | { typ: 'tische'; runde: number; von: number; tische: { name: string; fertig: number; gesamt: number; text?: string }[]; titel?: string }
+
+/**
+ * Boss-Arena (17.11.2026): Klasse (eigene Figuren, ohne Namen) gegen ein Monster. `ereignisse` sind die letzten Vorgänge
+ * mit laufender Nummer – der Beamer spielt neue davon ab (gedrosselt, Treffer zu Kombos zusammengefasst). `slot` = Platz
+ * der Figur in `figuren` (nie eine Kennung der Person).
+ */
+export interface BBlockBoss {
+  typ: 'boss'
+  name: string
+  symbol: string
+  monster: string
+  hintergrund: string | null
+  hp: number
+  max: number
+  phase: number
+  ruestung: boolean
+  treffer: number
+  angriffe: number
+  abgewehrt: number
+  held: number
+  heldMax: number
+  kugeln: { id: number; reif: boolean }[]
+  warnung: boolean
+  naechsterIn: number
+  spezial: number
+  figuren: { figur: string; ring: number | null; stufe: number }[]
+  ereignisse: BossEreignis[]
+  ausgang: 'sieg' | 'niederlage' | 'entkommen' | null
+  leben?: string
+  ruestungText?: string
+  texte?: { klasse: string; naechster: string; spezial: string; treffer: string; abgewehrt: string; holtAus: string; klassenangriff: string; ruestung: string; raserei: string }
+}
+export interface BossEreignis {
+  nr: number
+  art: 'treffer' | 'abwehr' | 'fehler' | 'schlag' | 'phase' | 'spezial'
+  wert?: number
+  slot?: number
+  krit?: boolean
+}
 
 export interface KBasis {
   spiel: KlassenspielId
@@ -132,6 +171,8 @@ export interface KBasis {
   nr: number
   /** Bisheriger Klassenrekord dieses Spiels (vom Server beim Start gesetzt) */
   rekordBisher: { wert: number; text: string } | null
+  /** Boss-Kampf: gewählte Figur je Person (im Wartebereich, vom Server gesetzt) und Ausrüstungsstufe */
+  figuren?: Record<string, { figur: string; stufe: number }>
 }
 
 export interface KErgebnis {
@@ -173,6 +214,8 @@ export interface KlassenRegeln<Z extends KBasis = KBasis> {
   beamer(z: Z, jetzt: number): BBlock[]
   /** Kopf am Gerät (Stand des Spiels, eigenes Team) */
   geraet(z: Z, wer: string, jetzt: number): Block[]
+  /** Zusatz für das Gerät außerhalb der Bausteine (Boss: eigene Figur, Schlag- und Rückmeldungsnummern für Effekte) */
+  geraetExtra?(z: Z, wer: string, jetzt: number): Record<string, unknown> | null
   ergebnis(z: Z): KErgebnis
 }
 
