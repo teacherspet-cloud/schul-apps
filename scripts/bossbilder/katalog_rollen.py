@@ -75,7 +75,7 @@ def spezialbild():
 
 def katalog():
     auftraege, eintraege = [], {"tanks": [], "heiler": [], "spezial": []}
-    reihenfolge = ["78", "910", "1113", "56"]
+    reihenfolge = ["78", "910", "56", "1113"]  # 17.11.2026: Jg. 5–6 vor 11–13 (Wunsch der Lehrkraft)
     for b in reihenfolge:
         bandnr = ["56", "78", "910", "1113"].index(b)
         for i, (rid, beschr, farben) in enumerate(TANKS):

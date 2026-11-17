@@ -266,7 +266,8 @@ function ohneZeitdruck(nutzerId: string): boolean {
 function figurSetzen(r: Raum, n: NutzerInfo, wunsch?: string): boolean {
   if (r.einst.spiel !== 'boss') return false
   const z = r.zustand
-  const erlaubt = new Set(figurenFuer(r.jahrgang).map((f) => f.id))
+  // Mit Rollen: nur Figuren der eigenen Rolle (Tanks/Heiler eigene, Angreifer die übrigen)
+  const erlaubt = new Set(figurenFuer(r.jahrgang, r.einst.bossRollen ? z.rollen?.[n.id] ?? null : null).map((f) => f.id))
   const daten = bossDatenVon(n)
   const stufe = ausruestungStufe(daten.siege)
   z.figuren ??= {}
@@ -300,6 +301,13 @@ function rolleSetzen(r: Raum, wer: string, rolle: string): string | null {
   const { zahlen, grenze } = rollenStand(r)
   if (zahlen[rolle] >= grenze) return 'Diese Rolle ist voll.'
   z.rollen[wer] = rolle
+  // Passt die gewählte Figur nicht zur neuen Rolle, wird neu gewählt (gemerkte Figur, sonst beim Start zufällig)
+  const f = z.figuren?.[wer]?.figur
+  if (f && !figurenFuer(r.jahrgang, rolle).some((x) => x.id === f)) {
+    delete z.figuren![wer]
+    const n = r.nutzer.get(wer)
+    if (n) figurSetzen(r, n)
+  }
   return null
 }
 
@@ -499,7 +507,13 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     ...(bloecke ? { bloecke } : {}),
     // Boss-Kampf: Figurenwahl im Wartebereich, danach Zusatz für die Effekte am Gerät (eigene Figur, Schlag, Abwehr)
     ...(boss && (r.phase === 'lobby' || r.phase === 'teams')
-      ? { figurWahl: { figuren: figurenFuer(r.jahrgang).map((f) => f.id), gewaehlt: z.figuren?.[wer]?.figur ?? null } }
+      ? {
+          figurWahl: {
+            // Mit Rollen erst die Rolle, dann die passenden Figuren
+            figuren: r.einst.bossRollen && !z.rollen?.[wer] ? [] : figurenFuer(r.jahrgang, r.einst.bossRollen ? z.rollen?.[wer] ?? null : null).map((f) => f.id),
+            gewaehlt: z.figuren?.[wer]?.figur ?? null
+          }
+        }
       : {}),
     // Boss-Kampf mit Rollen: Wahl im Wartebereich (Anzahl je Rolle, Obergrenze), danach die eigene Rolle
     ...(boss && r.einst.bossRollen ? { rollenWahl: { ...rollenStand(r), gewaehlt: z.rollen?.[wer] ?? null, offen: r.phase === 'lobby' || r.phase === 'teams' } } : {}),

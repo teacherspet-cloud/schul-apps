@@ -240,14 +240,15 @@ try {
   pruefe(await da(mp.locator('[data-klasse-eigene-rolle="heiler"]')), 'Gerät: „Deine Rolle“ Heilerin')
   // Ben (Tank) antwortet richtig → Schild wächst
   let schild = 0
-  for (let i = 0; i < 6 && schild === 0; i++) {
+  // Erste Möglichkeit ist nicht immer richtig – bis zu 15 Versuche
+  for (let i = 0; i < 15 && schild === 0; i++) {
     await antwortApi(Ben, n3.code, false)
     schild = (await api(lk).get(`/server/klassenspiel/${n3.code}/zustand`)).sicht?.bloecke?.find((b) => b.typ === 'boss')?.schild ?? 0
   }
   pruefe(schild > 0, `Tank antwortet richtig → Klassenschild ${schild}`)
   // Mia (Heilerin) antwortet im Browser richtig → Wirkung als Animation
   let wirkung = false
-  for (let i = 0; i < 6 && !wirkung; i++) {
+  for (let i = 0; i < 15 && !wirkung; i++) {
     await mp.waitForTimeout(3300)
     await mp.locator('[data-mehr-option]').first().click({ force: true }).catch(() => undefined)
     wirkung = await da(mp.locator('[data-klasse-wirkung="heilung"]'), 1500)

@@ -2,12 +2,15 @@
  * Bildbestand des Boss-Kampfs (17.11.2026, abgestimmt mit der Lehrkraft): Figuren der Lernenden, Monster und
  * Hintergründe je Jahrgangsband (5–6, 7–8, 9–10, 11–13) und Welt (Fantasy, Weltraum, Natur/Urzeit, Mythologie).
  * Die Bilder entstehen per Bild-KI (ChatGPT-Abo der Lehrkraft) als Bögen mit vier Posen und liegen als WebP unter
- * renderer/src/assets/klassenspiele/boss/ – Dateinamen: held-<id>-<pose>, boss-<id>-<pose>, hg-<id>, effekte-<id>.
+ * renderer/src/assets/klassenspiele/boss/ – Dateinamen: held-<id>-<pose>, boss-<id>-<pose>, hg-<id>, begleiter-<id>.
+ * Die Listen erzeugt scripts/bossbilder/bestand.py aus den vorhandenen Bildern (bossBestandDaten.ts).
  *
  * Fehlt einem Band noch etwas, gilt das nächstgelegene Band mit Bildern (Aufbau des Bestands Band für Band).
  * Monsternamen in der Kurssprache (Wunsch der Lehrkraft) – de/en/fr/es/it/la, sonst Englisch.
+ * Mit Rollen (17.11.2026): Tanks und Heiler wählen nur Figuren ihrer Rolle, Angreifer alle übrigen.
  */
 import { textSprache } from '../spielSprache'
+import { BEGLEITER_DATEN, FIGUREN_DATEN, HINTERGRUND_DATEN, MONSTER_DATEN } from './bossBestandDaten'
 
 export type BossBand = '5-6' | '7-8' | '9-10' | '11-13'
 export type BossWelt = 'fantasy' | 'weltraum' | 'natur' | 'mythos'
@@ -27,6 +30,12 @@ type Namen = { de: string; en: string; fr: string; es: string; it: string; la: s
 export interface FigurInfo {
   id: string
   band: BossBand
+  /** Rollenfigur (Boss-Kampf mit Rollen); ohne Angabe: Angreifer */
+  rolle?: 'tank' | 'heiler'
+  /** Spezialangriff-Pose vorhanden (held-<id>-spezial) */
+  spezial?: boolean
+  /** Rollenposen vorhanden (held-<id>-rolle1/-rolle2) */
+  rollenposen?: boolean
 }
 export interface MonsterInfo {
   id: string
@@ -35,6 +44,8 @@ export interface MonsterInfo {
   namen: Namen
   /** Rückfall-Symbol (Gerät, alte Ansichten) */
   symbol: string
+  /** Rüstungs- und Raserei-Fassung vorhanden */
+  phasen?: boolean
 }
 export interface HintergrundInfo {
   id: string
@@ -42,46 +53,11 @@ export interface HintergrundInfo {
   welt: BossWelt
 }
 
-export const FIGUREN: FigurInfo[] = [
-  { id: 'ritterin', band: '5-6' },
-  { id: 'magier', band: '5-6' },
-  { id: 'bogen', band: '5-6' },
-  { id: 'heilerin', band: '5-6' },
-  { id: 'tueftler', band: '5-6' }
-]
-
-export const MONSTER: MonsterInfo[] = [
-  {
-    id: 'drache',
-    band: '5-6',
-    welt: 'fantasy',
-    symbol: '🐉',
-    namen: { de: 'Grammatik-Drache', en: 'Grammar Dragon', fr: 'Dragon de grammaire', es: 'Dragón gramatical', it: 'Drago della grammatica', la: 'Draco grammaticus' }
-  },
-  {
-    id: 'krake',
-    band: '5-6',
-    welt: 'fantasy',
-    symbol: '🐙',
-    namen: { de: 'Vokabel-Krake', en: 'Vocab Kraken', fr: 'Kraken du vocabulaire', es: 'Kraken del vocabulario', it: 'Kraken del lessico', la: 'Polypus verborum' }
-  },
-  {
-    id: 'teufel',
-    band: '5-6',
-    welt: 'fantasy',
-    symbol: '👹',
-    namen: { de: 'Fehlerteufel', en: 'Mistake Devil', fr: 'Diable des fautes', es: 'Diablo de errores', it: 'Diavolo degli errori', la: 'Daemon errorum' }
-  },
-  {
-    id: 'golem',
-    band: '5-6',
-    welt: 'fantasy',
-    symbol: '🗿',
-    namen: { de: 'Wort-Golem', en: 'Word Golem', fr: 'Golem des mots', es: 'Gólem de palabras', it: 'Golem delle parole', la: 'Golem verborum' }
-  }
-]
-
-export const HINTERGRUENDE: HintergrundInfo[] = [{ id: 'burgarena', band: '5-6', welt: 'fantasy' }]
+export const FIGUREN: FigurInfo[] = FIGUREN_DATEN
+export const MONSTER: MonsterInfo[] = MONSTER_DATEN
+export const HINTERGRUENDE: HintergrundInfo[] = HINTERGRUND_DATEN
+/** Begleiter (Ausrüstung Stufe 3) – Bilder begleiter-<id> */
+export const BEGLEITER: string[] = BEGLEITER_DATEN
 
 /** Bänder nach Nähe zum gewünschten (für den Rückfall) */
 function naechsteBaender(b: BossBand): BossBand[] {
@@ -96,7 +72,16 @@ function imBand<T extends { band: BossBand }>(liste: T[], band: BossBand): T[] {
   return []
 }
 
-export const figurenFuer = (jahrgang: number | null | undefined): FigurInfo[] => imBand(FIGUREN, bandVon(jahrgang))
+/**
+ * Figuren zur Wahl: Band des Jahrgangs (sonst das nächste mit Bildern). Mit Rolle: Tanks/Heiler nur ihre Figuren,
+ * Angreifer alle ohne Rolle; gibt es (noch) keine passenden, alle des Bands.
+ */
+export function figurenFuer(jahrgang: number | null | undefined, rolle?: 'tank' | 'heiler' | 'angreifer' | null): FigurInfo[] {
+  const alle = imBand(FIGUREN, bandVon(jahrgang))
+  if (!rolle) return alle
+  const passend = alle.filter((f) => (rolle === 'angreifer' ? !f.rolle : f.rolle === rolle))
+  return passend.length ? passend : alle
+}
 export const monsterFuer = (jahrgang: number | null | undefined): MonsterInfo[] => imBand(MONSTER, bandVon(jahrgang))
 export const monster = (id: string): MonsterInfo | undefined => MONSTER.find((m) => m.id === id)
 export const istFigur = (id: unknown): id is string => typeof id === 'string' && FIGUREN.some((f) => f.id === id)

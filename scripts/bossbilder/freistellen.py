@@ -85,23 +85,41 @@ def teile(im, spalten, zeilen):
 
 
 POSEN4 = ["ruhe", "angriff", "getroffen", "besiegt"]
+# Begleiter (Ausrüstung Stufe 3) – Reihenfolge wie im Motivkatalog
+BEGLEITER = {"begleiter-a": ["eule", "minidrache", "roboter", "fuchs"], "begleiter-b": ["stern", "greif", "qualle", "schildkroete"]}
 for datei in sorted(os.listdir(ROH)):
     if not datei.endswith(".png"):
         continue
     name = datei[:-4]
     im = Image.open(os.path.join(ROH, datei))
-    if name == "arena":
-        im.convert("RGB").save(os.path.join(ZIEL, "arena.webp"), quality=84)
+    if name == "arena" or name.startswith("hg-"):
+        # Hintergründe: auf 1600 px Breite, ohne Freistellen
+        bild = im.convert("RGB")
+        if bild.width > 1600:
+            bild = bild.resize((1600, round(bild.height * 1600 / bild.width)), Image.LANCZOS)
+        bild.save(os.path.join(ZIEL, ("hg-burgarena" if name == "arena" else name) + ".webp"), quality=82)
+        print(name)
         continue
     frei = freistellen(im)
     if name.startswith("phase-"):
         teile_ = zip(["ruestung", "raserei"], teile(frei, 2, 1))
         name = "boss-" + name[6:]
+    elif name in BEGLEITER:
+        teile_ = zip(BEGLEITER[name], teile(frei, 2, 2))
+        name = "begleiter"
+    elif name.startswith("rolle-"):
+        teile_ = zip(["rolle1", "rolle2"], teile(frei, 2, 1))
+        name = "held-" + name[6:]
+    elif name.startswith("spezial-"):
+        teile_ = [("spezial", frei)]
+        name = "held-" + name[8:]
     elif name == "effekte":
         teile_ = zip(["kugel", "schild", "stern", "hieb"], teile(frei, 2, 2))
     else:
         teile_ = zip(POSEN4, teile(frei, 2, 2))
     for pose, t in teile_:
+        if os.path.exists(os.path.join(ZIEL, f"{name}-{pose}.webp")):
+            continue
         z = zuschneiden(t)
         z.save(os.path.join(ZIEL, f"{name}-{pose}.webp"), quality=88, method=4)
         print(name, pose, z.size)

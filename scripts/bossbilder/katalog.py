@@ -240,7 +240,7 @@ Absolutely no text, letters, numbers, labels, frames, grid lines or watermark.""
 def katalog():
     auftraege = []  # (name, text, referenz)
     eintraege = {"figuren": [], "monster": [], "hintergruende": [], "begleiter": []}
-    reihenfolge = ["78", "910", "1113", "56"]
+    reihenfolge = ["78", "910", "56", "1113"]  # 17.11.2026: Jg. 5–6 vor 11–13 (Wunsch der Lehrkraft)
     for nr, b in enumerate(reihenfolge):
         bandnr = ["56", "78", "910", "1113"].index(b)
         for i, arch in enumerate(ARCHETYPEN):

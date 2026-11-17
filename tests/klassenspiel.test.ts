@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { gramItems, vokItems, leererInhalt } from '../src/shared/mehrspieler/inhalt'
 import { frageAus } from '../src/shared/mehrspieler/kern'
 import { formatFuer, leiterVon } from '../src/shared/klassenspiel/leiter'
+import { figurenFuer, monsterFuer } from '../src/shared/klassenspiel/bossBestand'
 import type { Band } from '../src/shared/mehrspieler/typen'
 import type { Vokabel } from '../src/shared/vokabeltrainer'
 import { eloSchritt, startTheta, stufenFuer, wahrscheinlichkeit } from '../src/shared/klassenspiel/adaptiv'
@@ -394,6 +395,17 @@ describe('Boss-Kampf mit Rollen (17.11.2026)', () => {
     z.angriffe.push({ id: 900, item: z.inhalt.vok.items[0].id, von: 'p2', seit: 0 })
     r.tick!(z, 30_000)
     expect(z.schild).toBeLessThan(schild)
+  })
+  it('Figurenwahl nach Rolle: Tanks/Heiler nur ihre Figuren, Angreifer die übrigen; Jg. 7–8 hat eigenen Bestand', () => {
+    const tanks = figurenFuer(7, 'tank')
+    const heiler = figurenFuer(7, 'heiler')
+    const angreifer = figurenFuer(7, 'angreifer')
+    expect(tanks.length).toBeGreaterThan(0)
+    expect(tanks.every((f) => f.rolle === 'tank' && f.band === '7-8')).toBe(true)
+    expect(heiler.every((f) => f.rolle === 'heiler')).toBe(true)
+    expect(angreifer.every((f) => !f.rolle)).toBe(true)
+    expect(tanks.length + heiler.length + angreifer.length).toBe(figurenFuer(7).length)
+    expect(monsterFuer(8).every((m) => m.band === '7-8')).toBe(true)
   })
   it('Boss-Leben richtet sich nach den Angreifern; Tanks bekommen Angriffe jede zweite Aufgabe', () => {
     const viele = rollenSpiel(12, ['angreifer'])

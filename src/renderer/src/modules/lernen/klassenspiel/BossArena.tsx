@@ -42,7 +42,8 @@ const CSS = `
 .ba-abzeichen { position: absolute; left: 50%; top: -14%; width: 28%; transform: translateX(-50%); animation: ba-schweben 2s ease-in-out infinite }
 .ba-begleiter { position: absolute; right: -14%; top: 18%; font-size: 2.2cqi; animation: ba-schweben 1.6s ease-in-out infinite }
 @keyframes ba-schweben { 50% { transform: translate(-50%, -12%) } }
-.ba-begleiter { animation-name: ba-schweben2 } @keyframes ba-schweben2 { 50% { transform: translateY(-25%) } }
+.ba-begleiter { animation-name: ba-schweben2 }
+.ba-begleiter-bild { position: absolute; right: -22%; top: 30%; width: 34%; animation: ba-schweben2 1.8s ease-in-out infinite; filter: drop-shadow(0 .4cqi .3cqi #0007) } @keyframes ba-schweben2 { 50% { transform: translateY(-25%) } }
 .ba-wippen { animation: ba-wippen 1.5s ease-in-out infinite; height: 100%; position: relative }
 @keyframes ba-wippen { 50% { transform: translateY(-1.5%) } }
 .ba-atmen { animation: ba-atmen 2.6s ease-in-out infinite; transform-origin: 50% 100%; height: 100%; position: relative }
@@ -148,7 +149,11 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
   /** Plätze einer Rolle (mit Rollen nur Angreifer schlagen zu) */
   const slotsMit = (rolle: string): number[] => aktuell.current.figuren.map((f, i) => (f.rolle === rolle ? i : -1)).filter((i) => i >= 0)
 
-  const bossRuhe = (x: BBlockBoss): string => `boss-${x.monster}-${x.phase === 1 ? 'ruhe' : x.phase === 2 ? 'ruestung' : 'raserei'}`
+  const bossRuhe = (x: BBlockBoss): string => {
+    const n = `boss-${x.monster}-${x.phase === 1 ? 'ruhe' : x.phase === 2 ? 'ruestung' : 'raserei'}`
+    // Monster ohne Rüstungs-/Raserei-Bild (noch nicht erzeugt): Ruhepose
+    return bossBild(n) ? n : `boss-${x.monster}-ruhe`
+  }
   const figurRuhe = (x: BBlockBoss): FigurPose => (x.ausgang === 'niederlage' ? 'besiegt' : x.ausgang === 'sieg' ? 'angriff' : 'ruhe')
   const bossStand = (x: BBlockBoss): string => (x.ausgang === 'sieg' ? `boss-${x.monster}-besiegt` : bossRuhe(x))
 
@@ -483,7 +488,7 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
               <img ref={(el) => {
                   figurBilder.current[i] = el
                 }} className="ba-fig" src={figurBild(f.figur, figurRuhe(b))} alt="" aria-hidden />
-              {f.stufe >= 3 && <div className="ba-begleiter">✨</div>}
+              {f.stufe >= 3 && (f.begleiter && bossBild(`begleiter-${f.begleiter}`) ? <img className="ba-begleiter-bild" src={bossBild(`begleiter-${f.begleiter}`)} alt="" aria-hidden /> : <div className="ba-begleiter">✨</div>)}
               {f.stufe >= 4 && !f.rolle && <img className="ba-abzeichen" src={bossBild('effekte-stern')} alt="" aria-hidden />}
               {f.rolle && <div className="ba-rolle">{ROLLEN_ZEICHEN[f.rolle]}</div>}
             </div>

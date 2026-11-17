@@ -22,7 +22,7 @@
 import { zufall } from '../../mehrspieler/kern'
 import { klassenwertVon, meldung, type BBlock, type BossEreignis, type KBasis, type KlassenRegeln } from '../kern'
 import { kt } from '../texte'
-import { figurenFuer, hintergrundFuer, monsterFuer, monsterName } from '../bossBestand'
+import { BEGLEITER, figurenFuer, hintergrundFuer, monsterFuer, monsterName } from '../bossBestand'
 import type { LeiterFormat } from '../leiter'
 import { ANGREIFER_FAKTOR, HEILUNG_JE_ANTWORT, SCHILD_JE_ABWEHR, SCHILD_JE_ANTWORT, SCHILD_MAX, type BossRolle } from '../bossRollen'
 
@@ -96,9 +96,9 @@ export const reihenfolge = (z: KBasis): string[] =>
     .sort((a, b) => a.beitritt - b.beitritt || a.id.localeCompare(b.id))
     .map((p) => p.id)
 
-/** Figur ohne Wahl: zufällig aus dem Band (beim Start und für später Dazukommende) */
+/** Figur ohne Wahl: zufällig aus dem Band (beim Start und für später Dazukommende); mit Rollen aus den Figuren der Rolle */
 export function figurZuteilen(z: KBasis, wer: string): void {
-  const l = figurenFuer(z.jahrgang)
+  const l = figurenFuer(z.jahrgang, z.einst.bossRollen ? z.rollen?.[wer] ?? null : null)
   if (!l.length) return
   z.figuren ??= {}
   if (!z.figuren[wer]) z.figuren[wer] = { figur: l[Math.floor(zuf(z) * l.length) % l.length].id, stufe: 0 }
@@ -298,7 +298,15 @@ export const boss: KlassenRegeln<Boss> = {
         figuren: figuren.map((f, fi) => {
           const n = schon.get(f.figur) ?? 0
           schon.set(f.figur, n + 1)
-          return { figur: f.figur, stufe: f.stufe, ring: (zaehl.get(f.figur) ?? 0) > 1 ? n : null, ...(z.einst.bossRollen ? { rolle: rolleVon(z, reihe[fi]) } : {}) }
+          // Begleiter (Ausrüstung ab Stufe 3): fest je Person, aus dem Bestand
+          const begleiter = f.stufe >= 3 && BEGLEITER.length ? BEGLEITER[[...reihe[fi]].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % BEGLEITER.length] : undefined
+          return {
+            figur: f.figur,
+            stufe: f.stufe,
+            ring: (zaehl.get(f.figur) ?? 0) > 1 ? n : null,
+            ...(begleiter ? { begleiter } : {}),
+            ...(z.einst.bossRollen ? { rolle: rolleVon(z, reihe[fi]) } : {})
+          }
         }),
         ereignisse: z.ereignisse,
         ausgang: z.sieg ? 'sieg' : z.niederlage ? 'niederlage' : z.ende ? 'entkommen' : null,

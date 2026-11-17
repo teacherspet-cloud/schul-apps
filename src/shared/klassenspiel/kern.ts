@@ -144,7 +144,7 @@ export interface BBlockBoss {
   warnung: boolean
   naechsterIn: number
   spezial: number
-  figuren: { figur: string; ring: number | null; stufe: number; rolle?: 'tank' | 'heiler' | 'angreifer' }[]
+  figuren: { figur: string; ring: number | null; stufe: number; rolle?: 'tank' | 'heiler' | 'angreifer'; begleiter?: string }[]
   /** Mit Rollen: Klassenschild (fängt Bossschläge zuerst ab) */
   schild?: number
   schildMax?: number

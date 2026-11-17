@@ -159,14 +159,15 @@ function WirkungAnimation({ s }: { s: Sicht }): React.JSX.Element | null {
   const [zeigen, setZeigen] = useState<{ nr: number; art: string; wert: number } | null>(null)
   const vorher = useRef<number | null>(null)
   useEffect(() => {
-    if (!w) return
-    if (vorher.current !== null && w.nr > vorher.current) {
+    // Vor der ersten Wirkung gilt 0 – sonst würde die allererste richtige Antwort nicht gezeigt
+    const nr = w?.nr ?? 0
+    if (vorher.current !== null && w && nr > vorher.current) {
       setZeigen(w)
       const t = setTimeout(() => setZeigen(null), 1300)
-      vorher.current = w.nr
+      vorher.current = nr
       return () => clearTimeout(t)
     }
-    vorher.current = w.nr
+    vorher.current = nr
   }, [w?.nr]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!zeigen) return null
   const zeichen = zeigen.art === 'schild' ? '🛡️' : zeigen.art === 'heilung' ? '💚' : '⚔️'
@@ -386,7 +387,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
             </Card>
           )}
           {(s.phase === 'lobby' || s.phase === 'teams') && s.rollenWahl?.offen && <RollenWahl s={s} waehlen={rolleWaehlen} />}
-          {(s.phase === 'lobby' || s.phase === 'teams') && s.figurWahl && <FigurWahl s={s} waehlen={figurWaehlen} />}
+          {(s.phase === 'lobby' || s.phase === 'teams') && s.figurWahl && s.figurWahl.figuren.length > 0 && <FigurWahl s={s} waehlen={figurWaehlen} />}
           {s.phase === 'teams' && (
             <Stack>
               <Losen s={s} />
