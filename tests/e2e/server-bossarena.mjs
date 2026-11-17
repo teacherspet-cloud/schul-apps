@@ -136,7 +136,7 @@ try {
   pruefe(await da(p.locator('[data-boss-figuren="4"]')), 'Vier Figuren vorne (Noah bekam eine zufällige)')
   const arenaText = await p.locator('[data-boss-arena]').innerText()
   pruefe(!/Mia|Ben|Lea|Noah/.test(arenaText), 'Keine Namen in der Arena')
-  pruefe((await p.locator('[data-boss-figur="magier"]').count()) === 2, 'Magier zweimal vorne (Mehrfachwahl mit Farbring)')
+  pruefe((await p.locator('[data-boss-figur="magier"]').count()) >= 2, 'Magier mindestens zweimal vorne (Mehrfachwahl mit Farbring; Noah bekommt eine zufällige)')
   pruefe(await da(mp.locator('[data-klasse-eigene-figur="magier"]')), 'Mia sieht ihre Figur am Gerät')
   pruefe(await da(mp.locator('[data-klasse-leiter]')), 'Mia sieht ihre Stufe der Stufenleiter (Vorgabe)')
   const bild = await p.locator('[data-boss-arena] img').first().evaluate((i) => i.naturalWidth > 0)
@@ -205,6 +205,58 @@ try {
   const m2 = (await api(Mia).get(`/s/api/klassenspiel/zustand?code=${n2.code}`)).sicht
   pruefe(m2?.figurWahl?.gewaehlt === 'magier', `Neues Spiel: Mias Figur gemerkt (${m2?.figurWahl?.gewaehlt})`)
   await api(lk).post(`/server/klassenspiel/${n2.code}/steuern`, { aktion: 'schliessen' })
+
+  // ---------- Mit Rollen (17.11.2026): Wahl mit Obergrenze, Übersicht im Warteraum, Kampfreihe, Wirkung am Gerät
+  const n3 = await api(lk).post('/server/klassenspiel/neu', { kurs: vok.id, einstellungen: { spiel: 'boss', dauer: 5, bossRollen: true, bossReaktion: 'erfolge' } })
+  for (const c of [Mia, Ben, Lea, Noah]) await api(c).post('/s/api/klassenspiel/beitreten', { code: n3.code })
+  await mp.goto(`${A}/s/ks/${n3.code}`)
+  pruefe(await da(mp.locator('[data-klasse-rollenwahl]')), 'Rollen: Mia sieht die Rollenwahl')
+  pruefe(await da(mp.getByText('Damage Dealer').first()), 'Rollennamen in der Zielsprache („Damage Dealer")')
+  await mp.locator('[data-klasse-rolle="heiler"]').click()
+  pruefe(await da(mp.locator('[data-klasse-rollenwahl="heiler"]')), 'Rollen: Mia ist Heilerin')
+  await mp.screenshot({ path: join(out, '9-mia-rollenwahl.png') })
+  const t1 = await api(Ben).post('/s/api/klassenspiel/rolle', { code: n3.code, rolle: 'tank' })
+  const t2 = await api(Lea).post('/s/api/klassenspiel/rolle', { code: n3.code, rolle: 'tank' })
+  const t3 = await api(Noah).post('/s/api/klassenspiel/rolle', { code: n3.code, rolle: 'tank' })
+  pruefe(t1.status === 200 && t2.status === 200 && t3.status === 409, `Obergrenze: 2 von 4 dürfen Tank sein, die dritte Wahl ist voll (${t1.status}/${t2.status}/${t3.status})`)
+  const ue = (await api(lk).get(`/server/klassenspiel/${n3.code}/zustand`)).sicht
+  pruefe(ue?.rollenUebersicht?.tank?.length === 2 && ue?.rollenUebersicht?.heiler?.length === 1, 'Beamer-Warteraum: Übersicht je Rolle mit Namen')
+  // Beamer der Lehrkraft (über „Zum laufenden Spiel")
+  await p.goto(A)
+  await p.waitForTimeout(2000)
+  await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
+  await p.locator(`[data-klasse="${K}"]`).first().click()
+  await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
+  await p.locator('[data-klassenspiel-knopf]').click()
+  await p.locator('[data-klassenspiel-zurueck]').click()
+  pruefe(await da(p.locator('[data-klassenspiel-rollen]')), 'Beamer: Rollenübersicht im Warteraum')
+  await p.screenshot({ path: join(out, '10-beamer-rollen-lobby.png') })
+  await p.locator('[data-klassenspiel-start-knopf]').click()
+  pruefe(await da(p.locator('[data-boss-schild]')), 'Arena mit Rollen: Schildbalken der Klasse')
+  const sicht3 = (await api(lk).get(`/server/klassenspiel/${n3.code}/zustand`)).sicht
+  const fig = sicht3?.bloecke?.find((b) => b.typ === 'boss')?.figuren ?? []
+  pruefe(fig.length === 4 && fig.every((f) => ['tank', 'heiler', 'angreifer'].includes(f.rolle)), `Alle Figuren mit Rolle (Noah bekam die kleinste: ${fig.map((f) => f.rolle).join(', ')})`)
+  pruefe(!/Mia|Ben|Lea|Noah/.test(await p.locator('[data-boss-arena]').innerText()), 'Im Kampf keine Namen in der Arena')
+  pruefe(await da(mp.locator('[data-klasse-eigene-rolle="heiler"]')), 'Gerät: „Deine Rolle“ Heilerin')
+  // Ben (Tank) antwortet richtig → Schild wächst
+  let schild = 0
+  for (let i = 0; i < 6 && schild === 0; i++) {
+    await antwortApi(Ben, n3.code, false)
+    schild = (await api(lk).get(`/server/klassenspiel/${n3.code}/zustand`)).sicht?.bloecke?.find((b) => b.typ === 'boss')?.schild ?? 0
+  }
+  pruefe(schild > 0, `Tank antwortet richtig → Klassenschild ${schild}`)
+  // Mia (Heilerin) antwortet im Browser richtig → Wirkung als Animation
+  let wirkung = false
+  for (let i = 0; i < 6 && !wirkung; i++) {
+    await mp.waitForTimeout(3300)
+    await mp.locator('[data-mehr-option]').first().click({ force: true }).catch(() => undefined)
+    wirkung = await da(mp.locator('[data-klasse-wirkung="heilung"]'), 1500)
+  }
+  pruefe(wirkung, 'Gerät: Heilung als Animation sichtbar')
+  await mp.screenshot({ path: join(out, '11-mia-wirkung.png') })
+  await p.waitForTimeout(800)
+  await p.screenshot({ path: join(out, '12-beamer-rollen-arena.png') })
+  await api(lk).post(`/server/klassenspiel/${n3.code}/steuern`, { aktion: 'schliessen' })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

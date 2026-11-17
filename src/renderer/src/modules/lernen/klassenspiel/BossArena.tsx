@@ -32,6 +32,8 @@ const CSS = `
 .ba-platz.ba-s5 img.ba-fig { filter: drop-shadow(0 0 1.2cqi #fbbf24) drop-shadow(0 0 .4cqi #fde68a) drop-shadow(0 1cqi .5cqi #0008) }
 .ba-platz img.ba-fig.ba-weiss { filter: brightness(2.2) saturate(.3) }
 .ba-platz img.ba-fig.ba-rot { filter: sepia(1) saturate(5) hue-rotate(-25deg) }
+.ba-platz img.ba-fig.ba-blau { filter: drop-shadow(0 0 1.4cqi #38bdf8) brightness(1.15) }
+.ba-platz img.ba-fig.ba-gruen { filter: drop-shadow(0 0 1.4cqi #4ade80) brightness(1.15) }
 .ba-platz img.ba-fig.ba-gold { filter: drop-shadow(0 0 1.4cqi #fde047) brightness(1.25) }
 .ba-ring { position: absolute; left: 50%; bottom: -1.5%; width: 70%; height: 9%; transform: translateX(-50%); border-radius: 50%; border: .35cqi solid; opacity: .9 }
 .ba-plattform { position: absolute; left: 50%; bottom: -3%; width: 85%; height: 12%; transform: translateX(-50%); border-radius: 50%;
@@ -59,6 +61,14 @@ const CSS = `
   background: linear-gradient(transparent, #0b0f22d0); z-index: 40; font-weight: 800; font-size: 1.3cqi }
 .ba-fuss b { display: block; font-size: 2.2cqi; font-variant-numeric: tabular-nums }
 .ba-spezial .ba-leiste { height: 1.3cqi } .ba-spezial .ba-wert { background: linear-gradient(90deg, #fde68a, #f59e0b); left: 0 }
+.ba-rolle { position: absolute; left: 50%; top: -9%; transform: translateX(-50%); font-size: 1.7cqi; line-height: 1; background: #0b0f22cc; border-radius: 99px; padding: .25cqi .45cqi; box-shadow: 0 0 .6cqi #0008 }
+.ba-schildwand { position: absolute; left: 53%; bottom: 3%; width: 7%; height: 46%; transform: translateX(-50%); border-radius: 50% / 18%; z-index: 33; pointer-events: none;
+  background: radial-gradient(ellipse at 30% 50%, #e0f2fe, #38bdf8aa 45%, #0369a155 70%, transparent 72%); box-shadow: 0 0 2.5cqi #38bdf8; transition: opacity .4s }
+.ba-schildwand.blitz { animation: ba-schildblitz .45s }
+@keyframes ba-schildblitz { 30% { filter: brightness(2.4); transform: translateX(-50%) scale(1.08) } }
+.ba-schildleiste { height: .9cqi; border-radius: 99px; background: #0b0f22; margin-top: .35cqi; overflow: hidden; border: .15cqi solid #38bdf866 }
+.ba-schildleiste i { display: block; height: 100%; background: linear-gradient(90deg, #7dd3fc, #0284c7); transition: width .3s }
+.ba-warn { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); z-index: 45; background: #b91c1ccc; color: #fff; font-weight: 800; font-size: 1.6cqi; border-radius: .8cqi; padding: .5cqi 1.2cqi }
 .ba-boss-aus { transition: opacity 1.2s, transform 1.2s } .ba-boss-aus.weg { opacity: 0; transform: translateX(20%) scale(.8) }
 @media (prefers-reduced-motion: reduce) {
   .ba-wippen, .ba-atmen, .ba-kugel, .ba-abzeichen, .ba-begleiter { animation: none } .ba-rahmen.ba-wackeln { animation: none }
@@ -84,6 +94,34 @@ export function figurPlaetze(n: number): { x: number; b: number; h: number; z: n
   return aus
 }
 
+/**
+ * Kampfreihe mit Rollen (17.11.2026, Entscheidung der Lehrkraft): Tanks als Wand direkt vor dem Boss, Angreifer
+ * dahinter, Heiler ganz hinten links und etwas höher (Tiefe). Viele einer Rolle: zwei gestaffelte Reihen.
+ */
+export function rollenPlaetze(rollen: (string | undefined)[]): { x: number; b: number; h: number; z: number }[] {
+  const aus: { x: number; b: number; h: number; z: number }[] = new Array(rollen.length)
+  const gruppe = (rolle: string, x0: number, x1: number, b0: number, h: number, z0: number): void => {
+    const idx = rollen.map((r, i) => (r === rolle ? i : -1)).filter((i) => i >= 0)
+    const reihen = idx.length > 6 ? 2 : 1
+    const pro = Math.ceil(idx.length / reihen)
+    idx.forEach((i, k) => {
+      const r = Math.floor(k / pro)
+      const c = k % pro
+      const inReihe = Math.min(pro, idx.length - r * pro)
+      const ab = (x1 - x0) / inReihe
+      const klein = idx.length > 8 ? 0.85 : 1
+      aus[i] = { x: x0 + ab * (c + 0.5) + (r % 2 ? ab * 0.3 : 0), b: b0 + r * 8, h: h * (r ? 0.9 : 1) * klein, z: z0 - r * 4 + (c % 2) }
+    })
+  }
+  // Tanks enden vor dem Boss (sein Bild beginnt bei etwa 50 %), Angreifer dahinter, Heiler hinten links
+  gruppe('tank', 34, 50, 4, 32, 32)
+  gruppe('angreifer', 16, 35, 12, 27, 22)
+  gruppe('heiler', 2, 17, 22, 23, 12)
+  return aus
+}
+
+const ROLLEN_ZEICHEN: Record<string, string> = { tank: '🛡️', heiler: '💚', angreifer: '⚔️' }
+
 const BOSS_PLATZ = { x: 74, b: 6, h: 62 }
 
 export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
@@ -101,7 +139,14 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
   const aktuell = useRef(b)
   aktuell.current = b
   const ruhig = useMemo(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, [])
-  const plaetze = useMemo(() => figurPlaetze(b.figuren.length), [b.figuren.length])
+  const rollenSchluessel = b.rollen ? b.figuren.map((f) => f.rolle ?? '').join() : ''
+  const plaetze = useMemo(
+    () => (b.rollen ? rollenPlaetze(b.figuren.map((f) => f.rolle)) : figurPlaetze(b.figuren.length)),
+    [b.figuren.length, b.rollen, rollenSchluessel] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const schildwand = useRef<HTMLDivElement>(null)
+  /** Plätze einer Rolle (mit Rollen nur Angreifer schlagen zu) */
+  const slotsMit = (rolle: string): number[] => aktuell.current.figuren.map((f, i) => (f.rolle === rolle ? i : -1)).filter((i) => i >= 0)
 
   const bossRuhe = (x: BBlockBoss): string => `boss-${x.monster}-${x.phase === 1 ? 'ruhe' : x.phase === 2 ? 'ruestung' : 'raserei'}`
   const figurRuhe = (x: BBlockBoss): FigurPose => (x.ausgang === 'niederlage' ? 'besiegt' : x.ausgang === 'sieg' ? 'angriff' : 'ruhe')
@@ -177,7 +222,26 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
     if (a) a.onfinish = () => el.remove()
     else setTimeout(() => el.remove(), 1000)
   }
-  const fliegendeKugeln = (anzahl: number): void => {
+  /** Heilfunken: steigen von der Heilerin zum Lebensbalken der Klasse */
+  const heilFunken = (x0: number, y0: number): void => {
+    if (!fx.current) return
+    for (let k = 0; k < 5; k++) {
+      const el = document.createElement('div')
+      el.className = 'ba-zahl'
+      el.textContent = k % 2 ? '✚' : '✦'
+      Object.assign(el.style, { left: `${x0 + (Math.random() * 6 - 3)}%`, top: `${y0}%`, color: '#86efac', fontSize: '2cqi', transition: `left .9s ${k * 70}ms ease-in, top .9s ${k * 70}ms ease-in, opacity .9s ${k * 70}ms` })
+      fx.current.appendChild(el)
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          el.style.left = `${16 + Math.random() * 10}%`
+          el.style.top = '7%'
+          el.style.opacity = '0.2'
+        })
+      )
+      setTimeout(() => el.remove(), 1100 + k * 70)
+    }
+  }
+  const fliegendeKugeln = (anzahl: number, zielX?: number): void => {
     const src = bossBild('effekte-kugel')
     if (!fx.current || !src) return
     for (let i = 0; i < Math.min(anzahl, 12); i++) {
@@ -189,8 +253,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       fx.current.appendChild(el)
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          el.style.left = `${12 + Math.random() * 32}%`
-          el.style.top = `${55 + Math.random() * 20}%`
+          el.style.left = zielX !== undefined ? `${zielX + Math.random() * 2}%` : `${12 + Math.random() * 32}%`
+          el.style.top = zielX !== undefined ? `${35 + Math.random() * 25}%` : `${55 + Math.random() * 20}%`
         })
       )
       setTimeout(() => el.remove(), 520 + i * 40)
@@ -223,8 +287,9 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
         krit ||= Boolean(w.krit)
         if (w.slot !== undefined) slots.push(w.slot)
       }
-      const wer = slots.length ? [...new Set(slots)] : n ? [Math.floor(Math.random() * n)] : []
-      if (anzahl > 3 && !slots.length) for (let k = 0; k < Math.min(6, n); k++) wer.push(Math.floor(Math.random() * n))
+      const pool = x.rollen ? slotsMit('angreifer') : Array.from({ length: n }, (_, i) => i)
+      const wer = slots.length ? [...new Set(slots)] : pool.length ? [pool[Math.floor(Math.random() * pool.length)]] : []
+      if (anzahl > 3 && !slots.length) for (let k = 0; k < Math.min(6, pool.length); k++) wer.push(pool[Math.floor(Math.random() * pool.length)])
       wer.slice(0, 8).forEach((i, k) => setTimeout(() => angriffVon(i), k * 50))
       for (const i of slots) blitz(figurBilder.current[i], 'ba-gold', 380)
       setTimeout(() => {
@@ -250,19 +315,52 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
         figurPose(e.slot, 'getroffen', 450)
         blitz(figurBilder.current[e.slot], 'ba-rot', 220)
       }
+    } else if (e.art === 'schild' || e.art === 'heilung') {
+      // Rollen: Schild aufbauen bzw. heilen – mehrere kurz hintereinander zusammenfassen
+      let summe = e.wert ?? 0
+      const slots = e.slot !== undefined ? [e.slot] : []
+      while (schlange.current[0]?.art === e.art) {
+        const w = schlange.current.shift()!
+        summe += w.wert ?? 0
+        if (w.slot !== undefined) slots.push(w.slot)
+      }
+      const quelle = slots.length ? slots : slotsMit(e.art === 'schild' ? 'tank' : 'heiler').slice(0, 1)
+      for (const i of [...new Set(quelle)].slice(0, 6)) {
+        blitz(figurBilder.current[i], e.art === 'schild' ? 'ba-blau' : 'ba-gruen', 450)
+        const p = plaetze[i]
+        if (p && e.art === 'heilung') heilFunken(p.x, 100 - p.b - p.h * 0.6)
+      }
+      if (e.art === 'schild') {
+        const w = schildwand.current
+        if (w) (w.classList.remove('blitz'), void w.offsetWidth, w.classList.add('blitz'))
+        zahl(`+${Math.round(summe * 10) / 10} 🛡️`, 53, 40, '#7dd3fc', false)
+      } else zahl(`+${Math.round(summe * 10) / 10} 💚`, 18, 12, '#86efac', false)
     } else if (e.art === 'schlag') {
       bossPose('angriff', 750)
       stoss(bossPlatz.current, -10, 500)
-      fliegendeKugeln(Math.max(1, Math.round((e.wert ?? 1) / 2)))
+      const abgefangen = e.abgefangen ?? 0
+      fliegendeKugeln(Math.max(1, Math.round(((e.wert ?? 0) + abgefangen) / 2)), abgefangen > 0 && !(e.wert ?? 0) ? 53 : undefined)
       setTimeout(() => {
-        for (let i = 0; i < n; i++) {
-          if (!aktuell.current.ausgang) figurPose(i, 'getroffen', 520)
-          blitz(figurBilder.current[i], 'ba-rot', 200)
-          stoss(figurPlaetzeEl.current[i], -8, 380)
+        // Schild der Tanks fängt ab – bricht er, gehen die Tanks kurz in die Knie
+        if (abgefangen > 0) {
+          const w = schildwand.current
+          if (w) (w.classList.remove('blitz'), void w.offsetWidth, w.classList.add('blitz'))
+          zahl(`🛡️ ${Math.round(abgefangen)}`, 53, 34, '#7dd3fc', true)
+          if (e.bruch) {
+            effekt('schild', 53, 55, 16, 700)
+            for (const i of slotsMit('tank')) if (!aktuell.current.ausgang) figurPose(i, 'getroffen', 900)
+          }
         }
-        effekt('stern', 26, 60, 12, 400)
-        wackeln()
-        zahl(`−${Math.round(e.wert ?? 0)}`, 24, 30, '#f87171', true)
+        if ((e.wert ?? 0) > 0) {
+          for (let i = 0; i < n; i++) {
+            if (!aktuell.current.ausgang) figurPose(i, 'getroffen', 520)
+            blitz(figurBilder.current[i], 'ba-rot', 200)
+            stoss(figurPlaetzeEl.current[i], -8, 380)
+          }
+          effekt('stern', 26, 60, 12, 400)
+          wackeln()
+          zahl(`−${Math.round(e.wert ?? 0)}`, 24, 30, '#f87171', true)
+        }
       }, 520)
     } else if (e.art === 'phase') {
       if (bossImg.current) bossImg.current.src = bossBild(bossRuhe(x)) ?? ''
@@ -270,7 +368,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       wackeln()
     } else if (e.art === 'spezial') {
       zeigeBanner(x.texte?.klassenangriff ?? '', 1500)
-      for (let i = 0; i < n; i++) setTimeout(() => angriffVon(i), (i % 8) * 50)
+      const angreifer = x.rollen ? slotsMit('angreifer') : Array.from({ length: n }, (_, i) => i)
+      angreifer.forEach((i, k) => setTimeout(() => angriffVon(i), (k % 8) * 50))
       setTimeout(() => {
         effekt('stern', BOSS_PLATZ.x - 2, 45, 30, 700)
         bossPose('getroffen', 520)
@@ -332,6 +431,11 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
             <i className="ba-geist" style={{ left: 0, width: prozent(b.held, b.heldMax) }} />
             <i className="ba-wert" style={{ left: 0, width: prozent(b.held, b.heldMax), background: 'linear-gradient(#4ade80, #16a34a)' }} />
           </div>
+          {b.rollen && (
+            <div className="ba-schildleiste" title={b.texte?.schild} data-boss-schild={Math.round(b.schild ?? 0)}>
+              <i style={{ width: prozent(b.schild ?? 0, b.schildMax ?? 30) }} />
+            </div>
+          )}
         </div>
         <div className="ba-mitte">
           {!b.ausgang && (
@@ -380,7 +484,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
                   figurBilder.current[i] = el
                 }} className="ba-fig" src={figurBild(f.figur, figurRuhe(b))} alt="" aria-hidden />
               {f.stufe >= 3 && <div className="ba-begleiter">✨</div>}
-              {f.stufe >= 4 && <img className="ba-abzeichen" src={bossBild('effekte-stern')} alt="" aria-hidden />}
+              {f.stufe >= 4 && !f.rolle && <img className="ba-abzeichen" src={bossBild('effekte-stern')} alt="" aria-hidden />}
+              {f.rolle && <div className="ba-rolle">{ROLLEN_ZEICHEN[f.rolle]}</div>}
             </div>
           </div>
         )
@@ -413,6 +518,10 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
           )
         })}
 
+      {b.rollen && !b.ausgang && (
+        <div ref={schildwand} className="ba-schildwand" style={{ opacity: (b.schild ?? 0) > 0 ? 0.25 + 0.65 * Math.min(1, (b.schild ?? 0) / (b.schildMax ?? 30)) : 0 }} aria-hidden />
+      )}
+      {b.texte?.keinAngreifer && !b.ausgang && <div className="ba-warn">{b.texte.keinAngreifer}</div>}
       <div ref={fx} />
       <div ref={banner} className="ba-banner" />
       <div className={`ba-warnung${b.warnung ? ' an' : ''}`} />

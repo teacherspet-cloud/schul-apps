@@ -364,6 +364,76 @@ describe('Klassenspiele – Stufenleiter je Kind', () => {
   })
 })
 
+describe('Boss-Kampf mit Rollen (17.11.2026)', () => {
+  const rollenSpiel = (n: number, verteilung: string[]) => {
+    const einst = { ...STANDARD_EINSTELLUNGEN, bossRollen: true, spiel: 'boss' as const }
+    const z = kNeu({ spiel: 'boss', einst, jahrgang: 7, inhalt: inhalt(), saat: 42, jetzt: 0 })
+    for (let i = 0; i < n; i++) personDazu(z, `p${i}`, `Kind ${i}`, {}, 0)
+    z.rollen = Object.fromEntries(Object.keys(z.personen).map((id, i) => [id, verteilung[i % verteilung.length] as 'tank' | 'heiler' | 'angreifer']))
+    KLASSEN_REGELN.boss!.start(z, 0)
+    return z as KBasis & { hp: number; max: number; held: number; schild: number; angriffe: { id: number; item: string; von: string; seit: number }[]; niederlage: boolean }
+  }
+  it('Tank lädt Schild, Heiler heilt, nur Angreifer schaden dem Boss; Schild fängt den Schlag zuerst ab', () => {
+    const z = rollenSpiel(3, ['tank', 'heiler', 'angreifer'])
+    const r = KLASSEN_REGELN.boss!
+    const richtig = (wer: string, t: number): void => {
+      geraetSicht(z, r, wer, t - 5000)
+      antworten(z, r, wer, z.personen[wer].aufgabe!.frage.loesung, t)
+    }
+    const hp0 = z.hp
+    richtig('p0', 5000)
+    expect(z.schild).toBeGreaterThan(0)
+    expect(z.hp).toBe(hp0)
+    z.held = 50
+    richtig('p1', 6000)
+    expect(z.held).toBeGreaterThan(50)
+    expect(z.hp).toBe(hp0)
+    richtig('p2', 7000)
+    expect(z.hp).toBeLessThan(hp0)
+    const schild = z.schild
+    z.angriffe.push({ id: 900, item: z.inhalt.vok.items[0].id, von: 'p2', seit: 0 })
+    r.tick!(z, 30_000)
+    expect(z.schild).toBeLessThan(schild)
+  })
+  it('Boss-Leben richtet sich nach den Angreifern; Tanks bekommen Angriffe jede zweite Aufgabe', () => {
+    const viele = rollenSpiel(12, ['angreifer'])
+    const wenige = rollenSpiel(12, ['tank', 'heiler', 'angreifer'])
+    expect(wenige.max).toBeLessThan(viele.max)
+    const z = rollenSpiel(2, ['tank', 'angreifer'])
+    z.angriffe.push({ id: 1, item: z.inhalt.vok.items[0].id, von: 'p1', seit: 0 })
+    z.personen.p0.n = 1
+    expect(KLASSEN_REGELN.boss!.vorschlag!(z, 'p0')).toBe(z.inhalt.vok.items[0].id)
+    z.personen.p1.n = 1
+    expect(KLASSEN_REGELN.boss!.vorschlag!(z, 'p1')).toBeNull()
+  })
+  it('Simulation: gemischte Klasse bei Zielquote gewinnt und spürt Schaden, schwache verliert', () => {
+    const lauf = (quote: number) => {
+      const z = rollenSpiel(24, ['tank', 'heiler', 'angreifer', 'angreifer'])
+      const r = KLASSEN_REGELN.boss!
+      let s0 = 11
+      const zuf = (): number => ((s0 = (s0 * 16807) % 2147483647) / 2147483647)
+      let tief = 100
+      for (let t = 1000; t <= 10 * 60_000 && !z.ende; t += 1000) {
+        tief = Math.min(tief, z.held)
+        for (const wer of Object.keys(z.personen)) {
+          if (z.ende || zuf() > 4 / 60) continue
+          geraetSicht(z, r, wer, t)
+          const a = z.personen[wer].aufgabe
+          if (a) antworten(z, r, wer, zuf() < quote ? a.frage.loesung : '###', t)
+        }
+        kTakt(z, r, t)
+      }
+      return { z, tief }
+    }
+    const gut = lauf(0.78)
+    const schlecht = lauf(0.45)
+    expect(gut.z.sieg).toBe(true)
+    expect(gut.tief).toBeLessThan(90)
+    expect(gut.tief).toBeGreaterThan(40)
+    expect(schlecht.z.niederlage).toBe(true)
+  })
+})
+
 describe('Lückensätze: aus dem Zusammenhang lösbar (Befund 17.11.2026)', () => {
   it('Vokabel-Lücke zum Schreiben nennt die Bedeutung, beim Auswählen nicht', () => {
     const z = spiel('rekord', 1)

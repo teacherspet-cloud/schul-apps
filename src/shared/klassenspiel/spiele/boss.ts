@@ -24,6 +24,7 @@ import { klassenwertVon, meldung, type BBlock, type BossEreignis, type KBasis, t
 import { kt } from '../texte'
 import { figurenFuer, hintergrundFuer, monsterFuer, monsterName } from '../bossBestand'
 import type { LeiterFormat } from '../leiter'
+import { ANGREIFER_FAKTOR, HEILUNG_JE_ANTWORT, SCHILD_JE_ABWEHR, SCHILD_JE_ANTWORT, SCHILD_MAX, type BossRolle } from '../bossRollen'
 
 export const TAKT_MS = [12_000, 10_000, 8_000]
 export const KUGEL_REIF_MS = 6_000
@@ -58,16 +59,33 @@ export interface Boss extends KBasis {
   ereignisse: BossEreignis[]
   /** Je Person: letzter Schlag/Abwehr/Krit (Nummern für die Effekte am Gerät) */
   schlag: { nr: number; schaden: number }
-  eigen: Record<string, { abwehr?: number; krit?: number; auf?: number }>
+  eigen: Record<string, { abwehr?: number; krit?: number; auf?: number; wirkung?: { nr: number; art: 'schild' | 'heilung' | 'schaden'; wert: number } }>
+  /** Mit Rollen: Klassenschild in Lebenspunkten */
+  schild: number
 }
 
 /** Schaden je Format der Stufenleiter (FAUSTREGEL: Auswählen 1, Hören/Wort wählen/Salat 1,5, Schreiben 2, Diktat/Satz 2,5) */
 export const FORMAT_SCHADEN: Record<LeiterFormat, number> = { wahl3: 1, wahl4: 1, hoerwahl: 1.5, rueckwahl: 1.5, salat: 1.5, schreiben: 2, diktat: 2.5, satz: 2.5 }
 
 /** Stufenleiter: schwerere Formate schaden mehr – der Boss hat dort 30 % mehr Leben (Simulation 17.11.2026) */
-export const lebenFuer = (z: KBasis): number =>
-  Math.max(30, Math.round(Object.keys(z.personen).length * z.einst.dauer * 3.2 * (z.einst.schwierigkeit === 'leiter' ? 1.3 : 1)))
-export const schadenJeKugel = (z: KBasis): number => Math.min(8, 100 / (Math.max(1, Object.keys(z.personen).length) * z.einst.dauer * 0.8))
+/** Rolle der Person (ohne Rollen: alle greifen an) */
+export const rolleVon = (z: KBasis, wer: string): BossRolle => (z.einst.bossRollen ? z.rollen?.[wer] ?? 'angreifer' : 'angreifer')
+const angreiferZahl = (z: KBasis): number => Object.keys(z.personen).filter((id) => rolleVon(z, id) === 'angreifer').length
+
+/**
+ * Mit Rollen schaden nur Angreifer (1,5-fach) – das Boss-Leben richtet sich nach ihnen (mindestens einer), damit der
+ * Kampf etwa gleich lang dauert wie ohne Rollen.
+ */
+export const lebenFuer = (z: KBasis): number => {
+  const leute = z.einst.bossRollen ? Math.max(1, angreiferZahl(z)) * ANGREIFER_FAKTOR : Object.keys(z.personen).length
+  return Math.max(30, Math.round(leute * z.einst.dauer * 3.2 * (z.einst.schwierigkeit === 'leiter' ? 1.3 : 1)))
+}
+/** Mit Rollen schlägt der Boss härter zu – Tanks und Heiler sollen wirklich etwas zu tun haben (Simulation 17.11.2026) */
+export const ROLLEN_BOSSSCHADEN = 2
+/** Kugelschaden ohne Rollen-Zuschlag – Grundlage für Schild und Heilung (sonst wüchsen sie mit dem Bossschaden mit) */
+export const grundKugel = (z: KBasis): number => Math.min(8, 100 / (Math.max(1, Object.keys(z.personen).length) * z.einst.dauer * 0.8))
+export const schadenJeKugel = (z: KBasis): number =>
+  Math.min(z.einst.bossRollen ? 12 : 8, (100 / (Math.max(1, Object.keys(z.personen).length) * z.einst.dauer * 0.8)) * (z.einst.bossRollen ? ROLLEN_BOSSSCHADEN : 1))
 export const phaseVon = (z: Boss): number => (z.hp > z.max * 0.66 ? 1 : z.hp > z.max * 0.33 ? 2 : 3)
 
 const zuf = (z: KBasis): number => zufall(z)
@@ -129,13 +147,14 @@ export const boss: KlassenRegeln<Boss> = {
       ereignisse: [],
       schlag: { nr: 0, schaden: 0 },
       eigen: {},
+      schild: 0,
       level: 1
     })
   },
   vorschlag(z, wer) {
-    // Jede dritte Aufgabe ein offener Angriff (nicht der eigene Fehler)
+    // Jede dritte Aufgabe ein offener Angriff (nicht der eigene Fehler); Tanks jede zweite – sie wehren ab
     const p = z.personen[wer]
-    if (!p || p.n % 3 !== 2) return null
+    if (!p || (rolleVon(z, wer) === 'tank' ? p.n % 2 !== 1 : p.n % 3 !== 2)) return null
     return z.angriffe.find((a) => a.von !== wer)?.item ?? null
   },
   nachAntwort(z, wer, a, richtig, _p, jetzt) {
@@ -150,12 +169,27 @@ export const boss: KlassenRegeln<Boss> = {
     const p = z.personen[wer]
     const krit = Boolean(p && p.serie > 0 && p.serie % 5 === 0)
     const ruestung = vorher > 1
-    // Stufenleiter: schwerere Formate schaden mehr (FAUSTREGEL); sonst wie bisher Schreiben doppelt
-    const grund = a.format ? FORMAT_SCHADEN[a.format] : a.stufe >= 3 ? 2 : 1
-    const schaden = grund * (ruestung && a.stufe <= 2 ? 0.5 : 1) * (krit ? 3 : 1)
-    z.hp = Math.max(0, z.hp - schaden)
+    const rolle = rolleVon(z, wer)
+    const kugel = grundKugel(z)
     z.treffer++
-    ereignis(z, { art: 'treffer', wert: schaden, slot: slotFuer(z, wer, false), krit })
+    if (rolle === 'angreifer') {
+      // Stufenleiter: schwerere Formate schaden mehr (FAUSTREGEL); sonst wie bisher Schreiben doppelt; mit Rollen 1,5-fach
+      const grund = a.format ? FORMAT_SCHADEN[a.format] : a.stufe >= 3 ? 2 : 1
+      const schaden = grund * (ruestung && a.stufe <= 2 ? 0.5 : 1) * (krit ? 3 : 1) * (z.einst.bossRollen ? ANGREIFER_FAKTOR : 1)
+      z.hp = Math.max(0, z.hp - schaden)
+      ereignis(z, { art: 'treffer', wert: schaden, slot: slotFuer(z, wer, false), krit })
+      z.eigen[wer] = { ...z.eigen[wer], wirkung: { nr: z.nr, art: 'schaden', wert: Math.round(schaden * 10) / 10 } }
+    } else if (rolle === 'tank') {
+      const plus = Math.min(SCHILD_MAX - z.schild, SCHILD_JE_ANTWORT * kugel * (krit ? 2 : 1))
+      z.schild += plus
+      ereignis(z, { art: 'schild', wert: Math.round(plus * 10) / 10, slot: slotFuer(z, wer, false), krit })
+      z.eigen[wer] = { ...z.eigen[wer], wirkung: { nr: z.nr, art: 'schild', wert: Math.round(plus * 10) / 10 } }
+    } else {
+      const plus = Math.min(100 - z.held, HEILUNG_JE_ANTWORT * kugel * (krit ? 2 : 1))
+      z.held += plus
+      ereignis(z, { art: 'heilung', wert: Math.round(plus * 10) / 10, slot: slotFuer(z, wer, false), krit })
+      z.eigen[wer] = { ...z.eigen[wer], wirkung: { nr: z.nr, art: 'heilung', wert: Math.round(plus * 10) / 10 } }
+    }
     if (krit) z.eigen[wer] = { ...z.eigen[wer], krit: z.nr }
     // Aufstieg auf der Stufenleiter (kern.ts verbuchen) – vorne leuchtet die Figur
     if (p?.leiterAuf && p.leiterAuf.nr > (z.eigen[wer]?.auf ?? 0)) {
@@ -173,12 +207,14 @@ export const boss: KlassenRegeln<Boss> = {
       if (!k.getroffen) {
         z.abgewehrt++
         ereignis(z, { art: 'abwehr', slot: slotFuer(z, wer, false) })
+        // Tank wehrt ab: zusätzlicher Schild
+        if (rolle === 'tank') z.schild = Math.min(SCHILD_MAX, z.schild + SCHILD_JE_ABWEHR * kugel)
         z.eigen[wer] = { ...z.eigen[wer], abwehr: z.nr }
         if (z.abgewehrt % 5 === 0) meldung(z, kt(z.sprache, 'boAbgewehrt', z.abgewehrt), 'gut')
       }
     }
-    // Spezialleiste: voll nach ≈ 3 richtigen Antworten je Kind
-    z.spezial += 1 / (Math.max(1, Object.keys(z.personen).length) * 3)
+    // Spezialleiste: voll nach ≈ 3 richtigen Antworten je Kind; mit Rollen füllen sie nur die Angreifer
+    if (rolle === 'angreifer') z.spezial += 1 / (Math.max(1, z.einst.bossRollen ? angreiferZahl(z) : Object.keys(z.personen).length) * 3)
     if (z.spezial >= 1 && z.hp > 0) {
       z.spezial = 0
       const w = Math.round(z.max * 0.03)
@@ -217,10 +253,15 @@ export const boss: KlassenRegeln<Boss> = {
     z.gewarnt = false
     if (!reif.length) return true
     for (const k of reif) k.getroffen = true
-    const schaden = reif.length * schadenJeKugel(z)
+    const gesamt = reif.length * schadenJeKugel(z)
+    // Mit Rollen: der Schild der Tanks fängt zuerst ab
+    const abgefangen = Math.min(z.schild ?? 0, gesamt)
+    const bruch = abgefangen > 0 && abgefangen >= (z.schild ?? 0) && gesamt > abgefangen
+    z.schild = (z.schild ?? 0) - abgefangen
+    const schaden = gesamt - abgefangen
     z.held = Math.max(0, z.held - schaden)
     z.schlag = { nr: ++z.nr, schaden: Math.round(schaden) }
-    ereignis(z, { art: 'schlag', wert: Math.round(schaden * 10) / 10, krit: reif.length > 5 })
+    ereignis(z, { art: 'schlag', wert: Math.round(schaden * 10) / 10, krit: reif.length > 5, abgefangen: Math.round(abgefangen * 10) / 10, bruch })
     if (z.held <= 0) {
       niederlage(z)
       meldung(z, kt(z.sprache, 'boNiederlage', z.boss.name, Math.round(((z.max - z.hp) / z.max) * 100)), 'warn')
@@ -254,13 +295,14 @@ export const boss: KlassenRegeln<Boss> = {
         warnung: z.gewarnt,
         naechsterIn: Math.max(0, z.naechster - jetzt),
         spezial: Math.min(1, z.spezial),
-        figuren: figuren.map((f) => {
+        figuren: figuren.map((f, fi) => {
           const n = schon.get(f.figur) ?? 0
           schon.set(f.figur, n + 1)
-          return { figur: f.figur, stufe: f.stufe, ring: (zaehl.get(f.figur) ?? 0) > 1 ? n : null }
+          return { figur: f.figur, stufe: f.stufe, ring: (zaehl.get(f.figur) ?? 0) > 1 ? n : null, ...(z.einst.bossRollen ? { rolle: rolleVon(z, reihe[fi]) } : {}) }
         }),
         ereignisse: z.ereignisse,
         ausgang: z.sieg ? 'sieg' : z.niederlage ? 'niederlage' : z.ende ? 'entkommen' : null,
+        ...(z.einst.bossRollen ? { rollen: true, schild: Math.round((z.schild ?? 0) * 10) / 10, schildMax: SCHILD_MAX } : {}),
         leben: kt(z.sprache, 'boLeben', Math.ceil(z.hp), z.max, ph),
         ruestungText: kt(z.sprache, 'boRuestungHinweis'),
         texte: {
@@ -272,7 +314,9 @@ export const boss: KlassenRegeln<Boss> = {
           holtAus: kt(z.sprache, 'boHoltAus', z.boss.name),
           klassenangriff: kt(z.sprache, 'boKlassenangriff'),
           ruestung: kt(z.sprache, 'boRuestung', z.boss.name),
-          raserei: kt(z.sprache, 'boRaserei', z.boss.name)
+          raserei: kt(z.sprache, 'boRaserei', z.boss.name),
+          schild: kt(z.sprache, 'boSchild'),
+          ...(z.einst.bossRollen && !angreiferZahl(z) ? { keinAngreifer: kt(z.sprache, 'boKeinAngreifer') } : {})
         }
       }
     ]
@@ -287,6 +331,7 @@ export const boss: KlassenRegeln<Boss> = {
   geraetExtra(z, wer) {
     const p = z.personen[wer]
     return {
+      ...(z.einst.bossRollen ? { rolle: rolleVon(z, wer), wirkung: z.eigen[wer]?.wirkung ?? null } : {}),
       figur: z.figuren?.[wer]?.figur ?? null,
       schlag: z.schlag,
       rueck: p?.rueck ? { nr: p.rueck.nr, richtig: p.rueck.richtig } : null,

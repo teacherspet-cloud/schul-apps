@@ -19,6 +19,7 @@
  *             POST /s/api/klassenspiel/antwort {code, wert, nr}
  *             POST /s/api/klassenspiel/zug {code, aktion, wert}           Einsatz (Wett-Quiz), Sterne (Gebiet)
  *             POST /s/api/klassenspiel/figur {code, figur}                Boss-Kampf: eigene Figur (Wartebereich, 17.11.2026)
+ *             POST /s/api/klassenspiel/rolle {code, rolle}                Boss-Kampf mit Rollen: Tank/Heiler/Angreifer
  */
 import { randomInt } from 'node:crypto'
 import { datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
@@ -43,6 +44,7 @@ import { grammatikFuerSpiel as G } from './grammatik'
 import { achievementKlasse, achievementZusammen, bossDatenVon, bossFigurMerken } from './achievementsDaten'
 import { ausruestungStufe, figurenFuer } from '../shared/klassenspiel/bossBestand'
 import { leiterVon } from '../shared/klassenspiel/leiter'
+import { BOSS_ROLLEN, istBossRolle, kleinsteRolle, rollenGrenze, rollenZahlen } from '../shared/klassenspiel/bossRollen'
 import { figurZuteilen } from '../shared/klassenspiel/spiele/boss'
 import { kursFuerLernende } from '../shared/freigabePlan'
 import { GRAM_PRAEFIX } from '../shared/testAbschnitte'
@@ -280,6 +282,35 @@ function figurSetzen(r: Raum, n: NutzerInfo, wunsch?: string): boolean {
   return true
 }
 
+/** Boss-Kampf mit Rollen: Stand der Wahl (Anzahl je Rolle, Obergrenze) */
+function rollenStand(r: Raum) {
+  const z = r.zustand
+  const ids = Object.keys(z.personen)
+  return { zahlen: rollenZahlen(z.rollen ?? {}, ids), grenze: rollenGrenze(ids.length) }
+}
+
+/** Rolle der Person setzen – nur im Wartebereich, nur unter der Obergrenze (die eigene Rolle zählt nicht mit) */
+function rolleSetzen(r: Raum, wer: string, rolle: string): string | null {
+  if (r.einst.spiel !== 'boss' || !r.einst.bossRollen) return 'Dieses Spiel hat keine Rollen.'
+  if (r.phase !== 'lobby' && r.phase !== 'teams') return 'Die Rollen stehen schon fest.'
+  if (!istBossRolle(rolle)) return 'Diese Rolle gibt es nicht.'
+  const z = r.zustand
+  z.rollen ??= {}
+  if (z.rollen[wer] === rolle) return null
+  const { zahlen, grenze } = rollenStand(r)
+  if (zahlen[rolle] >= grenze) return 'Diese Rolle ist voll.'
+  z.rollen[wer] = rolle
+  return null
+}
+
+/** Ohne Wahl: in die kleinste Rolle (beim Start und für später Dazukommende) */
+function rolleZuteilen(r: Raum, wer: string): void {
+  if (r.einst.spiel !== 'boss' || !r.einst.bossRollen) return
+  const z = r.zustand
+  z.rollen ??= {}
+  if (!z.rollen[wer]) z.rollen[wer] = kleinsteRolle(rollenStand(r).zahlen)
+}
+
 // ---------------------------------------------------------------- Rekord und Auswertung
 
 function rekordLesen(vokId: string, spiel: string): { wert: number; text: string; zeit: number } | null {
@@ -470,6 +501,8 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     ...(boss && (r.phase === 'lobby' || r.phase === 'teams')
       ? { figurWahl: { figuren: figurenFuer(r.jahrgang).map((f) => f.id), gewaehlt: z.figuren?.[wer]?.figur ?? null } }
       : {}),
+    // Boss-Kampf mit Rollen: Wahl im Wartebereich (Anzahl je Rolle, Obergrenze), danach die eigene Rolle
+    ...(boss && r.einst.bossRollen ? { rollenWahl: { ...rollenStand(r), gewaehlt: z.rollen?.[wer] ?? null, offen: r.phase === 'lobby' || r.phase === 'teams' } } : {}),
     ...((r.phase === 'spiel' || r.phase === 'ende') && p && regeln.geraetExtra ? { extra: regeln.geraetExtra(z, wer, jetzt) } : {}),
     ...(r.phase === 'ende' && r.ergebnis
       ? {
@@ -525,6 +558,16 @@ function lehrSicht(r: Raum, jetzt: number) {
     // Boss-Kampf: gewählte Figuren im Wartebereich (ohne Namen)
     ...(r.einst.spiel === 'boss' && (r.phase === 'lobby' || r.phase === 'teams')
       ? { figuren: Object.keys(z.personen).flatMap((id) => (z.figuren?.[id] ? [z.figuren[id].figur] : [])) }
+      : {}),
+    // Mit Rollen: Übersicht je Rolle mit Vornamen – nur im Wartebereich (abgestimmt 17.11.2026)
+    ...(r.einst.spiel === 'boss' && r.einst.bossRollen && (r.phase === 'lobby' || r.phase === 'teams')
+      ? {
+          rollenUebersicht: Object.fromEntries([
+            ...BOSS_ROLLEN.map((ro) => [ro, Object.keys(z.personen).filter((id) => z.rollen?.[id] === ro).map((id) => ({ name: r.namen.get(id) ?? '', figur: z.figuren?.[id]?.figur ?? null }))]),
+            ['ohne', Object.keys(z.personen).filter((id) => !z.rollen?.[id]).map((id) => ({ name: r.namen.get(id) ?? '', figur: z.figuren?.[id]?.figur ?? null }))]
+          ]),
+          rollenGrenze: rollenStand(r).grenze
+        }
       : {}),
     bloecke,
     ...(r.phase === 'ende' && r.ergebnis
@@ -649,9 +692,10 @@ function starten(r: Raum, jetzt: number): string | null {
   // „Klasse gegen den Rekord" (und die Anzeige der anderen Spiele) kennt den bisherigen Bestwert
   const rek = rekordLesen(r.kurs, r.einst.spiel)
   z.rekordBisher = rek ? { wert: rek.wert, text: rek.text } : null
-  // Boss-Kampf: wer keine Figur gewählt hat, bekommt eine zufällige (mit der eigenen Ausrüstungsstufe)
+  // Boss-Kampf: wer keine Figur gewählt hat, bekommt eine zufällige (mit der eigenen Ausrüstungsstufe); ohne Rolle → kleinste
   if (r.einst.spiel === 'boss')
     for (const id of Object.keys(z.personen)) {
+      rolleZuteilen(r, id)
       figurZuteilen(z, id)
       const n = r.nutzer.get(id)
       if (n && z.figuren?.[id]) z.figuren[id].stufe = ausruestungStufe(bossDatenVon(n).siege)
@@ -673,6 +717,8 @@ function nochmal(r: Raum, jetzt: number): void {
     q.theta0 = p.theta
     q.ruhig = p.ruhig
   }
+  // Rollen bleiben als Vorschlag für das nächste Spiel (im Wartebereich änderbar)
+  if (alt.rollen) z.rollen = { ...alt.rollen }
   // Gewählte Figuren bleiben (Ausrüstung neu, falls gerade ein Sieg dazukam)
   if (alt.figuren) {
     z.figuren = {}
@@ -738,6 +784,8 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
         }
         if (r.phase !== 'ende' && !r.zustand.personen[ich.id]) personDazu(r.zustand, ich.id, r.namen.get(ich.id) ?? ich.name, baenderFuer(r, ich), jetzt)
         if (r.phase !== 'ende' && r.zustand.personen[ich.id]) {
+          // Später Dazukommende im laufenden Kampf: kleinste Rolle
+          if (r.phase === 'spiel') rolleZuteilen(r, ich.id)
           figurSetzen(r, ich)
           r.zustand.personen[ich.id].ruhig = ohneZeitdruck(ich.id)
         }
@@ -753,6 +801,13 @@ export function klassenspielRoute(adresse = ''): (k: Anfrage) => Promise<boolean
       }
       if (req.method === 'GET' && teile[0] === 'zustand') {
         r.lernende.abgefragt(ich.id, jetzt)
+        return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
+      }
+      if (req.method === 'POST' && teile[0] === 'rolle') {
+        if (!r.zustand.personen[ich.id]) return json(res, 409, { fehler: 'Erst beitreten.' }), true
+        const f = rolleSetzen(r, ich.id, String(k0.rolle ?? ''))
+        if (f) return json(res, 409, { fehler: f, sicht: lernSicht(r, ich.id, jetzt) }), true
+        verteilen(r, jetzt)
         return json(res, 200, { sicht: lernSicht(r, ich.id, jetzt) }), true
       }
       if (req.method === 'POST' && teile[0] === 'figur') {

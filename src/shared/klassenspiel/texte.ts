@@ -150,6 +150,21 @@ export const KT = {
   le_satz: t('Im Satz schreiben', 'Write it in the sentence', 'Écris-le dans la phrase', 'Escríbelo en la frase', 'Scrivilo nella frase', 'In sententia scribe'),
   uiLeiter: t('Stufenleiter: es wird immer schwerer', 'Level ladder: it gets harder and harder', 'Échelle de niveaux : de plus en plus difficile', 'Escalera de niveles: cada vez más difícil', 'Scala di livelli: sempre più difficile', 'Scala graduum: semper difficilius'),
   uiSalatLoeschen: t('Zurück', 'Undo', 'Annuler', 'Deshacer', 'Annulla', 'Retro'),
+  // Boss-Kampf mit Rollen (17.11.2026)
+  rolle_tank: t('Tank', 'Tank', 'Tank', 'Tanque', 'Tank', 'Scutarius'),
+  rolle_heiler: t('Heiler', 'Healer', 'Soigneur', 'Sanador', 'Guaritore', 'Medicus'),
+  rolle_angreifer: t('Angreifer', 'Damage Dealer', 'Attaquant', 'Atacante', 'Attaccante', 'Bellator'),
+  rolleText_tank: t('Fängt die Schläge des Bosses mit dem Schild der Klasse ab.', 'Blocks the boss’s blows with the class shield.', 'Bloque les coups du boss avec le bouclier de la classe.', 'Bloquea los golpes del jefe con el escudo de la clase.', 'Para i colpi del boss con lo scudo della classe.', 'Ictus monstri scuto classis excipit.'),
+  rolleText_heiler: t('Heilt die Klasse.', 'Heals the class.', 'Soigne la classe.', 'Cura a la clase.', 'Cura la classe.', 'Classem sanat.'),
+  rolleText_angreifer: t('Macht dem Boss Schaden.', 'Damages the boss.', 'Inflige des dégâts au boss.', 'Hace daño al jefe.', 'Infligge danni al boss.', 'Monstrum laedit.'),
+  uiRolleWaehlen: t('Wähle deine Rolle', 'Choose your role', 'Choisis ton rôle', 'Elige tu papel', 'Scegli il tuo ruolo', 'Elige munus tuum'),
+  uiRolleVoll: t('voll', 'full', 'complet', 'lleno', 'pieno', 'plenum'),
+  uiDeineRolle: t('Deine Rolle: {0}', 'Your role: {0}', 'Ton rôle : {0}', 'Tu papel: {0}', 'Il tuo ruolo: {0}', 'Munus tuum: {0}'),
+  woSchild: t('+{0} Schild', '+{0} shield', '+{0} bouclier', '+{0} escudo', '+{0} scudo', '+{0} scutum'),
+  woHeilung: t('+{0} Leben für die Klasse', '+{0} health for the class', '+{0} vie pour la classe', '+{0} vida para la clase', '+{0} vita per la classe', '+{0} vitae classi'),
+  woSchaden: t('−{0} für den Boss', '−{0} for the boss', '−{0} pour le boss', '−{0} para el jefe', '−{0} per il boss', '−{0} monstro'),
+  boSchild: t('Schild', 'Shield', 'Bouclier', 'Escudo', 'Scudo', 'Scutum'),
+  boKeinAngreifer: t('Kein Angreifer – der Boss nimmt keinen Schaden!', 'No damage dealer – the boss takes no damage!', 'Aucun attaquant – le boss ne subit aucun dégât !', 'Ningún atacante: ¡el jefe no recibe daño!', 'Nessun attaccante – il boss non subisce danni!', 'Nullus bellator – monstrum non laeditur!'),
   uiDuBist: t('Deine Figur', 'Your character', 'Ton personnage', 'Tu personaje', 'Il tuo personaggio', 'Persona tua'),
 
   // ---------------------------------------------------------------- Rennen

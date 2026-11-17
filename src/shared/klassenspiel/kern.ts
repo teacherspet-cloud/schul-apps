@@ -144,16 +144,23 @@ export interface BBlockBoss {
   warnung: boolean
   naechsterIn: number
   spezial: number
-  figuren: { figur: string; ring: number | null; stufe: number }[]
+  figuren: { figur: string; ring: number | null; stufe: number; rolle?: 'tank' | 'heiler' | 'angreifer' }[]
+  /** Mit Rollen: Klassenschild (fängt Bossschläge zuerst ab) */
+  schild?: number
+  schildMax?: number
+  rollen?: boolean
   ereignisse: BossEreignis[]
   ausgang: 'sieg' | 'niederlage' | 'entkommen' | null
   leben?: string
   ruestungText?: string
-  texte?: { klasse: string; naechster: string; spezial: string; treffer: string; abgewehrt: string; holtAus: string; klassenangriff: string; ruestung: string; raserei: string }
+  texte?: { klasse: string; naechster: string; spezial: string; treffer: string; abgewehrt: string; holtAus: string; klassenangriff: string; ruestung: string; raserei: string; schild?: string; keinAngreifer?: string }
 }
 export interface BossEreignis {
   nr: number
-  art: 'treffer' | 'abwehr' | 'fehler' | 'schlag' | 'phase' | 'spezial' | 'aufstieg'
+  art: 'treffer' | 'abwehr' | 'fehler' | 'schlag' | 'phase' | 'spezial' | 'aufstieg' | 'schild' | 'heilung'
+  /** Schlag: davon vom Schild abgefangen, Schild gebrochen */
+  abgefangen?: number
+  bruch?: boolean
   wert?: number
   slot?: number
   krit?: boolean
@@ -193,6 +200,8 @@ export interface KBasis {
   leiterMindest?: number
   /** Boss-Kampf: gewählte Figur je Person (im Wartebereich, vom Server gesetzt) und Ausrüstungsstufe */
   figuren?: Record<string, { figur: string; stufe: number }>
+  /** Boss-Kampf mit Rollen: Rolle je Person (im Wartebereich gewählt, beim Start ergänzt) */
+  rollen?: Record<string, 'tank' | 'heiler' | 'angreifer'>
 }
 
 export interface KErgebnis {

@@ -71,6 +71,9 @@ export interface BeamerSicht {
   code: string
   /** Boss-Kampf: gewählte Figuren im Wartebereich (ohne Namen) */
   figuren?: string[]
+  /** Boss-Kampf mit Rollen: wer welche Rolle gewählt hat (nur im Wartebereich, mit Vornamen) */
+  rollenUebersicht?: Record<'tank' | 'heiler' | 'angreifer' | 'ohne', { name: string; figur: string | null }[]>
+  rollenGrenze?: number
   phase: 'lobby' | 'teams' | 'spiel' | 'ende'
   titel: string
   spiel: KlassenspielId
@@ -395,6 +398,14 @@ function StartFenster({ kursId, schliessen, gestartet }: { kursId: string; schli
                 </div>
               )}
               {e.spiel === 'boss' && (
+                <Switch
+                  label="Mit Rollen: Lernende wählen Tank (Schild für die Klasse), Heiler (heilt die Klasse) oder Angreifer (nur sie schaden dem Boss) – je Rolle höchstens die Hälfte"
+                  checked={e.bossRollen}
+                  onChange={(x) => setze({ bossRollen: x.currentTarget.checked })}
+                  data-klassenspiel-boss-rollen
+                />
+              )}
+              {e.spiel === 'boss' && (
                 <div>
                   <Text size="sm" fw={600} mb={4}>
                     Eigene Figur vorne reagiert auf …
@@ -677,6 +688,32 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                 </Stack>
               </Group>
               {s.phase === 'teams' && <TeamKarten teams={losen ?? s.teams} />}
+              {s.rollenUebersicht && (
+                <SimpleGrid cols={3} spacing="md" data-klassenspiel-rollen>
+                  {(['tank', 'heiler', 'angreifer'] as const).map((ro) => (
+                    <Paper key={ro} withBorder radius="lg" p="md" data-klassenspiel-rolle={ro}>
+                      <Group justify="space-between" mb="xs">
+                        <Text fw={900} size="1.6rem">
+                          {{ tank: '🛡️', heiler: '💚', angreifer: '⚔️' }[ro]} {kt(s.sprache, `rolle_${ro}` as const)}
+                        </Text>
+                        <Badge size="lg" variant="light" tt="none">
+                          {s.rollenUebersicht![ro].length} / {s.rollenGrenze}
+                        </Badge>
+                      </Group>
+                      <Text size="sm" c="dimmed" mb="xs">
+                        {kt(s.sprache, `rolleText_${ro}` as const)}
+                      </Text>
+                      <Group gap={6}>
+                        {s.rollenUebersicht![ro].map((p, i) => (
+                          <Badge key={i} size="lg" variant="outline" tt="none" leftSection={p.figur ? <img src={figurBild(p.figur)} alt="" aria-hidden style={{ height: 18 }} /> : undefined}>
+                            {p.name}
+                          </Badge>
+                        ))}
+                      </Group>
+                    </Paper>
+                  ))}
+                </SimpleGrid>
+              )}
               {s.spiel === 'boss' && (s.figuren?.length ?? 0) > 0 && (
                 <Group gap={4} justify="center" align="flex-end" data-klassenspiel-figuren={s.figuren!.length}>
                   {s.figuren!.map((f, i) => (

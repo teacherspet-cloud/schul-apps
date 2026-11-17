@@ -139,6 +139,8 @@ export interface KlassenEinstellungen {
   bossReaktion: BossReaktion
   /** Stufenleiter (17.11.2026): Formate mit Hören erlaubt (Kopfhörer) – sonst ohne „Hören" und „Diktat" */
   hoeren: boolean
+  /** Boss-Kampf „mit Rollen" (17.11.2026): Tank, Heiler, Angreifer – im Wartebereich wählbar */
+  bossRollen: boolean
 }
 
 export type BossReaktion = 'erfolge' | 'alle' | 'gemeinsam'
@@ -156,7 +158,8 @@ export const STANDARD_EINSTELLUNGEN: Omit<KlassenEinstellungen, 'spiel'> = {
   teams: 2,
   top3: true,
   bossReaktion: 'erfolge',
-  hoeren: false
+  hoeren: false,
+  bossRollen: false
 }
 
 const zahl = (x: unknown, min: number, max: number, std: number): number => {
@@ -183,7 +186,8 @@ export function einstellungenBereinigt(roh: Record<string, unknown>): KlassenEin
     teams: zahl(roh.teams, 2, 6, s.teams),
     top3: roh.top3 !== false,
     bossReaktion: roh.bossReaktion === 'alle' || roh.bossReaktion === 'gemeinsam' ? roh.bossReaktion : 'erfolge',
-    hoeren: roh.hoeren === true
+    hoeren: roh.hoeren === true,
+    bossRollen: roh.bossRollen === true
   }
 }
 

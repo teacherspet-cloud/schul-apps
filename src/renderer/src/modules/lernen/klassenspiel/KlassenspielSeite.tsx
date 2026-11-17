@@ -37,10 +37,12 @@ interface Sicht {
   losenSeit?: number
   team: { name: string; farbe: string; symbol: string; mitglieder: string[] } | null
   bloecke?: Block[]
+  /** Boss-Kampf mit Rollen: Anzahl je Rolle, Obergrenze, eigene Wahl */
+  rollenWahl?: { zahlen: Record<'tank' | 'heiler' | 'angreifer', number>; grenze: number; gewaehlt: 'tank' | 'heiler' | 'angreifer' | null; offen: boolean }
   /** Boss-Kampf: Figurenwahl im Wartebereich */
   figurWahl?: { figuren: string[]; gewaehlt: string | null }
   /** Boss-Kampf: eigene Figur und Nummern für die Effekte (Schlag auf die Klasse, eigene Rückmeldung, Abwehr, Krit) */
-  extra?: { figur?: string | null; schlag?: { nr: number; schaden: number }; rueck?: { nr: number; richtig: boolean } | null; abwehr?: number; krit?: number } | null
+  extra?: { rolle?: 'tank' | 'heiler' | 'angreifer'; wirkung?: { nr: number; art: 'schild' | 'heilung' | 'schaden'; wert: number } | null; figur?: string | null; schlag?: { nr: number; schaden: number }; rueck?: { nr: number; richtig: boolean } | null; abwehr?: number; krit?: number } | null
   ergebnis?: {
     text: string
     sieg: boolean | null
@@ -100,6 +102,84 @@ function Losen({ s }: { s: Sicht }): React.JSX.Element | null {
   )
 }
 
+const ROLLE_ZEICHEN = { tank: '🛡️', heiler: '💚', angreifer: '⚔️' } as const
+
+/** Rollenwahl im Wartebereich (Boss-Kampf mit Rollen, 17.11.2026): volle Rollen ausgegraut */
+function RollenWahl({ s, waehlen }: { s: Sicht; waehlen: (r: string) => void }): React.JSX.Element {
+  const w = s.rollenWahl!
+  return (
+    <Card withBorder radius="lg" padding="md" data-klasse-rollenwahl={w.gewaehlt ?? ''}>
+      <Text fw={800} size="lg" ta="center">
+        {kt(s.sprache, 'uiRolleWaehlen')}
+      </Text>
+      <Stack gap="xs" mt="sm">
+        {(['tank', 'heiler', 'angreifer'] as const).map((ro) => {
+          const voll = w.zahlen[ro] >= w.grenze && w.gewaehlt !== ro
+          return (
+            <UnstyledButton
+              key={ro}
+              onClick={() => !voll && waehlen(ro)}
+              disabled={voll}
+              aria-pressed={w.gewaehlt === ro}
+              data-klasse-rolle={ro}
+              style={{
+                borderRadius: 12,
+                padding: '10px 14px',
+                opacity: voll ? 0.45 : 1,
+                outline: w.gewaehlt === ro ? '4px solid var(--mantine-color-yellow-5)' : '1px solid var(--mantine-color-default-border)'
+              }}
+            >
+              <Group justify="space-between" wrap="nowrap">
+                <div>
+                  <Text fw={800} size="lg">
+                    {ROLLE_ZEICHEN[ro]} {kt(s.sprache, `rolle_${ro}` as const)}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    {kt(s.sprache, `rolleText_${ro}` as const)}
+                  </Text>
+                </div>
+                <Badge variant="light" tt="none" style={{ flexShrink: 0, overflow: 'visible' }} miw={52}>
+                  {voll ? kt(s.sprache, 'uiRolleVoll') : `${w.zahlen[ro]} / ${w.grenze}`}
+                </Badge>
+              </Group>
+            </UnstyledButton>
+          )
+        })}
+      </Stack>
+    </Card>
+  )
+}
+
+/**
+ * Wirkung jeder richtigen Antwort als Animation (Boss mit Rollen, 17.11.2026, Wunsch der Lehrkraft: „grafische Animation
+ * als direktes Feedback"): Schild fliegt in den Klassenbalken, Herzen steigen auf, Hieb in den Boss-Balken.
+ */
+function WirkungAnimation({ s }: { s: Sicht }): React.JSX.Element | null {
+  const w = s.extra?.wirkung
+  const [zeigen, setZeigen] = useState<{ nr: number; art: string; wert: number } | null>(null)
+  const vorher = useRef<number | null>(null)
+  useEffect(() => {
+    if (!w) return
+    if (vorher.current !== null && w.nr > vorher.current) {
+      setZeigen(w)
+      const t = setTimeout(() => setZeigen(null), 1300)
+      vorher.current = w.nr
+      return () => clearTimeout(t)
+    }
+    vorher.current = w.nr
+  }, [w?.nr]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!zeigen) return null
+  const zeichen = zeigen.art === 'schild' ? '🛡️' : zeigen.art === 'heilung' ? '💚' : '⚔️'
+  const text = kt(s.sprache, zeigen.art === 'schild' ? 'woSchild' : zeigen.art === 'heilung' ? 'woHeilung' : 'woSchaden', zeigen.wert)
+  const farbe = zeigen.art === 'schild' ? '#38bdf8' : zeigen.art === 'heilung' ? '#22c55e' : '#ef4444'
+  return (
+    <div key={zeigen.nr} className="ks-wirkung" style={{ color: farbe }} data-klasse-wirkung={zeigen.art} aria-live="polite">
+      <span className={`ks-wirkung-zeichen ks-${zeigen.art}`}>{zeichen}</span>
+      <span>{text}</span>
+    </div>
+  )
+}
+
 /** Figurenwahl im Wartebereich (Boss-Kampf, 17.11.2026): Mehrfachwahl erlaubt, vorne unterscheidet ein Farbring */
 function FigurWahl({ s, waehlen }: { s: Sicht; waehlen: (f: string) => void }): React.JSX.Element {
   const w = s.figurWahl!
@@ -143,6 +223,17 @@ const BOSS_CSS = `
 .ks-wackeln { animation: ks-wackeln .3s }
 @media (prefers-reduced-motion: reduce) { .ks-wackeln { animation: none } }
 .ks-rand { position: fixed; inset: 0; pointer-events: none; z-index: 300; transition: box-shadow .25s; box-shadow: inset 0 0 0 0 transparent }
+.ks-wirkung { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 310; pointer-events: none; display: flex; align-items: center; gap: 10px;
+  font-weight: 900; font-size: 1.4rem; text-shadow: 0 2px 6px #0008; animation: ks-wirkung 1.3s ease-out forwards }
+.ks-wirkung-zeichen { font-size: 3rem; display: inline-block }
+.ks-schild { animation: ks-fliegen-hoch 1.2s ease-in forwards }
+.ks-heilung { animation: ks-steigen 1.2s ease-out forwards }
+.ks-schaden { animation: ks-hieb 1.2s ease-in forwards }
+@keyframes ks-wirkung { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7) } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1) } 70% { opacity: 1 } 100% { opacity: 0; transform: translate(-50%, -120%) scale(.9) } }
+@keyframes ks-fliegen-hoch { 60% { transform: translate(0, 0) scale(1.2) } 100% { transform: translate(-30vw, -38vh) scale(.4) } }
+@keyframes ks-steigen { 0% { transform: translateY(0) } 50% { transform: translateY(-12px) scale(1.25) } 100% { transform: translate(-30vw, -36vh) scale(.5) } }
+@keyframes ks-hieb { 0% { transform: rotate(-30deg) } 30% { transform: rotate(40deg) scale(1.3) } 100% { transform: translate(30vw, -34vh) rotate(90deg) scale(.5) } }
+@media (prefers-reduced-motion: reduce) { .ks-wirkung, .ks-wirkung-zeichen { animation: none } }
 .ks-rand.rot { box-shadow: inset 0 0 40px 10px #ef4444aa } .ks-rand.gold { box-shadow: inset 0 0 40px 10px #f59e0bbb }
 `
 
@@ -246,6 +337,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
     },
     [code, s?.aufgabeNr, setSicht, setFehler]
   )
+  const rolleWaehlen = useCallback((rolle: string): void => void liveSenden<Sicht>('/s/api/klassenspiel/rolle', { code, rolle }, setSicht, setFehler, 15000), [code, setSicht, setFehler])
   const figurWaehlen = useCallback((figur: string): void => void liveSenden<Sicht>('/s/api/klassenspiel/figur', { code, figur }, setSicht, setFehler, 15000), [code, setSicht, setFehler])
   const effekte = useBossEffekte(s ?? null)
   const tempo = useTempo(s ?? null)
@@ -293,6 +385,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
               </Text>
             </Card>
           )}
+          {(s.phase === 'lobby' || s.phase === 'teams') && s.rollenWahl?.offen && <RollenWahl s={s} waehlen={rolleWaehlen} />}
           {(s.phase === 'lobby' || s.phase === 'teams') && s.figurWahl && <FigurWahl s={s} waehlen={figurWaehlen} />}
           {s.phase === 'teams' && (
             <Stack>
@@ -315,8 +408,14 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                   <Text size="sm" c="dimmed">
                     {kt(s.sprache, 'uiDuBist')}
                   </Text>
+                  {s.extra.rolle && (
+                    <Badge size="lg" variant="light" tt="none" data-klasse-eigene-rolle={s.extra.rolle}>
+                      {ROLLE_ZEICHEN[s.extra.rolle]} {kt(s.sprache, `rolle_${s.extra.rolle}` as const)}
+                    </Badge>
+                  )}
                 </Group>
               )}
+              {s.extra?.rolle && <WirkungAnimation s={s} />}
               {s.leiter && (
                 <Group gap="xs" justify="space-between" wrap="nowrap" data-klasse-leiter={s.leiter.stufe}>
                   <Badge size="lg" variant="light" color="grape" tt="none">
