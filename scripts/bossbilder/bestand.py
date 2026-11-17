@@ -45,9 +45,9 @@ def band_und_basis(fid):
 
 
 def rolle_von(fid, basis):
-    if fid.startswith('tank-'):
+    if fid.startswith('tank-') and fid.count('-') >= 2:
         return 'tank'
-    if fid.startswith('heiler-'):
+    if fid.startswith('heiler-') and fid.count('-') >= 2:
         return 'heiler'
     if basis in TANK:
         return 'tank'
@@ -60,11 +60,19 @@ def main():
     dateien = {f[:-5] for f in os.listdir(BILDER) if f.endswith('.webp')}
     figuren, monster, hg, begleiter = [], [], [], []
     ids = sorted({d[5:].rsplit('-', 1)[0] for d in dateien if d.startswith('held-') and d.endswith('-ruhe')})
+    eigene = {}
+    for fid in ids:
+        if all(f'held-{fid}-{p}' in dateien for p in POSEN) and fid.split('-')[0] in ('tank', 'heiler') and fid.count('-') >= 2:
+            k = (band_und_basis(fid)[0], fid.split('-')[0])
+            eigene[k] = eigene.get(k, 0) + 1
     for fid in ids:
         if not all(f'held-{fid}-{p}' in dateien for p in POSEN):
             continue
         band, basis = band_und_basis(fid)
         r = rolle_von(fid, basis)
+        # Hat das Band genug eigene Rollenfiguren (mind. 6), sind die vorläufig zugeordneten wieder Angreifer
+        if r and not (fid.startswith(r + '-') and fid.count('-') >= 2) and eigene.get((band, r), 0) >= 6:
+            r = None
         figuren.append({'id': fid, 'band': band, **({'rolle': r} if r else {}),
                         **({'spezial': True} if f'held-{fid}-spezial' in dateien else {}),
                         **({'rollenposen': True} if f'held-{fid}-rolle1' in dateien else {})})

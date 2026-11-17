@@ -265,8 +265,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       setTimeout(() => el.remove(), 520 + i * 40)
     }
   }
-  const angriffVon = (i: number): void => {
-    figurPose(i, 'angriff', 420)
+  const angriffVon = (i: number, spezial = false): void => {
+    figurPose(i, spezial ? 'spezial' : 'angriff', spezial ? 1100 : 420)
     stoss(figurPlaetzeEl.current[i], 14)
   }
 
@@ -309,6 +309,7 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
     } else if (e.art === 'abwehr') {
       const p = e.slot !== undefined ? plaetze[e.slot] : null
       effekt('schild', p ? p.x + 4 : 40, p ? 100 - p.b - p.h / 2 : 60, p ? 12 : 20, 600)
+      if (e.slot !== undefined && x.figuren[e.slot]?.rolle === 'tank') figurPose(e.slot, 'rolle1', 700)
     } else if (e.art === 'aufstieg') {
       if (e.slot !== undefined) {
         blitz(figurBilder.current[e.slot], 'ba-gold', 900)
@@ -330,7 +331,10 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
         if (w.slot !== undefined) slots.push(w.slot)
       }
       const quelle = slots.length ? slots : slotsMit(e.art === 'schild' ? 'tank' : 'heiler').slice(0, 1)
+      const viele = new Set(quelle).size > 1
       for (const i of [...new Set(quelle)].slice(0, 6)) {
+        // Rollenpose: Tank hebt den Schild, Heiler wirkt den Heilzauber (mehrere zugleich: große Heilwelle)
+        if (!aktuell.current.ausgang) figurPose(i, e.art === 'heilung' && viele ? 'rolle2' : 'rolle1', 750)
         blitz(figurBilder.current[i], e.art === 'schild' ? 'ba-blau' : 'ba-gruen', 450)
         const p = plaetze[i]
         if (p && e.art === 'heilung') heilFunken(p.x, 100 - p.b - p.h * 0.6)
@@ -353,12 +357,13 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
           zahl(`🛡️ ${Math.round(abgefangen)}`, 53, 34, '#7dd3fc', true)
           if (e.bruch) {
             effekt('schild', 53, 55, 16, 700)
-            for (const i of slotsMit('tank')) if (!aktuell.current.ausgang) figurPose(i, 'getroffen', 900)
-          }
+            for (const i of slotsMit('tank')) if (!aktuell.current.ausgang) figurPose(i, 'rolle2', 1300)
+          } else for (const i of slotsMit('tank')) if (!aktuell.current.ausgang) figurPose(i, 'rolle1', 650)
         }
         if ((e.wert ?? 0) > 0) {
           for (let i = 0; i < n; i++) {
-            if (!aktuell.current.ausgang) figurPose(i, 'getroffen', 520)
+            // Tanks mit gebrochenem Schild bleiben in der Knie-Pose
+            if (!aktuell.current.ausgang && !(e.bruch && x.figuren[i]?.rolle === 'tank')) figurPose(i, 'getroffen', 520)
             blitz(figurBilder.current[i], 'ba-rot', 200)
             stoss(figurPlaetzeEl.current[i], -8, 380)
           }
@@ -374,7 +379,7 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
     } else if (e.art === 'spezial') {
       zeigeBanner(x.texte?.klassenangriff ?? '', 1500)
       const angreifer = x.rollen ? slotsMit('angreifer') : Array.from({ length: n }, (_, i) => i)
-      angreifer.forEach((i, k) => setTimeout(() => angriffVon(i), (k % 8) * 50))
+      angreifer.forEach((i, k) => setTimeout(() => angriffVon(i, true), (k % 8) * 50))
       setTimeout(() => {
         effekt('stern', BOSS_PLATZ.x - 2, 45, 30, 700)
         bossPose('getroffen', 520)

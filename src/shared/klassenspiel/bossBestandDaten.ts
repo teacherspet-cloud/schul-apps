@@ -10,26 +10,37 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rolle": "heiler"
  },
  {
+  "id": "alchemist-1113",
+  "band": "11-13",
+  "rolle": "heiler"
+ },
+ {
   "id": "alchemist-78",
   "band": "7-8",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "alchemist-910",
   "band": "9-10",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "ballkuenstler",
   "band": "5-6"
  },
  {
+  "id": "ballkuenstler-1113",
+  "band": "11-13"
+ },
+ {
   "id": "ballkuenstler-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "ballkuenstler-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "barde",
@@ -37,74 +48,109 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rolle": "heiler"
  },
  {
+  "id": "barde-1113",
+  "band": "11-13",
+  "rolle": "heiler"
+ },
+ {
   "id": "barde-78",
   "band": "7-8",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "barde-910",
   "band": "9-10",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "bogen",
   "band": "5-6"
  },
  {
+  "id": "bogen-1113",
+  "band": "11-13"
+ },
+ {
   "id": "bogen-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "bogen-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "brettfahrer",
   "band": "5-6"
  },
  {
+  "id": "brettfahrer-1113",
+  "band": "11-13"
+ },
+ {
   "id": "brettfahrer-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "brettfahrer-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "eis",
   "band": "5-6"
  },
  {
+  "id": "eis-1113",
+  "band": "11-13"
+ },
+ {
   "id": "eis-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "eis-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "feuer",
   "band": "5-6"
  },
  {
+  "id": "feuer-1113",
+  "band": "11-13"
+ },
+ {
   "id": "feuer-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "feuer-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "forscher",
   "band": "5-6"
  },
  {
+  "id": "forscher-1113",
+  "band": "11-13"
+ },
+ {
   "id": "forscher-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "forscher-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "gaertner",
@@ -112,36 +158,202 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rolle": "heiler"
  },
  {
+  "id": "gaertner-1113",
+  "band": "11-13",
+  "rolle": "heiler"
+ },
+ {
   "id": "gaertner-78",
   "band": "7-8",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "gaertner-910",
   "band": "9-10",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "gelehrter",
   "band": "5-6"
  },
  {
+  "id": "gelehrter-1113",
+  "band": "11-13"
+ },
+ {
   "id": "gelehrter-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "gelehrter-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
+ },
+ {
+  "id": "heiler-1113",
+  "band": "11-13",
+  "rolle": "heiler"
  },
  {
   "id": "heiler-78",
   "band": "7-8",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "heiler-910",
   "band": "9-10",
-  "rolle": "heiler"
+  "spezial": true
+ },
+ {
+  "id": "heiler-blumenheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-blumenheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-feuerheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-feuerheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-kraeuterkundige-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-kraeuterkundige-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-kristallheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-kristallheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-lichtheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-lichtheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-lichtheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-mondheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-mondheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sangesheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sangesheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sani-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sani-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sternenheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sternenheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-techheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-techheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-wasserheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-wasserheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-windheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-windheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
  },
  {
   "id": "heilerin",
@@ -150,246 +362,566 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "ingenieur",
-  "band": "5-6",
+  "band": "5-6"
+ },
+ {
+  "id": "ingenieur-1113",
+  "band": "11-13",
   "rolle": "tank"
  },
  {
   "id": "ingenieur-78",
   "band": "7-8",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "ingenieur-910",
   "band": "9-10",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "kampfkunst",
   "band": "5-6"
  },
  {
+  "id": "kampfkunst-1113",
+  "band": "11-13"
+ },
+ {
   "id": "kampfkunst-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "kampfkunst-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "klang",
   "band": "5-6"
  },
  {
+  "id": "klang-1113",
+  "band": "11-13"
+ },
+ {
   "id": "klang-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "klang-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "kletterer",
   "band": "5-6"
  },
  {
+  "id": "kletterer-1113",
+  "band": "11-13"
+ },
+ {
   "id": "kletterer-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "kletterer-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "koch",
   "band": "5-6"
  },
  {
+  "id": "koch-1113",
+  "band": "11-13"
+ },
+ {
   "id": "koch-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "koch-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "lanze",
-  "band": "5-6",
+  "band": "5-6"
+ },
+ {
+  "id": "lanze-1113",
+  "band": "11-13",
   "rolle": "tank"
  },
  {
   "id": "lanze-78",
   "band": "7-8",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "lanze-910",
   "band": "9-10",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "magier",
   "band": "5-6"
  },
  {
+  "id": "magier-1113",
+  "band": "11-13"
+ },
+ {
   "id": "magier-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "magier-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "maler",
   "band": "5-6"
  },
  {
+  "id": "maler-1113",
+  "band": "11-13"
+ },
+ {
   "id": "maler-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "maler-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
+ },
+ {
+  "id": "ritter-1113",
+  "band": "11-13",
+  "rolle": "tank"
  },
  {
   "id": "ritter-78",
   "band": "7-8",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "ritter-910",
   "band": "9-10",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "ritterin",
-  "band": "5-6",
-  "rolle": "tank"
+  "band": "5-6"
  },
  {
   "id": "rollstuhl-bogen",
   "band": "5-6"
  },
  {
+  "id": "rollstuhl-bogen-1113",
+  "band": "11-13"
+ },
+ {
   "id": "rollstuhl-bogen-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "rollstuhl-bogen-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "rollstuhl-tueftler",
   "band": "5-6"
  },
  {
+  "id": "rollstuhl-tueftler-1113",
+  "band": "11-13"
+ },
+ {
   "id": "rollstuhl-tueftler-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "rollstuhl-tueftler-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "schatten",
   "band": "5-6"
  },
  {
+  "id": "schatten-1113",
+  "band": "11-13"
+ },
+ {
   "id": "schatten-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "schatten-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "schild",
-  "band": "5-6",
+  "band": "5-6"
+ },
+ {
+  "id": "schild-1113",
+  "band": "11-13",
   "rolle": "tank"
  },
  {
   "id": "schild-78",
   "band": "7-8",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "schild-910",
   "band": "9-10",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "schmied",
-  "band": "5-6",
+  "band": "5-6"
+ },
+ {
+  "id": "schmied-1113",
+  "band": "11-13",
   "rolle": "tank"
  },
  {
   "id": "schmied-78",
   "band": "7-8",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "schmied-910",
   "band": "9-10",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "spaeher",
   "band": "5-6"
  },
  {
+  "id": "spaeher-1113",
+  "band": "11-13"
+ },
+ {
   "id": "spaeher-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "spaeher-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "sterne",
   "band": "5-6"
  },
  {
+  "id": "sterne-1113",
+  "band": "11-13"
+ },
+ {
   "id": "sterne-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "sterne-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "sturm",
   "band": "5-6"
  },
  {
+  "id": "sturm-1113",
+  "band": "11-13"
+ },
+ {
   "id": "sturm-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "sturm-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
+ },
+ {
+  "id": "tank-bollwerk-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-bollwerk-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-bollwerk-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-eisenfaust-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-eisenfaust-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-eisenfaust-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-felsenherz-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-felsenherz-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-felsenherz-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-kristallwall-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-kristallwall-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-kristallwall-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-nebelwacht-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-nebelwacht-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-nebelwacht-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-panzerbot-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-panzerbot-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-panzerbot-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildkroete-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildkroete-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildkroete-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildritter-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildritter-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildritter-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sonnenschild-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sonnenschild-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sonnenschild-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sturmwall-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sturmwall-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sturmwall-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-waechter-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-waechter-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-waechter-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wurzelwacht-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wurzelwacht-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wurzelwacht-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
  },
  {
   "id": "trommler",
   "band": "5-6"
  },
  {
+  "id": "trommler-1113",
+  "band": "11-13"
+ },
+ {
   "id": "trommler-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "trommler-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  },
  {
   "id": "tueftler",
   "band": "5-6"
  },
  {
+  "id": "tueftler-1113",
+  "band": "11-13"
+ },
+ {
   "id": "tueftler-78",
-  "band": "7-8"
+  "band": "7-8",
+  "spezial": true
  },
  {
   "id": "tueftler-910",
-  "band": "9-10"
+  "band": "9-10",
+  "spezial": true
  }
 ]
 
@@ -406,6 +938,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
    "es": "Pescador Abisal",
    "it": "Pescatore degli Abissi",
    "la": "Piscator Abyssi"
+  },
+  "phasen": true
+ },
+ {
+  "id": "algorithmus",
+  "band": "11-13",
+  "welt": "weltraum",
+  "symbol": "👾",
+  "namen": {
+   "de": "Der Algorithmus",
+   "en": "The Algorithm",
+   "fr": "L'Algorithme",
+   "es": "El Algoritmo",
+   "it": "L'Algoritmo",
+   "la": "Algorithmus"
   },
   "phasen": true
  },
@@ -466,6 +1013,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
    "es": "Quimera",
    "it": "Chimera",
    "la": "Chimaera"
+  },
+  "phasen": true
+ },
+ {
+  "id": "chronos",
+  "band": "11-13",
+  "welt": "mythos",
+  "symbol": "🏛️",
+  "namen": {
+   "de": "Chronos der Zeitfresser",
+   "en": "Chronos the Time Eater",
+   "fr": "Chronos le Dévoreur de Temps",
+   "es": "Cronos el Devorador del Tiempo",
+   "it": "Crono il Divoratore del Tempo",
+   "la": "Chronos Edax Temporis"
   },
   "phasen": true
  },
@@ -560,6 +1122,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
   "phasen": true
  },
  {
+  "id": "ereignishorizont",
+  "band": "11-13",
+  "welt": "weltraum",
+  "symbol": "👾",
+  "namen": {
+   "de": "Ereignishorizont",
+   "en": "Event Horizon",
+   "fr": "Horizon des Événements",
+   "es": "Horizonte de Sucesos",
+   "it": "Orizzonte degli Eventi",
+   "la": "Horizon Eventuum"
+  },
+  "phasen": true
+ },
+ {
   "id": "fenris",
   "band": "9-10",
   "welt": "mythos",
@@ -601,6 +1178,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
    "es": "Puño de Hielo",
    "it": "Pugno di Gelo",
    "la": "Pugnus Gelidus"
+  },
+  "phasen": true
+ },
+ {
+  "id": "gierigetruhe",
+  "band": "11-13",
+  "welt": "fantasy",
+  "symbol": "🐉",
+  "namen": {
+   "de": "Die Gierige Truhe",
+   "en": "The Greedy Chest",
+   "fr": "Le Coffre Avide",
+   "es": "El Cofre Codicioso",
+   "it": "Lo Scrigno Avido",
+   "la": "Arca Avida"
   },
   "phasen": true
  },
@@ -650,6 +1242,36 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
   "phasen": true
  },
  {
+  "id": "knochenkoenig",
+  "band": "11-13",
+  "welt": "fantasy",
+  "symbol": "🐉",
+  "namen": {
+   "de": "Knochenkönig",
+   "en": "Bone King",
+   "fr": "Roi des Os",
+   "es": "Rey de los Huesos",
+   "it": "Re delle Ossa",
+   "la": "Rex Ossium"
+  },
+  "phasen": true
+ },
+ {
+  "id": "kolossx",
+  "band": "11-13",
+  "welt": "weltraum",
+  "symbol": "👾",
+  "namen": {
+   "de": "Koloss X",
+   "en": "Colossus X",
+   "fr": "Colosse X",
+   "es": "Coloso X",
+   "it": "Colosso X",
+   "la": "Colossus X"
+  },
+  "phasen": true
+ },
+ {
   "id": "krake",
   "band": "5-6",
   "welt": "fantasy",
@@ -691,6 +1313,51 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
    "es": "Lagarto de Lava",
    "it": "Lucertola di Lava",
    "la": "Lacerta Lavae"
+  },
+  "phasen": true
+ },
+ {
+  "id": "leviathan",
+  "band": "11-13",
+  "welt": "natur",
+  "symbol": "🦖",
+  "namen": {
+   "de": "Leviathan",
+   "en": "Leviathan",
+   "fr": "Léviathan",
+   "es": "Leviatán",
+   "it": "Leviatano",
+   "la": "Leviathan"
+  },
+  "phasen": true
+ },
+ {
+  "id": "megalodon",
+  "band": "11-13",
+  "welt": "natur",
+  "symbol": "🦖",
+  "namen": {
+   "de": "Megalodon",
+   "en": "Megalodon",
+   "fr": "Mégalodon",
+   "es": "Megalodón",
+   "it": "Megalodonte",
+   "la": "Megalodon"
+  },
+  "phasen": true
+ },
+ {
+  "id": "midgardschlange",
+  "band": "11-13",
+  "welt": "mythos",
+  "symbol": "🏛️",
+  "namen": {
+   "de": "Midgardschlange",
+   "en": "World Serpent",
+   "fr": "Serpent du Monde",
+   "es": "Serpiente del Mundo",
+   "it": "Serpente del Mondo",
+   "la": "Serpens Mundi"
   },
   "phasen": true
  },
@@ -751,6 +1418,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
    "es": "Dientes de Sable",
    "it": "Denti a Sciabola",
    "la": "Dens Gladii"
+  },
+  "phasen": true
+ },
+ {
+  "id": "sandschlund",
+  "band": "11-13",
+  "welt": "natur",
+  "symbol": "🦖",
+  "namen": {
+   "de": "Sandschlund",
+   "en": "Sand Maw",
+   "fr": "Gueule des Sables",
+   "es": "Fauce de Arena",
+   "it": "Fauci di Sabbia",
+   "la": "Fauces Harenae"
   },
   "phasen": true
  },
@@ -890,6 +1572,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
   "phasen": true
  },
  {
+  "id": "totenwaechter",
+  "band": "11-13",
+  "welt": "mythos",
+  "symbol": "🏛️",
+  "namen": {
+   "de": "Totenwächter",
+   "en": "Tomb Guardian",
+   "fr": "Gardien du Tombeau",
+   "es": "Guardián de la Tumba",
+   "it": "Guardiano della Tomba",
+   "la": "Custos Sepulcri"
+  },
+  "phasen": true
+ },
+ {
   "id": "ufolino",
   "band": "5-6",
   "welt": "weltraum",
@@ -901,6 +1598,21 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
    "es": "Platillín",
    "it": "Dischetto",
    "la": "Patellus"
+  },
+  "phasen": true
+ },
+ {
+  "id": "uraltdrache",
+  "band": "11-13",
+  "welt": "fantasy",
+  "symbol": "🐉",
+  "namen": {
+   "de": "Uralter Drache",
+   "en": "Elder Dragon",
+   "fr": "Dragon Ancestral",
+   "es": "Dragón Ancestral",
+   "it": "Drago Ancestrale",
+   "la": "Draco Antiquus"
   },
   "phasen": true
  },
@@ -953,6 +1665,11 @@ export const MONSTER_DATEN: { id: string; band: BossBand; welt: BossWelt; symbol
 
 export const HINTERGRUND_DATEN: { id: string; band: BossBand; welt: BossWelt }[] = [
  {
+  "id": "asteroiden-1113",
+  "band": "11-13",
+  "welt": "weltraum"
+ },
+ {
   "id": "asteroiden-78",
   "band": "7-8",
   "welt": "weltraum"
@@ -978,9 +1695,19 @@ export const HINTERGRUND_DATEN: { id: string; band: BossBand; welt: BossWelt }[]
   "welt": "natur"
  },
  {
+  "id": "cyberdach-1113",
+  "band": "11-13",
+  "welt": "weltraum"
+ },
+ {
   "id": "cyberdach-910",
   "band": "9-10",
   "welt": "weltraum"
+ },
+ {
+  "id": "drachenhort-1113",
+  "band": "11-13",
+  "welt": "fantasy"
  },
  {
   "id": "drachenhort-910",
@@ -1023,6 +1750,11 @@ export const HINTERGRUND_DATEN: { id: string; band: BossBand; welt: BossWelt }[]
   "welt": "natur"
  },
  {
+  "id": "grabkammer-1113",
+  "band": "11-13",
+  "welt": "mythos"
+ },
+ {
   "id": "grabkammer-910",
   "band": "9-10",
   "welt": "mythos"
@@ -1063,14 +1795,34 @@ export const HINTERGRUND_DATEN: { id: string; band: BossBand; welt: BossWelt }[]
   "welt": "weltraum"
  },
  {
+  "id": "olymp-1113",
+  "band": "11-13",
+  "welt": "mythos"
+ },
+ {
+  "id": "raumstation-1113",
+  "band": "11-13",
+  "welt": "weltraum"
+ },
+ {
   "id": "raumstation-56",
   "band": "5-6",
   "welt": "weltraum"
  },
  {
+  "id": "riff-1113",
+  "band": "11-13",
+  "welt": "natur"
+ },
+ {
   "id": "riff-910",
   "band": "9-10",
   "welt": "natur"
+ },
+ {
+  "id": "ruine-1113",
+  "band": "11-13",
+  "welt": "fantasy"
  },
  {
   "id": "ruine-78",
@@ -1088,6 +1840,11 @@ export const HINTERGRUND_DATEN: { id: string; band: BossBand; welt: BossWelt }[]
   "welt": "mythos"
  },
  {
+  "id": "urzeit-1113",
+  "band": "11-13",
+  "welt": "natur"
+ },
+ {
   "id": "vulkankrater-56",
   "band": "5-6",
   "welt": "fantasy"
@@ -1095,6 +1852,11 @@ export const HINTERGRUND_DATEN: { id: string; band: BossBand; welt: BossWelt }[]
  {
   "id": "vulkankrater-78",
   "band": "7-8",
+  "welt": "fantasy"
+ },
+ {
+  "id": "zauberwald-1113",
+  "band": "11-13",
   "welt": "fantasy"
  },
  {
