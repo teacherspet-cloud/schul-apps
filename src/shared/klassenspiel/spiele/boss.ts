@@ -131,7 +131,8 @@ export const boss: KlassenRegeln<Boss> = {
   nachAntwort(z, wer, a, richtig, _p, jetzt) {
     const vorher = phaseVon(z)
     if (!richtig) {
-      if (!z.angriffe.some((x) => x.item === a.item)) z.angriffe = [...z.angriffe, { id: ++z.nr, item: a.item, von: wer, seit: jetzt }].slice(-40)
+      // Jede falsche Antwort lädt eine Kugel (17.11.2026: vorher nur eine je Wort – bei wenigen Wörtern traf bald nichts mehr)
+      z.angriffe = [...z.angriffe, { id: ++z.nr, item: a.item, von: wer, seit: jetzt }].slice(-60)
       const slot = slotFuer(z, wer, true)
       if (slot !== undefined) ereignis(z, { art: 'fehler', slot })
       return
@@ -144,10 +145,13 @@ export const boss: KlassenRegeln<Boss> = {
     z.treffer++
     ereignis(z, { art: 'treffer', wert: schaden, slot: slotFuer(z, wer, false), krit })
     if (krit) z.eigen[wer] = { ...z.eigen[wer], krit: z.nr }
-    const i = z.angriffe.findIndex((x) => x.item === a.item)
-    if (i >= 0) {
-      const k = z.angriffe[i]
-      z.angriffe.splice(i, 1)
+    // Abwehr nur durch andere (17.11.2026: eigene Wiederholung wehrte die eigene Kugel ab, bevor sie traf);
+    // die eigene richtige Wiederholung räumt nur bereits getroffene Kugeln des Worts ab
+    const i = z.angriffe.findIndex((x) => x.item === a.item && !x.getroffen && x.von !== wer)
+    const j = i >= 0 ? i : z.angriffe.findIndex((x) => x.item === a.item && x.getroffen)
+    if (j >= 0) {
+      const k = z.angriffe[j]
+      z.angriffe.splice(j, 1)
       if (!k.getroffen) {
         z.abgewehrt++
         ereignis(z, { art: 'abwehr', slot: slotFuer(z, wer, false) })

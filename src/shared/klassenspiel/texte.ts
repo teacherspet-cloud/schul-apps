@@ -133,6 +133,8 @@ export const KT = {
   boSchlag: t('Treffer für die Klasse: −{0}', 'The class is hit: −{0}', 'La classe est touchée : −{0}', 'La clase recibe un golpe: −{0}', 'La classe è colpita: −{0}', 'Classis icta: −{0}'),
   uiFigurWaehlen: t('Wähle deine Figur', 'Choose your character', 'Choisis ton personnage', 'Elige tu personaje', 'Scegli il tuo personaggio', 'Elige personam tuam'),
   uiFigurGewaehlt: t('Deine Figur steht vorne bereit.', 'Your character is ready at the front.', 'Ton personnage est prêt devant.', 'Tu personaje está listo delante.', 'Il tuo personaggio è pronto davanti.', 'Persona tua ante omnes parata est.'),
+  uiZuSchnell: t('Zu schnell! Lies erst die Frage – weiter in {0} s.', 'Too fast! Read the question first – go on in {0} s.', 'Trop vite ! Lis d’abord la question – reprise dans {0} s.', '¡Demasiado rápido! Lee primero la pregunta: sigues en {0} s.', 'Troppo veloce! Leggi prima la domanda – riprendi tra {0} s.', 'Nimis celeriter! Prius quaestionem lege – post {0} s perge.'),
+  uiLoesungLesen: t('Lies die Lösung …', 'Read the answer …', 'Lis la solution …', 'Lee la solución …', 'Leggi la soluzione …', 'Responsum lege …'),
   uiDuBist: t('Deine Figur', 'Your character', 'Ton personnage', 'Tu personaje', 'Il tuo personaggio', 'Persona tua'),
 
   // ---------------------------------------------------------------- Rennen

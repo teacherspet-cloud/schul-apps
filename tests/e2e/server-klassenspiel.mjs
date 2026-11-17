@@ -70,6 +70,11 @@ const api = (c) => ({
     return { status: r.status(), ...(await r.json().catch(() => ({}))) }
   }
 })
+/** Tempo-Schutz (17.11.2026): wie echte Lernende erst nach der Lesezeit bzw. Sperre antworten */
+async function warteBereit(s) {
+  const ms = Math.max(s?.bereitAb ?? 0, s?.sperre?.bis ?? 0) - (s?.jetzt ?? 0)
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms + 80))
+}
 /** Eine Antwort über die Schnittstelle: Möglichkeit mit Index `i` (falsch bei „###") */
 async function antwortApi(c, code, wahl = 0) {
   let s = (await api(c).get(`/s/api/klassenspiel/zustand?code=${code}`)).sicht
@@ -83,6 +88,7 @@ async function antwortApi(c, code, wahl = 0) {
   if (!f || !f.optionen) return false
   if (!f.tippen && !f.optionen.length) return false
   const wert = f.tippen ? (wahl === 'falsch' ? '###' : 'x') : f.optionen[typeof wahl === 'number' ? wahl % f.optionen.length : 0]
+  await warteBereit(s)
   const r = await api(c).post('/s/api/klassenspiel/antwort', { code, wert, nr: s.aufgabeNr })
   return r.status === 200 ? f.frage || true : false
 }
@@ -188,6 +194,8 @@ try {
   let geantwortet = 0
   for (let i = 0; i < 8; i++) {
     const nr0 = await mp.locator('[data-mehr-frage-text]').innerText().catch(() => '')
+    // Tempo-Schutz: Frage lesen bzw. Lösung ansehen
+    await mp.waitForTimeout(3200)
     const opt = mp.locator('[data-mehr-option]')
     if (await opt.count()) await opt.first().click()
     else {
@@ -315,6 +323,7 @@ try {
       await mp.locator('[data-mehr-knopf="einsatz"]').nth(i % 3).click({ timeout: 8000 })
       await mp.locator('[data-mehr-frage]').waitFor({ timeout: 8000 })
       if (i === 0) await mp.screenshot({ path: join(out, '13-wette-frage.png') })
+      await mp.waitForTimeout(3200)
       const opt = mp.locator('[data-mehr-option]')
       if (await opt.count()) await opt.first().click()
       else {

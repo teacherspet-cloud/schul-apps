@@ -53,12 +53,18 @@ const api = (c) => ({
     return { status: r.status(), ...(await r.json().catch(() => ({}))) }
   }
 })
+/** Tempo-Schutz (17.11.2026): wie echte Lernende erst nach der Lesezeit bzw. Sperre antworten */
+async function warteBereit(s) {
+  const ms = Math.max(s?.bereitAb ?? 0, s?.sperre?.bis ?? 0) - (s?.jetzt ?? 0)
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms + 80))
+}
 /** Antwort über die Schnittstelle: richtig (erste passende Möglichkeit ist nicht sicher richtig) oder sicher falsch */
 async function antwortApi(c, code, falsch) {
   const s = (await api(c).get(`/s/api/klassenspiel/zustand?code=${code}`)).sicht
   const f = s?.bloecke?.find((b) => b.typ === 'frage')
   if (!f) return false
   const wert = falsch ? '###' : f.tippen ? 'x' : f.optionen[0]
+  await warteBereit(s)
   return (await api(c).post('/s/api/klassenspiel/antwort', { code, wert, nr: s.aufgabeNr })).status === 200
 }
 
@@ -135,6 +141,24 @@ try {
   const bild = await p.locator('[data-boss-arena] img').first().evaluate((i) => i.naturalWidth > 0)
   pruefe(bild, 'Figurenbilder laden')
 
+  // Tempo-Schutz: sofort antippen → „Zu schnell", die Antwort zählt nicht
+  const opt0 = mp.locator('[data-mehr-option]')
+  if (await opt0.count()) {
+    // Gültig antworten (nach der Lesezeit), dann die neue Frage sofort antippen. War die gültige Antwort falsch, sperrt
+    // erst die Fehlerzeit (Taps zählen nicht) – dann noch einmal versuchen.
+    let gesehen = false
+    for (let i = 0; i < 5 && !gesehen; i++) {
+      await mp.waitForTimeout(3600)
+      const text0 = await mp.locator('[data-mehr-frage-text]').innerText().catch(() => '')
+      await mp.locator('[data-mehr-option]').first().click({ force: true })
+      await mp.waitForFunction((t) => document.querySelector('[data-mehr-frage-text]')?.textContent !== t, text0, { timeout: 5000 }).catch(() => undefined)
+      await mp.locator('[data-mehr-option]').first().click({ force: true })
+      gesehen = await da(mp.locator('[data-klasse-zu-schnell]'), 1500)
+    }
+    pruefe(gesehen, 'Sofort getippt: Hinweis „Too fast!" und Sperre')
+    await mp.screenshot({ path: join(out, '3b-mia-zu-schnell.png') })
+    await mp.waitForTimeout(3300)
+  }
   // Mia antwortet falsch im Browser → roter Rand
   const opt = mp.locator('[data-mehr-option]')
   if (await opt.count()) {

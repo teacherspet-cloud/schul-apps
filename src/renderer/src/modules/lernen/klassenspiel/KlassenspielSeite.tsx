@@ -26,6 +26,9 @@ interface Sicht {
   dabei: boolean
   name: string
   aufgabeNr?: number
+  /** Tempo-Schutz: ab wann wieder geantwortet werden darf (Server-Zeit) und laufende Sperre */
+  bereitAb?: number
+  sperre?: { bis: number; grund: 'fehler' | 'schnell' } | null
   bis: number
   jetzt: number
   pause: boolean
@@ -179,6 +182,35 @@ function useBossEffekte(s: Sicht | null): { rand: string; wackeln: number; meldu
   return { rand, wackeln, meldung }
 }
 
+/**
+ * Tempo-Schutz am Gerät (17.11.2026): Lesebalken bis zur Freigabe (früheres Tippen sperrt wachsend), bei Sperre sind die
+ * Knöpfe aus und ein Hinweis zählt herunter. Gewertet wird auf dem Server (kern.ts `lesezeit`).
+ */
+function useTempo(s: Sicht | null): { gesperrt: 'fehler' | 'schnell' | null; rest: number; lesen: number } {
+  const [jetzt, setJetzt] = useState(Date.now())
+  const versatz = useRef(0)
+  useEffect(() => {
+    if (s) versatz.current = s.jetzt - Date.now()
+    setJetzt(Date.now())
+  }, [s])
+  const bis = Math.max(s?.bereitAb ?? 0, s?.sperre?.bis ?? 0)
+  useEffect(() => {
+    if (!s || s.phase !== 'spiel' || bis <= Date.now() + versatz.current) return
+    const t = setInterval(() => {
+      setJetzt(Date.now())
+      if (bis <= Date.now() + versatz.current) clearInterval(t)
+    }, 100)
+    return () => clearInterval(t)
+  }, [bis, s?.phase]) // eslint-disable-line react-hooks/exhaustive-deps
+  const server = jetzt + versatz.current
+  const sperre = s?.sperre && server < s.sperre.bis ? s.sperre : null
+  return {
+    gesperrt: sperre?.grund ?? null,
+    rest: sperre ? Math.ceil((sperre.bis - server) / 1000) : 0,
+    lesen: !sperre && s?.bereitAb && server < s.bereitAb ? Math.min(1, (s.bereitAb - server) / 3000) : 0
+  }
+}
+
 export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element {
   const vorher = useCallback(() => senden('/s/api/klassenspiel/beitreten', { code }), [code])
   const { sicht: s, fehler, setSicht, setFehler } = useLiveSicht<Sicht>({
@@ -197,6 +229,7 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
   )
   const figurWaehlen = useCallback((figur: string): void => void liveSenden<Sicht>('/s/api/klassenspiel/figur', { code, figur }, setSicht, setFehler, 15000), [code, setSicht, setFehler])
   const effekte = useBossEffekte(s ?? null)
+  const tempo = useTempo(s ?? null)
   const karte = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = karte.current
@@ -271,8 +304,27 @@ export function KlassenspielSeite({ code }: { code: string }): React.JSX.Element
                   </Text>
                 </Card>
               ) : (
-                <div ref={karte}>
-                  <Bloecke bloecke={s.bloecke ?? []} senden={antwort} sprache={s.sprache} jahrgang={s.jahrgang} />
+                <div ref={karte} style={{ position: 'relative' }}>
+                  {tempo.gesperrt === 'schnell' && (
+                    <Alert color="red" variant="filled" py={8} mb="xs" data-klasse-zu-schnell={tempo.rest}>
+                      {kt(s.sprache, 'uiZuSchnell', tempo.rest)}
+                    </Alert>
+                  )}
+                  {tempo.gesperrt === 'fehler' && (
+                    <Text size="sm" c="dimmed" ta="center" mb={4} data-klasse-loesung-lesen>
+                      {kt(s.sprache, 'uiLoesungLesen')}
+                    </Text>
+                  )}
+                  <div
+                    style={{ height: 4, borderRadius: 2, marginBottom: 6, background: 'var(--mantine-color-default-border)', overflow: 'hidden', visibility: tempo.lesen > 0 ? 'visible' : 'hidden' }}
+                    aria-hidden
+                    data-klasse-lesen={tempo.lesen > 0 ? 'ja' : ''}
+                  >
+                    <div style={{ height: '100%', width: `${Math.round(tempo.lesen * 100)}%`, background: 'var(--mantine-color-blue-5)', transition: 'width .1s linear' }} />
+                  </div>
+                  <div style={tempo.gesperrt ? { pointerEvents: 'none', opacity: 0.45, filter: 'grayscale(.6)' } : undefined} aria-disabled={tempo.gesperrt ? true : undefined}>
+                    <Bloecke bloecke={s.bloecke ?? []} senden={antwort} sprache={s.sprache} jahrgang={s.jahrgang} />
+                  </div>
                 </div>
               )}
               {s.spiel === 'boss' && effekte.meldung && (

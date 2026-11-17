@@ -54,6 +54,7 @@ import { bandEinzeln, bandGemeinsam } from '../shared/mehrspieler/schwierigkeit'
 import type { Band, MehrspielId } from '../shared/mehrspieler/typen'
 import {
   antworten,
+  bereitAb,
   geraetSicht,
   gramKennung,
   kennungAus,
@@ -433,6 +434,8 @@ function lernSicht(r: Raum, wer: string, jetzt: number) {
     name: r.namen.get(wer) ?? '',
     // Nummer der laufenden Aufgabe – die Antwort nennt sie (doppelt getippt zählt nicht zweimal)
     ...(r.phase === 'spiel' && p?.aufgabe ? { aufgabeNr: p.aufgabe.nr } : {}),
+    // Tempo-Schutz: ab wann wieder geantwortet werden darf (Server-Zeit) und warum gesperrt
+    ...(r.phase === 'spiel' && p ? { bereitAb: bereitAb(p), sperre: (p.sperreBis ?? 0) > jetzt ? { bis: p.sperreBis, grund: p.sperreGrund ?? 'fehler' } : null } : {}),
     bis: z.bis,
     jetzt,
     pause: z.pause !== null,

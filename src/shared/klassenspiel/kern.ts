@@ -74,6 +74,12 @@ export interface KPerson {
   wieder: { item: string; ab: number }[]
   serie: number
   beitritt: number
+  /** Tempo-Schutz (17.11.2026): vor diesem Zeitpunkt zählt keine Antwort (Lösung lesen bzw. Strafe für Hämmern) */
+  sperreBis?: number
+  sperreGrund?: 'fehler' | 'schnell'
+  /** Zu schnelle Antworten innerhalb einer Minute (die Sperre wächst) und Zeitpunkt der letzten */
+  zuSchnell?: number
+  zuSchnellZeit?: number
 }
 
 export interface BBlockTeam {
@@ -461,6 +467,26 @@ export function neueAufgabe<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, we
 
 // ---------------------------------------------------------------- Antworten
 
+/**
+ * Tempo-Schutz (17.11.2026, Befund der Lehrkraft: auf dem iPad immer an dieselbe Stelle tippen gab blitzschnell Antworten,
+ * egal ob richtig oder falsch). Der Server wertet eine Antwort erst, wenn die Frage gelesen sein kann, und lässt nach einem
+ * Fehler Zeit für die Lösung. Wer vorher tippt, wird kurz gesperrt (innerhalb einer Minute wachsend: 3, 6, 12, 20 s) –
+ * die Antwort zählt nicht.
+ * FAUSTREGELN: Lesezeit 600 ms + 20 ms je Zeichen von Frage und Möglichkeiten, mindestens 1 s, höchstens 3 s (Schreiben:
+ * 1 s, Tippen dauert ohnehin); nach einem Fehler 2,5 s für die Lösung. Das Gerät zeigt die Lesezeit als Balken.
+ */
+export const FEHLER_SPERRE_MS = 2500
+export const SCHNELL_SPERRE_MS = [3000, 6000, 12000, 20000]
+export function lesezeit(a: KAufgabe): number {
+  if (a.frage.tippen) return 1000
+  const zeichen = (a.frage.frage ?? '').length + (a.frage.zusatz ?? '').length + a.frage.optionen.join('').length
+  return Math.min(3000, Math.max(1000, 600 + 20 * zeichen))
+}
+/** Ab wann die Person wieder antworten darf (Server-Zeit) */
+export function bereitAb(p: KPerson): number {
+  return Math.max(p.sperreBis ?? 0, p.aufgabe ? p.aufgabe.seit + lesezeit(p.aufgabe) : 0)
+}
+
 /** FAUSTREGEL: Verbesserungspunkte = 4 + 8 · (1 − P) – wer gegen das eigene Niveau Schweres schafft, bekommt mehr */
 export const punkteFuer = (p: number): number => Math.round(4 + 8 * (1 - p))
 
@@ -471,9 +497,25 @@ export function antworten<Z extends KBasis>(z: Z, regeln: KlassenRegeln<Z>, wer:
   const a = p?.aufgabe
   if (!p || !a) return null
   if (regeln.frageZeigen && !regeln.frageZeigen(z, wer)) return null
+  // Tempo-Schutz: noch gesperrt → nichts; vor der Lesezeit → wachsende Sperre, die Antwort zählt nicht
+  if (jetzt < (p.sperreBis ?? 0)) return null
+  if (jetzt < a.seit + lesezeit(a)) {
+    // Zählt eine Minute lang zusammen – wer weiter hämmert, wartet 3, 6, 12, 20 s
+    if (jetzt - (p.zuSchnellZeit ?? -Infinity) > 60_000) p.zuSchnell = 0
+    p.zuSchnell = (p.zuSchnell ?? 0) + 1
+    p.zuSchnellZeit = jetzt
+    p.sperreBis = jetzt + SCHNELL_SPERRE_MS[Math.min(SCHNELL_SPERRE_MS.length - 1, p.zuSchnell - 1)]
+    p.sperreGrund = 'schnell'
+    return null
+  }
   const richtig = antwortRichtig(a.frage, wert)
   verbuchen(z, regeln, wer, a, richtig, jetzt)
   p.aufgabe = z.ende ? null : neueAufgabe(z, regeln, wer, jetzt)
+  // Nach einem Fehler: Zeit, die Lösung zu lesen
+  if (!richtig) {
+    p.sperreBis = jetzt + FEHLER_SPERRE_MS
+    p.sperreGrund = 'fehler'
+  }
   return { richtig }
 }
 

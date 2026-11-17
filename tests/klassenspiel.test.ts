@@ -79,7 +79,8 @@ function simuliere(z: KBasis, id: KlassenspielId, schritte: number, faehig: (wer
         antworten(z, r, wer, wahl, (t += 200))
       }
     }
-    t += 1000
+    // Tempo-Schutz: je Person mindestens Lesezeit + Fehlersperre zwischen zwei Antworten
+    t += 4000
     kTakt(z, r, t)
   }
 }
@@ -224,14 +225,52 @@ describe('Klassenspiele – Spiele mit 30 Kindern', () => {
     const r = KLASSEN_REGELN.expedition!
     geraetSicht(z, r, 'p0', 0)
     const item = z.personen.p0.aufgabe!.item
-    antworten(z, r, 'p0', '###', 1)
+    antworten(z, r, 'p0', '###', 5000)
     expect(z.personen.p0.fehler).toContain(item)
     const gesehen: string[] = []
     for (let i = 0; i < 6; i++) {
       gesehen.push(z.personen.p0.aufgabe!.item)
-      antworten(z, r, 'p0', z.personen.p0.aufgabe!.frage.loesung, 2 + i)
+      antworten(z, r, 'p0', z.personen.p0.aufgabe!.frage.loesung, 10_000 + i * 5000)
     }
     expect(gesehen).toContain(item)
+  })
+})
+
+describe('Klassenspiele – Tempo-Schutz (Hämmern auf dem iPad)', () => {
+  it('zu schnell zählt nicht und sperrt wachsend; nach einem Fehler Zeit für die Lösung', () => {
+    const z = spiel('boss', 1)
+    const r = KLASSEN_REGELN.boss!
+    geraetSicht(z, r, 'p0', 0)
+    const a = z.personen.p0.aufgabe!
+    expect(antworten(z, r, 'p0', a.frage.loesung, 300)).toBeNull()
+    expect(z.personen.p0.n).toBe(0)
+    expect(z.personen.p0.sperreBis).toBe(3300)
+    // Während der Sperre zählt nichts
+    expect(antworten(z, r, 'p0', a.frage.loesung, 3000)).toBeNull()
+    // Nach der Sperre gilt die (inzwischen gelesene) Antwort; ein Fehler lässt Zeit für die Lösung
+    expect(antworten(z, r, 'p0', '###', 3400)).toEqual({ richtig: false })
+    expect(z.personen.p0.sperreGrund).toBe('fehler')
+    expect(antworten(z, r, 'p0', 'x', 4000)).toBeNull()
+    // Neue Aufgabe sofort nach der Fehlersperre angetippt (vor ihrer Lesezeit) → längere Sperre (6 s), weil binnen einer Minute
+    const neu = z.personen.p0.aufgabe!
+    neu.seit = 5900
+    expect(antworten(z, r, 'p0', 'x', 6000)).toBeNull()
+    expect(z.personen.p0.sperreGrund).toBe('schnell')
+    expect(z.personen.p0.sperreBis).toBe(12_000)
+    expect(z.personen.p0.n).toBe(1)
+  })
+  it('Boss: jede falsche Antwort lädt eine Kugel, die eigene Wiederholung wehrt sie nicht ab', () => {
+    const z = spiel('boss', 1) as KBasis & { angriffe: { item: string; getroffen?: boolean }[]; held: number }
+    const r = KLASSEN_REGELN.boss!
+    let t = 0
+    for (let i = 0; i < 8; i++) {
+      geraetSicht(z, r, 'p0', t)
+      t += 6000
+      antworten(z, r, 'p0', '###', t)
+    }
+    expect(z.angriffe.length).toBe(8)
+    r.tick!(z, t + 60_000)
+    expect(z.held).toBeLessThan(100)
   })
 })
 
@@ -289,9 +328,9 @@ describe('Klassenspiele – Stufe B', () => {
     expect(z.tischRunde.every((t) => t.fragen.length === 5)).toBe(true)
     for (let k = 0; k < 5; k++)
       for (const wer of Object.keys(z.personen)) {
-        geraetSicht(z, r, wer, k)
+        geraetSicht(z, r, wer, k * 10_000)
         const a = z.personen[wer].aufgabe!
-        antworten(z, r, wer, Number(wer.slice(1)) % 3 === 0 ? a.frage.loesung : '###', k)
+        antworten(z, r, wer, Number(wer.slice(1)) % 3 === 0 ? a.frage.loesung : '###', k * 10_000 + 5000)
       }
     expect(z.runde).toBe(2)
     // 3 Tische × (6 + 4 + 2) bzw. geteilte Plätze – Summe bleibt 36
@@ -312,7 +351,7 @@ describe('Klassenspiele – Stufe B', () => {
     expect(r.zug!(z, 'p0', 'sterne', '2', 0)).toBe(true)
     geraetSicht(z, r, 'p0', 0)
     const a = z.personen.p0.aufgabe!
-    antworten(z, r, 'p0', a.frage.loesung, 1)
+    antworten(z, r, 'p0', a.frage.loesung, 5000)
     const erobert = z.felder.filter((f) => f.team === z.personen.p0.team)
     expect(erobert).toHaveLength(1)
     expect(erobert[0].sterne).toBe(2)
@@ -323,15 +362,15 @@ describe('Klassenspiele – Stufe B', () => {
     const r = KLASSEN_REGELN.wette!
     expect(r.zug!(z, 'p0', 'einsatz', '3', 0)).toBe(true)
     geraetSicht(z, r, 'p0', 0)
-    antworten(z, r, 'p0', z.personen.p0.aufgabe!.frage.loesung, 1)
+    antworten(z, r, 'p0', z.personen.p0.aufgabe!.frage.loesung, 5000)
     expect(z.konto.p0).toBe(3)
-    r.zug!(z, 'p0', 'einsatz', '2', 2)
-    geraetSicht(z, r, 'p0', 2)
-    antworten(z, r, 'p0', '###', 3)
+    r.zug!(z, 'p0', 'einsatz', '2', 10_000)
+    geraetSicht(z, r, 'p0', 10_000)
+    antworten(z, r, 'p0', '###', 15_000)
     expect(z.konto.p0).toBe(1)
     expect(r.eigenText!(z, 'p0')).toContain('Bet 3: 1 of 1')
     // Ohne Einsatz keine Antwort
-    expect(antworten(z, r, 'p0', 'x', 4)).toBeNull()
+    expect(antworten(z, r, 'p0', 'x', 20_000)).toBeNull()
   })
   it('Rekord: Wert je Kind und Minute × Quote, Sieg nur über dem bisherigen Rekord', () => {
     const z = spiel('rekord', 2, { dauer: 3 })
