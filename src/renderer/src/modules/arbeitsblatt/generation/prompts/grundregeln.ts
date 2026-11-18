@@ -1,3 +1,4 @@
+import { aufgabenSpanne } from '../../didactics/anzahlSpanne'
 import { versuchRegeln } from '../../didactics/protokoll'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import type { LearnerProfile } from '../../didactics/profile'
@@ -236,7 +237,11 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
  * nachgeben – sonst überstimmen sie zu viert die eine Vorgabe. Genau das passierte bei
  * „Zahl der Aufgaben = 1": Es entstanden trotzdem mehrere.
  */
-export const wantedTasks = (meta: WorksheetMeta): number => Math.max(0, Math.round(meta.taskCount ?? 0))
+// Genaue Zahl; bei einer Spanne („5–10", 18.11.2026) 0 – die Sonderregeln für „genau eine Aufgabe" gelten dann nicht
+export const wantedTasks = (meta: WorksheetMeta): number => {
+  const s = aufgabenSpanne(meta)
+  return s && s.max === s.min ? s.min : 0
+}
 
 export function taskCountRules(meta: WorksheetMeta, profile: LearnerProfile): string {
   const [min, max] = profile.tasks.perPage
@@ -255,12 +260,14 @@ export function taskCountRules(meta: WorksheetMeta, profile: LearnerProfile): st
    * Hat die Lehrkraft eine Zahl gesetzt, gilt sie genau – sonst hätte das Feld keinen Zweck.
    * Ohne Vorgabe bleibt es beim Richtwert des Altersbands, und der ist bewusst eine Spanne.
    */
-  const wanted = Math.round(meta.taskCount ?? 0)
+  const wanted = aufgabenSpanne(meta)
   return [
     'ZAHL DER AUFGABEN (gut überlegen):',
-    wanted > 0
-      ? `- Das Blatt hat GENAU ${wanted} Aufgaben – nicht mehr und nicht weniger. Die Lehrkraft hat diese Zahl vorgegeben; teile den Stoff so ein, dass er auf ${wanted} tragfähige Aufgaben passt.`
-      : seitenVorgabe(meta)
+    wanted && wanted.max > wanted.min
+      ? `- Das Blatt hat ZWISCHEN ${wanted.min} UND ${wanted.max} Aufgaben – nicht weniger und nicht mehr. Die Lehrkraft hat diese Spanne vorgegeben; wähle die Zahl darin nach Stoff und Bearbeitungszeit.`
+      : wanted
+        ? `- Das Blatt hat GENAU ${wanted.min} Aufgaben – nicht mehr und nicht weniger. Die Lehrkraft hat diese Zahl vorgegeben; teile den Stoff so ein, dass er auf ${wanted.min} tragfähige Aufgaben passt.`
+        : seitenVorgabe(meta)
         ? `- Plane ${total} Aufgaben für ${seitenText(meta)} und bleibe im Zweifel am unteren Rand. Wenige, tragfähige Aufgaben sind besser als viele kleine Schritte.`
         : `- Plane etwa ${total} Aufgaben (Richtwert für ${meta.minutes} Minuten Bearbeitungszeit) und bleibe im Zweifel am unteren Rand. Wenige, tragfähige Aufgaben sind besser als viele kleine Schritte.`,
     '- Eine Aufgabe umfasst einen vollständigen Denkschritt. Zerlege nicht, was zusammengehört, und mache aus einem Arbeitsauftrag nicht drei.',

@@ -18,7 +18,7 @@ import type { SeitenPlan, SeitenVorschlag, Sheet, WorksheetMeta } from '../model
  */
 
 type SeitenMeta = Pick<WorksheetMeta, 'pages' | 'pagesBis'>
-type SchaetzMeta = SeitenMeta & Pick<WorksheetMeta, 'grade' | 'minutes' | 'taskCount'>
+type SchaetzMeta = SeitenMeta & Pick<WorksheetMeta, 'grade' | 'minutes' | 'taskCount' | 'taskCountBis'>
 
 /** Die Vorgabe der Lehrkraft – null, wenn die KI die Seitenzahl selbst festlegt */
 export function seitenVorgabe(meta: SeitenMeta): { min: number; max: number } | null {
@@ -47,11 +47,13 @@ export function seitenBereich(meta: SchaetzMeta): { min: number; max: number } {
 }
 
 /** Geschätzte Seitenzahl ohne Vorgabe – zwischen 1 und 4 */
-export function seitenSchaetzung(meta: Pick<WorksheetMeta, 'grade' | 'minutes' | 'taskCount'>): number {
+export function seitenSchaetzung(meta: Pick<WorksheetMeta, 'grade' | 'minutes' | 'taskCount' | 'taskCountBis'>): number {
   const band = ageBandForGrade(meta.grade)
   const jeSeite = (band.tasksPerPage[0] + band.tasksPerPage[1]) / 2
   const minutenJeAufgabe = (band.minutesPerTask[0] + band.minutesPerTask[1]) / 2
-  const aufgaben = meta.taskCount && meta.taskCount > 0 ? meta.taskCount : (meta.minutes || 45) / minutenJeAufgabe
+  // Bei einer Spanne („5–10") die Mitte
+  const vorgabe = meta.taskCount && meta.taskCount > 0 ? (meta.taskCount + Math.max(meta.taskCount, meta.taskCountBis ?? 0)) / 2 : 0
+  const aufgaben = vorgabe || (meta.minutes || 45) / minutenJeAufgabe
   return Math.min(4, Math.max(1, Math.round(aufgaben / jeSeite)))
 }
 

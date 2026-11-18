@@ -1,4 +1,6 @@
 import { schulbuchAusSeiten } from '../../../shared/schulbuch/SchulbuchDialog'
+import SpannenFeld from './SpannenFeld'
+import { aufgabenFelder, aufgabenSpanne, fragenFelder, fragenSpanne, istSpanne, spanneText } from '../didactics/anzahlSpanne'
 import { useExperte } from '../../../shared/settingsStore'
 import { NurExperte, OptionenBereich } from '../../../shared/components/NurExperte'
 import InterkulturSchalter from './InterkulturSchalter'
@@ -930,44 +932,40 @@ export default function TopicStep(): React.JSX.Element {
                         value={meta.minutes}
                         onChange={(v) => patch({ minutes: Number(v) || 45 })}
                       />
-                      <NurExperte geaendert={Boolean(meta.taskCount) && `${meta.taskCount} Aufgaben`}>
-                        {/* Leer lassen heißt „Richtwert des Altersbands" – eine eingetragene Zahl gilt genau. */}
-                        <ZahlFeld
+                      <NurExperte geaendert={Boolean(aufgabenSpanne(meta)) && `${spanneText(aufgabenSpanne(meta)!)} Aufgaben`}>
+                        {/* Leer lassen heißt „Richtwert des Altersbands" – eine Zahl gilt genau, eine Spanne („5–10") als Rahmen (18.11.2026). */}
+                        <SpannenFeld
                           label="Zahl der Aufgaben"
                           description={
-                            meta.taskCount
-                              ? `Es entstehen genau ${meta.taskCount} Aufgaben. Leeren, um wieder den Richtwert zu nutzen.`
-                              : `Leer lassen: Richtwert für Klasse ${meta.grade} sind ${profile.tasks.perPage[0] * seitenBereich(meta).min}–${
+                            aufgabenSpanne(meta)
+                              ? `Es entstehen ${istSpanne(aufgabenSpanne(meta)) ? 'zwischen' : 'genau'} ${spanneText(aufgabenSpanne(meta)!)} Aufgaben. Leeren, um wieder den Richtwert zu nutzen.`
+                              : `Eine Zahl oder Spanne (z. B. 5–8). Leer lassen: Richtwert für Klasse ${meta.grade} sind ${profile.tasks.perPage[0] * seitenBereich(meta).min}–${
                                   profile.tasks.perPage[1] * seitenBereich(meta).max
                                 } Aufgaben auf ${seitenText(meta)}.`
                           }
                           placeholder={`automatisch (${profile.tasks.perPage[0] * seitenBereich(meta).min}–${
                             profile.tasks.perPage[1] * seitenBereich(meta).max
                           })`}
-                          min={1}
-                          max={20}
-                          value={meta.taskCount || ''}
-                          onChange={(v) => patch({ taskCount: Number(v) || 0 })}
+                          wert={aufgabenSpanne(meta)}
+                          onChange={(s) => patch(aufgabenFelder(s))}
                         />
                       </NurExperte>
-                      <NurExperte geaendert={Boolean(meta.itemCount) && `${meta.itemCount} Fragen`}>
+                      <NurExperte geaendert={Boolean(fragenSpanne(meta)) && `${spanneText(fragenSpanne(meta)!)} Fragen`}>
                         {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
-                          <ZahlFeld
+                          <SpannenFeld
                             label={meta.skillFocus === 'listening' ? 'Fragen je Hörtext' : 'Fragen zum Text'}
                             description={
-                              meta.itemCount
-                                ? `Genau ${meta.itemCount} Fragen${
+                              fragenSpanne(meta)
+                                ? `${istSpanne(fragenSpanne(meta)) ? 'Zwischen' : 'Genau'} ${spanneText(fragenSpanne(meta)!)} Fragen${
                                     meta.skillFocus === 'listening' && (meta.audioCount ?? 1) > 1 ? ` zu jedem der ${meta.audioCount} Hörtexte` : ''
                                   }.`
-                                : `Leer lassen: Richtwert für Niveau ${meta.cefrLevel} sind ${listeningRules(meta.cefrLevel).items[0]}–${
+                                : `Eine Zahl oder Spanne (z. B. 5–10). Leer lassen: Richtwert für Niveau ${meta.cefrLevel} sind ${listeningRules(meta.cefrLevel).items[0]}–${
                                     listeningRules(meta.cefrLevel).items[1]
                                   } Fragen je Text.`
                             }
                             placeholder={`automatisch (${listeningRules(meta.cefrLevel).items[0]}–${listeningRules(meta.cefrLevel).items[1]})`}
-                            min={1}
-                            max={20}
-                            value={meta.itemCount || ''}
-                            onChange={(v) => patch({ itemCount: Number(v) || 0 })}
+                            wert={fragenSpanne(meta)}
+                            onChange={(s) => patch(fragenFelder(s))}
                           />
                         )}
                       </NurExperte>

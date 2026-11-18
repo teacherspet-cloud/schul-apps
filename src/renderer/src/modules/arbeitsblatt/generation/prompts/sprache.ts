@@ -1,3 +1,4 @@
+import { fragenSpanne, istSpanne, spanneAuftrag } from '../../didactics/anzahlSpanne'
 import { stageForGrade } from '../../didactics/profile'
 import type { WorksheetMeta } from '../../model/types'
 import { subjectById } from '../../model/subjects'
@@ -55,8 +56,8 @@ export function listeningTextRules(meta: WorksheetMeta): string {
       meta.instructionsInGerman ? 'auf Deutsch' : `auf ${subjectById(meta.subjectId).label}`
     } mit Anlass, Zahl und Rolle der Sprechenden. Sie nimmt KEINE Information vorweg, mit der sich eine Aufgabe schon vor dem Hören lösen ließe.`,
     `- plays = ${rules.plays} (so oft wird der Text gehört).`,
-    meta.itemCount && meta.itemCount > 0
-      ? `- GENAU ${Math.round(meta.itemCount)} Items zu JEDEM Hörtext, über den ganzen Text verteilt und in der Reihenfolge des Textes. Die Lehrkraft hat diese Zahl vorgegeben.`
+    fragenSpanne(meta)
+      ? `- ${spanneAuftrag(fragenSpanne(meta)!)} Items zu JEDEM Hörtext, über den ganzen Text verteilt und in der Reihenfolge des Textes. Die Lehrkraft hat diese ${istSpanne(fragenSpanne(meta)) ? 'Spanne' : 'Zahl'} vorgegeben.`
       : `- ${rules.items[0]} bis ${rules.items[1]} Items zum Hörtext, über den ganzen Text verteilt und in der Reihenfolge des Textes.`,
     count > 1
       ? '- REIHENFOLGE AUF DEM BLATT: erst Hörtext 1 mit ALLEN seinen Aufgaben, dann Hörtext 2 mit allen seinen Aufgaben, und so weiter. Aufgaben zu verschiedenen Hörtexten werden nicht vermischt, und keine Aufgabe bezieht sich auf zwei Hörtexte – außer einer abschließenden Aufgabe, die beide vergleicht und dann als letzte steht.'

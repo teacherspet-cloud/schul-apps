@@ -1,3 +1,4 @@
+import { aufgabenSpanne, spanneAuftrag } from '../../didactics/anzahlSpanne'
 import type { WorksheetMeta } from '../../model/types'
 import { subjectById } from '../../model/subjects'
 import { istUebungsklausur } from '../abiturPrompt'
@@ -163,7 +164,9 @@ export function skillFocusPrompt(meta: WorksheetMeta): string {
       ? `${grund.replace(/davor eine kurze Aufgabe zur Vorentlastung \(Wortschatz, Erwartungen\) und /, '')} AUSSCHLIESSLICH Aufgaben in den gewählten Formaten zum vorgegebenen Text bzw. Video – keine Vorentlastungsaufgabe, keine weiterführende Aufgabe, kein weiterer Baustein außer dem Text, Hörtext oder Video.`
       : grund
   const wanted = wantedTasks(meta)
-  if (!wanted || !text) return text
+  // Spanne „5–10" (18.11.2026): ersetzt die Zahl im Schwerpunkt-Text wie eine genaue Zahl
+  const spanne = aufgabenSpanne(meta)
+  if ((!wanted && !spanne) || !text) return text
   /*
    * Die Schwerpunkt-Texte nennen selbst eine Zahl („2–3 Aufgaben"), und beim Hörverstehen
    * zusätzlich eine Vorentlastungsaufgabe. Gibt die Lehrkraft eine Zahl vor, darf hier keine
@@ -176,7 +179,7 @@ export function skillFocusPrompt(meta: WorksheetMeta): string {
      * fünf. Der Hinweis vor dem Hören geht nicht verloren: Er steht im Baustein „audio".
      */
     .replace(/davor eine kurze Aufgabe zur Vorentlastung \(Wortschatz, Erwartungen\) und /, '')
-    .replace(/2–3 Aufgaben/g, wanted === 1 ? 'GENAU EINE Aufgabe' : `GENAU ${wanted} Aufgaben`)
+    .replace(/2–3 Aufgaben/g, wanted === 1 ? 'GENAU EINE Aufgabe' : `${spanneAuftrag(spanne!)} Aufgaben`)
   return wanted === 1
     ? `${ersetzt} Es entsteht KEINE weitere Aufgabe – der Hinweis vor dem Hören bzw. Lesen steht im Material, nicht als eigene Aufgabe.`
     : ersetzt

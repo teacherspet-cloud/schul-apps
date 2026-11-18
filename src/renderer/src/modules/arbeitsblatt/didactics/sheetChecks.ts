@@ -1,3 +1,4 @@
+import { aufgabenSpanne, spanneText } from './anzahlSpanne'
 /**
  * Prüfungen für das ganze Arbeitsblatt (ohne KI): Operatoren des Fachs, Anforderungsbereiche,
  * Ergebnissicherung, Aufgabenmischung und die Länge der Arbeitsanweisungen.
@@ -131,14 +132,14 @@ export function checkTaskCount(sheet: Sheet, meta: WorksheetMeta, profile?: Lear
    * Der Richtwert des Altersbands hat dann nichts mehr zu melden: Wer sechs Aufgaben bestellt,
    * will bei fünf oder sieben einen Hinweis, nicht bei zwölf.
    */
-  const wanted = Math.round(meta.taskCount ?? 0)
-  if (wanted > 0 && !simplified && list.length !== wanted) {
+  const spanne = aufgabenSpanne(meta)
+  if (spanne && !simplified && (list.length < spanne.min || list.length > spanne.max)) {
     out.push({
       kind: 'taskCount',
-      message: `${list.length} Aufgaben, vorgegeben waren ${wanted}. ${list.length > wanted ? 'Aufgaben zusammenfassen, die einen Denkschritt bilden' : 'Es fehlt eine Aufgabe'}.`
+      message: `${list.length} Aufgaben, vorgegeben waren ${spanneText(spanne)}. ${list.length > spanne.max ? 'Aufgaben zusammenfassen, die einen Denkschritt bilden' : spanne.min - list.length > 1 ? 'Es fehlen Aufgaben' : 'Es fehlt eine Aufgabe'}.`
     })
   }
-  if (profile && !simplified && wanted === 0) {
+  if (profile && !simplified && !spanne) {
     // Ohne Seitenvorgabe zählt die geschätzte Seitenzahl, bei einer Spanne die Obergrenze (didactics/seiten.ts, Paket 7)
     const max = profile.tasks.perPage[1] * seitenBereich(meta).max
     if (list.length > max) {
@@ -195,7 +196,7 @@ export function checkComprehensionFormats(sheet: Sheet, meta: WorksheetMeta): Di
   const skill = meta.skillFocus === 'listening' ? 'listening' : meta.skillFocus === 'reading' ? 'reading' : null
   if (!skill || !meta.comprehensionFormats?.length) return []
   // Bei genau einer bestellten Aufgabe kann nicht jedes Format vorkommen – das ist gewollt
-  if (Math.round(meta.taskCount ?? 0) === 1) return []
+  if (aufgabenSpanne(meta)?.max === 1) return []
   const kinds = new Set(
     tasks(sheet)
       .filter((t) => !t.skill || t.skill === skill)

@@ -1211,8 +1211,12 @@ export interface WorksheetMeta {
    * einem Grammatikblatt etwas anderes als bei einem Hörverstehensblatt.
    */
   taskCount?: number
+  /** Obergrenze einer Spanne „5–10 Aufgaben" (18.11.2026); fehlt oder ≤ `taskCount` = genaue Zahl */
+  taskCountBis?: number
   /** Hör-/Leseverstehen: Zahl der Fragen JE Text (0 oder fehlend = Richtwert nach Niveau) */
   itemCount?: number
+  /** Obergrenze einer Spanne „5–10 Fragen" (18.11.2026); fehlt oder ≤ `itemCount` = genaue Zahl */
+  itemCountBis?: number
   minutes: number
   socialForms: SocialForm[]
   differentiation: {

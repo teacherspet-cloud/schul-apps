@@ -1,3 +1,4 @@
+import { fragenSpanne, istSpanne, spanneAuftrag } from '../../didactics/anzahlSpanne'
 import { stufenRaster } from '../../../../shared/verstehen/regeln'
 import type { LearnerProfile } from '../../didactics/profile'
 import type { WorksheetMeta } from '../../model/types'
@@ -67,7 +68,7 @@ export function comprehensionRules(meta: WorksheetMeta): string {
     '',
     'REGELN FÜR ALLE VERSTEHENSAUFGABEN:',
     // Die Zahl gilt JE Text: Bei zwei Hörtexten bekommt jeder so viele Fragen.
-    meta.itemCount && meta.itemCount > 0 ? `- GENAU ${Math.round(meta.itemCount)} Items je Text – die Lehrkraft hat diese Zahl vorgegeben.` : '',
+    fragenSpanne(meta) ? `- ${spanneAuftrag(fragenSpanne(meta)!)} Items je Text – die Lehrkraft hat diese ${istSpanne(fragenSpanne(meta)) ? 'Spanne' : 'Zahl'} vorgegeben.` : '',
     '- Die Items folgen der Reihenfolge des Textes und verteilen sich über den ganzen Text.',
     // 29.09.2026 (Entscheidung der Lehrkraft): Wortgleichheit ist kein Fehler, sondern Stufe 1 – das Raster steuert die Schwierigkeit
     stufenRaster(),

@@ -70,12 +70,12 @@ describe('Aufgabe ohne Items', () => {
   })
 
   it('jeder Erzeugungsauftrag verlangt vollständige Aufgaben', () => {
-    const meta = { ...defaultMeta(), subjectId: 'englisch', grade: 5 }
+    const meta = { ...defaultMeta('NI', 'gymnasium', 'Gymnasium'), subjectId: 'englisch', grade: 5 }
     expect(taskContext(meta, profileFromMeta(meta))).toMatch(/VOLLSTÄNDIGE AUFGABEN/)
   })
 
   it('Neuerzeugen fordert fehlende Items einmal nach und meldet sie, wenn sie dann noch fehlen', async () => {
-    const meta = { ...defaultMeta(), subjectId: 'englisch', grade: 5 }
+    const meta = { ...defaultMeta('NI', 'gymnasium', 'Gymnasium'), subjectId: 'englisch', grade: 5 }
     const alt = aufgabe(BEFUND, antwort('none'))
     const sheet: Sheet = { id: 's', label: 'A', blocks: [alt] }
     const ws = { meta, sheets: [sheet], sources: [] } as unknown as Worksheet
