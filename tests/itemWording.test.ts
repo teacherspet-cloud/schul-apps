@@ -251,7 +251,7 @@ describe('Musterformulierungen je Format', () => {
 
   it('erreichen die KI', () => {
     const rules = comprehensionRules(meta({ comprehensionFormats: ['multiple-choice'] }))
-    expect(rules).toContain('Tick (✓) the correct answer.')
+    expect(rules).toContain('Tick the correct answer.')
   })
 
   it('nennt bei Lückenformaten die Höchstzahl der Wörter', () => {

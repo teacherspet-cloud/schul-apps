@@ -33,6 +33,14 @@ describe('Groß am Satzanfang', () => {
     // Schreibmarke mitten im Text: nur die Stelle davor zählt
     expect(grossAmSatzanfang('Hallo. d Welt', 8)).toBe('Hallo. D Welt')
   })
+  it('Lücke mitten im Satz: Feldanfang ist kein Satzanfang (18.11.2026)', () => {
+    expect(grossAmSatzanfang('w', 1, false)).toBeNull()
+    expect(grossAmSatzanfang('went home. t', 12, false)).toBe('went home. T')
+    // Text vor der Lücke auf dem Blatt
+    expect(amSatzanfang('Yesterday I ')).toBe(false)
+    expect(amSatzanfang('I was tired. ')).toBe(true)
+    expect(amSatzanfang('')).toBe(true)
+  })
   it('Umlaute und ß', () => {
     expect(grossAmSatzanfang('ä', 1)).toBe('Ä')
     // ß hat keinen einzelnen Großbuchstaben – bleibt

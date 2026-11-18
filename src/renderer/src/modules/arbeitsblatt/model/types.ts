@@ -1150,6 +1150,11 @@ export interface WorksheetMeta {
    */
   nurGewaehlteFormate?: boolean
   /**
+   * Klassenarbeit (18.11.2026, Vorgabe der Lehrkraft): je Hör-/Lesetext GENAU EIN Aufgabenformat – jedes weitere
+   * Format bekommt einen eigenen, neuen Text. Auf Arbeitsblättern bleibt es bei mehreren Formaten je Text.
+   */
+  einFormatJeText?: boolean
+  /**
    * Fremdsprachen: Hilfsblatt mit nützlichen Ausdrücken und Wortschatz für die Lernenden.
    * 'aus' = keines · 'blatt' = eigenes Blatt am Ende · 'inline' = auf dem Aufgabenblatt.
    *

@@ -32,7 +32,14 @@ export function comprehensionRules(meta: WorksheetMeta): string {
     meta.nurGewaehlteFormate ? '- NUR diese Formate: Außer den Verstehensaufgaben in diesen Formaten entsteht keine weitere Aufgabe.' : '',
     chosen.length === 1
       ? `- Benutze AUSSCHLIESSLICH dieses eine Format. Kein anderes Antwortformat kommt vor.`
-      : wantedTasks(meta) === 1
+      : meta.einFormatJeText
+        ? [
+            // Klassenarbeit (18.11.2026, Vorgabe der Lehrkraft): ein Format je Text, für jedes weitere Format ein neuer Text
+            `- JEDER Text bekommt GENAU EIN Aufgabenformat. Es gibt ${chosen.length} Texte – je einen für jedes dieser ${chosen.length} Formate, in dieser Reihenfolge: ${chosen.map((f, i) => `Text ${i + 1} → ${f.label}`).join(', ')}.`,
+            '- Zu einem Text gibt es nie zwei verschiedene Formate (auch nicht als Teilaufgabe). Ein weiteres Format braucht immer einen eigenen, neuen Text.',
+            '- Andere Formate sind nicht erlaubt.'
+          ].join('\n')
+        : wantedTasks(meta) === 1
         ? `- Wähle EINES dieser ${chosen.length} Formate – die Lehrkraft hat nur eine Aufgabe bestellt.`
         : `- JEDES dieser ${chosen.length} Formate kommt mindestens einmal vor; andere Formate sind nicht erlaubt.`,
     // `stem` nennt den Wortlaut der Frage – ohne ihn schrieb die KI zu jedem Format denselben Satz
@@ -67,7 +74,11 @@ export function comprehensionRules(meta: WorksheetMeta): string {
     '- Mische die Stufen: überwiegend Stufe 2–4; Stufe 1 (1:1 aus dem Text) höchstens für ein Viertel der Items, in Übungen für den Einstieg.',
     '- Jede Antwort steht wörtlich oder sinngemäß im Text; nichts ist aus Vorwissen allein lösbar.',
     '- Bewertet wird nur, ob die Lösung das richtige Verständnis nachweist; sprachliche Verstöße und Rechtschreibung zählen nicht.',
-    wantedTasks(meta) === 1 ? '' : '- Mische ein geschlossenes und ein halboffenes Format; zum Ende der Sekundarstufe I überwiegen die offeneren Formate.',
+    wantedTasks(meta) === 1 || (meta.einFormatJeText && chosen.length === 1)
+      ? ''
+      : meta.einFormatJeText
+        ? '- Die Formate wechseln von Text zu Text (geschlossen, halboffen); innerhalb eines Textes bleibt es bei einem Format.'
+        : '- Mische ein geschlossenes und ein halboffenes Format; zum Ende der Sekundarstufe I überwiegen die offeneren Formate.',
     skill === 'listening'
       ? '- Vor dem Hören bekommen die Lernenden Zeit, die Aufgaben zu lesen; der Text wird zweimal gehört.'
       : '- Der Lesetext trägt Zeilennummern, damit Textbelege angegeben werden können.'

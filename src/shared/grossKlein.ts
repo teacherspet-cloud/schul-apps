@@ -54,20 +54,23 @@ const SATZENDE = new RegExp(`(\\S*?)([.!?…])["“”')\\]]*\\s+${OEFFNEND}$`, 
  * Der Text mit großem Buchstaben an `pos - 1`, wenn dort eben ein Kleinbuchstabe am Satzanfang getippt wurde – sonst null.
  * `pos` ist die Schreibmarke nach dem Tippen (Index hinter dem neuen Zeichen).
  */
-export function grossAmSatzanfang(text: string, pos: number): string | null {
+export function grossAmSatzanfang(text: string, pos: number, feldanfang = true): string | null {
   if (pos < 1 || pos > text.length) return null
   const z = text[pos - 1]
   if (!/\p{Ll}/u.test(z)) return null
   const gross = z.toLocaleUpperCase('de')
   if (gross === z || gross.length !== 1) return null
   const vor = text.slice(0, pos - 1)
-  if (!amSatzanfang(vor)) return null
+  if (!amSatzanfang(vor, feldanfang)) return null
   return vor + gross + text.slice(pos)
 }
 
-/** Beginnt nach `vor` ein Satz? (Feldanfang, Zeilenanfang oder Satzzeichen mit Leerzeichen – ohne Auslassung, Ordnungszahl und Abkürzung) */
-export function amSatzanfang(vor: string): boolean {
-  if (FELDANFANG.test(vor) || ZEILENANFANG.test(vor)) return true
+/**
+ * Beginnt nach `vor` ein Satz? (Feldanfang, Zeilenanfang oder Satzzeichen mit Leerzeichen – ohne Auslassung, Ordnungszahl
+ * und Abkürzung). `feldanfang = false`: Der Feldanfang ist KEIN Satzanfang – eine Lücke mitten im Satz (18.11.2026).
+ */
+export function amSatzanfang(vor: string, feldanfang = true): boolean {
+  if ((feldanfang && FELDANFANG.test(vor)) || ZEILENANFANG.test(vor)) return true
   const m = SATZENDE.exec(vor)
   if (!m) return false
   const [, wort, zeichen] = m

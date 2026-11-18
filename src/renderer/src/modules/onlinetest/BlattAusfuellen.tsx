@@ -9,7 +9,8 @@
  * Das Blatt steht in einem iframe ohne Skripte (sandbox, nur same-origin zum Messen); darüber
  * liegen die Eingabefelder, beides gemeinsam auf die Breite des Geräts skaliert.
  */
-import { grossAmSatzanfang } from '@shared/grossKlein'
+import { amSatzanfang, grossAmSatzanfang } from '@shared/grossKlein'
+import { materialMitZeilen } from './materialZeilen'
 import type { Stil } from './objektOptionen'
 import { HilfeModal, hilfekartenAus, oeffneHilfeFenster, type Hilfekarten } from './hilfeFenster'
 import {
@@ -96,6 +97,8 @@ interface Feld {
   bezug?: string
   /** Zweites Feld an derselben Stelle (Kästchen in der Richtig/Falsch-Zelle) – zählt nicht, Nummern bleiben stabil */
   doppelt?: boolean
+  /** Lücke mitten im Satz (18.11.2026): der erste Buchstabe wird nicht automatisch groß */
+  satzMitte?: boolean
 }
 
 interface Seite {
@@ -454,7 +457,24 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
         const kopf = c >= 0 ? text(el.closest('table')?.querySelectorAll('thead th')[c]) : ''
         beschriftung = [text(tr?.querySelector('td:not(.ws-cell-empty)')), kopf].filter(Boolean).join(' – ')
       }
+      // Lücke mitten im Satz? Text davor im selben Absatz bzw. in derselben Zelle (18.11.2026, Befund der Lehrkraft:
+      // der erste Buchstabe wurde auch mitten im Satz großgeschrieben)
+      let satzMitte = false
+      if (art === 'luecke') {
+        const absatz = el.closest('p, li, td, th, .ws-gaptext, .ws-task-instruction') ?? el.parentElement
+        if (absatz) {
+          try {
+            const r = doc.createRange()
+            r.setStart(absatz, 0)
+            r.setEndBefore(el)
+            satzMitte = !amSatzanfang(r.toString().replace(/\s+/g, ' '))
+          } catch {
+            satzMitte = false
+          }
+        }
+      }
       roh.push({
+        ...(satzMitte ? { satzMitte } : {}),
         ...(li !== null ? { anker: Number(li) } : {}),
         el: index.get(el),
         nr: n,
@@ -539,7 +559,19 @@ export default function BlattAusfuellen({ id }: { id: string }): React.JSX.Eleme
  * Das Blatt ausfüllen bzw. ansehen. Mit `lehrkraft` (App „Freigegebene Blätter", 03.10.2026): nur
  * ansehen, Rückweg in die App, PDF über den Lehrkraft-Weg des Servers.
  */
-export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zurueck: () => void } }): React.JSX.Element {
+/**
+ * Probe-Feedback (18.11.2026, Wunsch der Lehrkraft): In der Schüleransicht des Arbeitsblatt-Editors gibt es kein
+ * freigegebenes Blatt und keinen Server – das Feedback zu einer Aufgabe entsteht dann über diese Funktion (KI der
+ * Lehrkraft, nichts wird gespeichert). Ohne sie gilt wie bisher der Weg über den Server.
+ */
+export type ProbeFeedback = (x: {
+  nr: number
+  antworten: Record<string, string>
+  felder: { id: string; nr: number; art: string; seite: number; text?: string; bezug?: string }[]
+  material: string
+}) => Promise<{ einschaetzung: string; text: string; krise?: boolean }>
+
+export function Ausfuellen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: { zurueck: () => void }; probe?: ProbeFeedback }): React.JSX.Element {
   const [antworten, setAntworten] = useState<Record<string, string>>(d.antworten)
   // Im Fachordner geöffnet (09.10.2026): dessen „Zurück" blättert zurück – kein eigener Rückweg
   const ordnerBlatt = useBlaettern()
@@ -836,15 +868,17 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     const bereich = a && s0 ? { seite: a.seite, von: a.y - s0.y - 10, bis: naechste ? naechste.y - s0.y - 10 : s0.h } : undefined
     if (kriseVerdacht(eigeneEintraege())) setHilfe(true)
     try {
-      const fb = await senden<{ einschaetzung: string; text: string; krise?: boolean }>('/s/api/blatt/aufgabe', {
-        id: d.id,
-        nr,
-        antworten,
-        felder: felderAlsDaten(),
-        ...(bereich ? { bereich } : {}),
-        ...(a?.zeichnen ? { nurZeichenflaeche: true } : {}),
-        ...(stand.current.tinteGeaendert ? { tinte } : {})
-      })
+      const fb = probe
+        ? await probe({ nr, antworten, felder: felderAlsDaten(), material: iframe.current?.contentDocument ? materialMitZeilen(iframe.current.contentDocument) : '' })
+        : await senden<{ einschaetzung: string; text: string; krise?: boolean }>('/s/api/blatt/aufgabe', {
+            id: d.id,
+            nr,
+            antworten,
+            felder: felderAlsDaten(),
+            ...(bereich ? { bereich } : {}),
+            ...(a?.zeichnen ? { nurZeichenflaeche: true } : {}),
+            ...(stand.current.tinteGeaendert ? { tinte } : {})
+          })
       stand.current.tinteGeaendert = false
       if (fb.krise) setHilfe(true)
       setAufgabenFb((x) => ({ ...x, [String(nr)]: [...(x[String(nr)] ?? []), { ...fb, zeit: Date.now() }] }))
@@ -1584,6 +1618,8 @@ function Ebene(p: {
   const knopfBreite = useTouch() ? 44 : 28
   const schreibt = p.werkzeug !== 'tastatur'
   const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
+  // Lücke mit Schreibmarke: zeigt beim Tippen den ganzen Text (18.11.2026)
+  const [fokus, setFokus] = useState<string | null>(null)
   // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
   const [lagen, setLagen] = useState<Record<number, { y: number; feld: string; ende: { x: number; y: number } }>>({})
   // Pendeln abfangen (28.10.2026, Fehler #185): je Kommentar höchstens 20 neue Lagen in kurzer Folge, danach erst wieder nach 1 s
@@ -1686,7 +1722,16 @@ function Ebene(p: {
           )
         if (f.art === 'luecke' || (f.art === 'zeilen' && (f.zeilen ?? 1) === 1) || f.art === 'text') {
           const hoehe = f.art === 'zeilen' ? Math.max(f.h, 22) : f.h
-          const eingabeStil: React.CSSProperties = { ...stil, top: f.y + f.h - hoehe, height: hoehe, fontSize: Math.max(12, Math.min(18, hoehe * 0.65)) }
+          const schrift = Math.max(12, Math.min(18, hoehe * 0.65))
+          const seite = p.seiten[f.seite]
+          const eingabeStil: React.CSSProperties = {
+            ...stil,
+            top: f.y + f.h - hoehe,
+            height: hoehe,
+            fontSize: schrift,
+            // Lücken: Text bleibt sichtbar, ohne das Blatt umzubrechen (18.11.2026)
+            ...(f.art === 'luecke' ? lueckenGroesse(wert, f, schrift, lueckenRand(f, p.felder, seite), fokus === f.id) : {})
+          }
           const treffer = trefferVon(wert, f.nr)
           return [
             treffer.length ? (
@@ -1704,10 +1749,13 @@ function Ebene(p: {
               key={f.id}
               value={wert}
               disabled={p.gesperrt}
-              onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein))}
+              onChange={(e) => p.setze(f.id, eingabeWert(e.currentTarget, p.grossKlein, !f.satzMitte))}
+              onFocus={() => setFokus(f.id)}
+              onBlur={() => setFokus((x) => (x === f.id ? null : x))}
               autoComplete="off"
               autoCorrect="off"
-              autoCapitalize={p.grossKlein ? 'sentences' : 'none'}
+              // Lücke mitten im Satz: die Tastatur (iPad) beginnt klein
+              autoCapitalize={p.grossKlein && !f.satzMitte ? 'sentences' : 'none'}
               spellCheck={false}
               style={{ ...eingabeStil, ...(treffer.length ? { background: 'transparent' } : {}) }}
               data-feld={f.id}
@@ -2084,6 +2132,58 @@ function Liste(p: {
   )
 }
 
+/*
+ * Breite einer Lücke beim Online-Ausfüllen (18.11.2026, Befund der Lehrkraft: längerer Text verschwand in der kleinen
+ * Lücke). Das Blatt bleibt, wie es ist – das Feld liegt darüber:
+ *  1. Passt der Text, bleibt alles wie gedruckt.
+ *  2. Etwas zu lang: Die Schrift wird kleiner (bis drei Viertel), die Lücke bleibt gleich breit.
+ *  3. Noch länger oder beim Tippen: Das Feld wird nach rechts breiter, weiß hinterlegt mit leichtem Schatten, damit es
+ *     lesbar über dem Text daneben liegt – höchstens bis kurz vor die NÄCHSTE Lücke derselben Zeile bzw. bis zum
+ *     Seitenrand (sonst ließe sich die nächste Lücke nicht mehr antippen). Reicht auch das nicht, wird die Schrift
+ *     weiter kleiner (bis 60 %).
+ */
+const LUECKE_MINDEST = 0.6
+/** Rechter Rand für eine Lücke: Seitenrand oder kurz vor dem nächsten Feld in derselben Zeile */
+function lueckenRand(f: Feld, felder: Feld[], seite: Seite | undefined): number {
+  let rand = seite ? seite.x + seite.w - 8 : f.x + f.w * 3
+  const mitte = f.y + f.h / 2
+  for (const g of felder) {
+    if (g === f || g.seite !== f.seite || g.x <= f.x + 1) continue
+    if (Math.abs(g.y + g.h / 2 - mitte) < Math.max(f.h, 12)) rand = Math.min(rand, g.x - 4)
+  }
+  return rand
+}
+let messFlaeche: CanvasRenderingContext2D | null | undefined
+function textBreite(text: string, schrift: number): number {
+  if (messFlaeche === undefined) messFlaeche = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null
+  if (!messFlaeche) return text.length * schrift * 0.6
+  messFlaeche.font = `${schrift}px "Segoe Print", "Comic Sans MS", system-ui, sans-serif`
+  return messFlaeche.measureText(text).width
+}
+const LUECKE_POLSTER = 10
+const LUECKE_KLEINSTE = 0.75
+function lueckenGroesse(wert: string, f: { x: number; w: number }, schrift: number, rechterRand: number, fokus: boolean): React.CSSProperties {
+  if (!wert) return {}
+  const voll = textBreite(wert, schrift) + LUECKE_POLSTER
+  if (voll <= f.w) return {}
+  const platz = Math.max(f.w, rechterRand - f.x)
+  const ueberBlatt = (breite: number, groesse: number): React.CSSProperties => ({
+    width: Math.min(platz, Math.ceil(breite)),
+    fontSize: groesse,
+    background: '#fff',
+    boxShadow: '0 1px 4px rgba(0,0,0,.18)',
+    borderRadius: 3,
+    zIndex: 16
+  })
+  // Breite bei Schriftmaßstab s
+  const noetig = (s: number): number => (voll - LUECKE_POLSTER) * s + LUECKE_POLSTER
+  // Passt es nicht einmal über dem Blatt: so klein wie nötig (bis 60 %), Feld so breit wie möglich
+  const knapp = (): React.CSSProperties => ueberBlatt(platz, Math.max(9, schrift * Math.max(LUECKE_MINDEST, (platz - LUECKE_POLSTER) / (voll - LUECKE_POLSTER))))
+  if (fokus) return noetig(1) <= platz ? ueberBlatt(voll, schrift) : knapp()
+  if (noetig(LUECKE_KLEINSTE) <= f.w) return { fontSize: Math.max(9, (schrift * (f.w - LUECKE_POLSTER)) / (voll - LUECKE_POLSTER)) }
+  return noetig(LUECKE_KLEINSTE) <= platz ? ueberBlatt(noetig(LUECKE_KLEINSTE), Math.max(9, schrift * LUECKE_KLEINSTE)) : knapp()
+}
+
 const MARKE_TEXT: Record<FeldMarke['m'], string> = { r: 'richtig', f: 'falsch', fehlt: 'Hier wäre richtig gewesen' }
 
 /** ✓ (grün), ✗ (rot) bzw. Hinweis auf das Fehlende (orange) an einem geprüften Feld (08.10.2026) */
@@ -2091,10 +2191,10 @@ const MARKE_TEXT: Record<FeldMarke['m'], string> = { r: 'richtig', f: 'falsch', 
  * Wert eines Textfelds nach dem Tippen (27.10.2026): mit Groß-/Kleinschreibung automatisch wird ein eben getippter Kleinbuchstabe
  * am Satzanfang groß (shared/grossKlein.ts); der Wert wird direkt im Feld gesetzt, damit die Schreibmarke stehen bleibt.
  */
-function eingabeWert(el: HTMLInputElement | HTMLTextAreaElement, grossKlein?: boolean): string {
+function eingabeWert(el: HTMLInputElement | HTMLTextAreaElement, grossKlein?: boolean, feldanfang = true): string {
   if (!grossKlein) return el.value
   const pos = el.selectionStart ?? el.value.length
-  const neu = grossAmSatzanfang(el.value, pos)
+  const neu = grossAmSatzanfang(el.value, pos, feldanfang)
   if (neu === null) return el.value
   el.value = neu
   try {

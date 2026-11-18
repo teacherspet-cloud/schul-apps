@@ -13,7 +13,9 @@ import { fachDerArbeit, formatArt, inhaltsanteil, sprachfolge, zweiterTeil } fro
 import type { Quellentreffer, StructuredRequest } from '@shared/types'
 import { obj, str } from '../../../shared/aiSchema'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
-import { comprehensionFormatById, defaultComprehensionFormats } from '../../arbeitsblatt/didactics/comprehensionFormats'
+import { comprehensionFormatById } from '../../arbeitsblatt/didactics/comprehensionFormats'
+import { istVerstehensteil, teilFormate } from '../model/verstehensFormate'
+import { pruefeEinFormatJeText } from './einFormatJeText'
 import { buildLearnerProfile, stageForGrade } from '../../arbeitsblatt/didactics/profile'
 import type { AfbMix } from '../../arbeitsblatt/didactics/ageBands'
 import { browserWorksheetImageDeps, worksheetImagePool } from '../../arbeitsblatt/generation/browserImages'
@@ -59,7 +61,7 @@ import { formenRegelFuerFach } from '../../../shared/bekannteFormen'
 import { bilingualAktiv, checkBilingualOperatoren, PRUEFUNGSSPRACHE_HINWEIS } from '../../arbeitsblatt/didactics/bilingual'
 import { glossarFuerArbeit } from './glossar'
 import { generateSprechDaten, sprechBausteine } from './sprechpruefung'
-import { scriptForSheet, wantsListening, writeListeningScript } from '../../arbeitsblatt/generation/listening'
+import { scriptForSheet, wantsListening, writeListeningScripts } from '../../arbeitsblatt/generation/listening'
 import type { ListeningScript } from '../../arbeitsblatt/generation/listening'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
 import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
@@ -129,7 +131,9 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     wordLimit: wortzahlErlaubt(m.stateId, m.subjectId) ? (m.wordLimit ?? false) : false,
     skillFocus: skill,
     grammarTopic: m.grammarTopic,
-    comprehensionFormats: part?.formats ?? [],
+    // Verstehensteile: je Text ein Format, Text 1 → Format 1 … (18.11.2026); Vorgabe 2 Formate
+    comprehensionFormats: part ? teilFormate(part, m.grade, brauchtOriginaltext(exam, part)) : [],
+    einFormatJeText: part ? istVerstehensteil(part.formatId) : false,
     // In der Arbeit wird bewertet, nicht geübt: keine Hilfen und keine Selbsteinschätzung
     differentiation: { levels: 1, mode: 'separate' },
     // In der gymnasialen Oberstufe darf kein von einer KI erfundenes Material verwendet
@@ -154,7 +158,9 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     audioAi: m.audioAi,
     audioFormat: m.audioFormat,
     audioProvider: m.audioProvider,
-    audioModel: m.audioModel
+    audioModel: m.audioModel,
+    // Hörverstehen: so viele Hörtexte wie Formate (je Text ein Format, 18.11.2026)
+    ...(part && formatArt(part.formatId) === 'listening' ? { audioCount: teilFormate(part, m.grade).length } : {})
   }
 }
 
@@ -579,11 +585,13 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
   const m = exam.meta
   const format = formatById(part.formatId)
   const productive = typeof part.contentShare === 'number'
-  const formats = (
-    part.formats?.length ? part.formats : defaultComprehensionFormats(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', m.grade)
-  )
+  const verstehen = istVerstehensteil(part.formatId)
+  const hoeren = formatArt(part.formatId) === 'listening'
+  const formats = teilFormate(part, m.grade, brauchtOriginaltext(exam, part))
     .map((id) => comprehensionFormatById(id)?.label)
     .filter(Boolean)
+  // Je Text ein Format (18.11.2026): so viele Texte wie Formate
+  const texte = verstehen ? Math.max(1, formats.length) : 1
   return [
     `Erstelle Teil ${number} einer Klassenarbeit im Fach ${m.subjectLabel}.`,
     `Thema der Arbeit: ${m.topic}`,
@@ -601,7 +609,17 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
       : part.items && part.items > 0
         ? `Dieser Teil hat GENAU ${part.items} Items und ${part.points} Punkte – ein Punkt je Item. Die Lehrkraft hat die Zahl vorgegeben; halte sie ein und nenne die Punkte je Aufgabe im Feld points.`
         : `Dieser Teil hat insgesamt ${part.points} Punkte. Verteile sie auf die Items und nenne die Punkte je Aufgabe im Feld points.`,
-    ['listening', 'reading'].includes(formatArt(part.formatId) ?? '') && formats.length ? `Benutze diese Aufgabenformate: ${formats.join(', ')}.` : '',
+    verstehen && formats.length
+      ? texte > 1
+        ? [
+            `Dieser Teil hat ${texte} ${hoeren ? 'Hörtexte' : 'Lesetexte'} – je einen für jedes Aufgabenformat, in dieser Reihenfolge: ${formats.map((f, k) => `${hoeren ? 'Hörtext' : 'Lesetext'} ${k + 1} → ${f}`).join(', ')}.`,
+            `Zu jedem Text gibt es GENAU EIN Aufgabenformat (Vorgabe der Lehrkraft); ein Text mit zwei verschiedenen Formaten ist nicht erlaubt. ${hoeren ? '' : 'Die Lesetexte sind verschieden (eigener Inhalt, eigene Textsorte möglich) und je entsprechend kürzer, damit die Bearbeitungszeit reicht. '}Verteile Items und Punkte etwa gleichmäßig auf die Texte.`,
+            hoeren ? '' : 'Reihenfolge: Lesetext 1, dann die Aufgabe zu Lesetext 1, dann Lesetext 2, dann die Aufgabe dazu – und so weiter. Jede Aufgabe nennt in der Arbeitsanweisung ihren Text (M{ref}).'
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : `Benutze ausschließlich dieses Aufgabenformat: ${formats[0]}.`
+      : '',
     `Erlaubte Hilfsmittel: ${m.aids || 'keine'}.`,
     vocabRules(exam),
     partNotes(part),
@@ -622,7 +640,7 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
     '',
     answerKeyRules(exam, part),
     '',
-    `Gib nur die Bausteine dieses Teils zurück (Material und Aufgaben), höchstens ${productive ? 2 : 4} Bausteine.`
+    `Gib nur die Bausteine dieses Teils zurück (Material und Aufgaben), höchstens ${productive ? 2 : Math.max(4, texte * 2 + 1)} Bausteine.`
   ]
     .filter(Boolean)
     .join('\n')
@@ -718,10 +736,11 @@ export async function generateExamPart(
   const profile = profileFor(meta)
   // Hörverstehen: erst den Hörtext schreiben (auf Wunsch mit einem stärkeren Modell),
   // dann die Aufgaben dazu – so passen sie wirklich zum Text.
-  let script: ListeningScript | null = null
+  // Je Format ein eigener Hörtext (18.11.2026): meta.audioCount = Zahl der Formate
+  let script: ListeningScript[] | null = null
   if (formatArt(part.formatId) === 'listening' && wantsListening(meta)) {
     try {
-      script = await writeListeningScript(meta, profile, ai, { provider: meta.audioProvider, model: meta.audioModel })
+      script = await writeListeningScripts(meta, profile, ai, { provider: meta.audioProvider, model: meta.audioModel })
     } catch {
       script = null
     }
@@ -1200,10 +1219,14 @@ async function pruefeFassung(
      * hinweg (render/examWorksheet.ts setzt sie auf ein Blatt). Ein „M3" in Teil 2 kann in Teil 1
      * stehen – gemeldet wurde es trotzdem als fehlend (Paket 12, 26.09.2026).
      */
-    const findings = checkIntegrity(
-      sheet,
-      out.flatMap((p) => p.blocks)
-    )
+    const findings = [
+      ...checkIntegrity(
+        sheet,
+        out.flatMap((p) => p.blocks)
+      ),
+      // Verstehensteile: je Hör-/Lesetext nur ein Aufgabenformat (18.11.2026)
+      ...(istVerstehensteil(part.formatId) ? pruefeEinFormatJeText(part.blocks) : [])
+    ]
     if (!findings.length) continue
     const severe = findings.filter((f) => f.severity === 'hoch')
     if (severe.length) {

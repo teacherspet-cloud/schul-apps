@@ -52,7 +52,8 @@ import { suggestLevel } from '../../../shared/cefr'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
-import { comprehensionFormatById, comprehensionFormatsFor, defaultComprehensionFormats } from '../../arbeitsblatt/didactics/comprehensionFormats'
+import { comprehensionFormatById, comprehensionFormatsFor } from '../../arbeitsblatt/didactics/comprehensionFormats'
+import { VERSTEHEN_FORMATE_MAX, vorgabeFormate } from '../model/verstehensFormate'
 import { findGrammarTopic } from '../../arbeitsblatt/didactics/grammar'
 import GrammatikAuswahl from '../../arbeitsblatt/steps/GrammatikAuswahl'
 import { AIDS_SUGGESTIONS } from '../model/aids'
@@ -848,6 +849,9 @@ export default function FrameStep(): React.JSX.Element {
                                         mt="xs"
                                         size="xs"
                                         label="Aufgabenformate"
+                                        // Je Hör-/Lesetext ein Format (18.11.2026): jedes Format bekommt einen eigenen Text
+                                        description="Je Format ein eigener Text (höchstens 3)."
+                                        maxValues={VERSTEHEN_FORMATE_MAX}
                                         data={comprehensionFormatsFor(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade).map(
                                           (f) => ({
                                             value: f.id,
@@ -856,7 +860,7 @@ export default function FrameStep(): React.JSX.Element {
                                         )}
                                         value={part.formats ?? []}
                                         onChange={(v) => update((d) => (d.parts[i].formats = v))}
-                                        placeholder={defaultComprehensionFormats(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade)
+                                        placeholder={vorgabeFormate(part.formatId, meta.grade)
                                           .map((id) => comprehensionFormatById(id)?.label)
                                           .filter(Boolean)
                                           .join(' · ')}
