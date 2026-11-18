@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ankreuzTeilung, ohneKreuzZeichen } from '../src/renderer/src/modules/arbeitsblatt/render/mcGrid'
+import { ankreuzTeilung, hatEigeneMarke, ohneKreuzZeichen } from '../src/renderer/src/modules/arbeitsblatt/render/mcGrid'
 
 describe('ankreuzTeilung – Kästchen hinter dem Ankreuz-Wort', () => {
   it('setzt hinter „tick"', () => {
@@ -18,6 +18,11 @@ describe('ankreuzTeilung – Kästchen hinter dem Ankreuz-Wort', () => {
     expect(ankreuzTeilung('**Tick** (✔) the correct box.')).toEqual(['**Tick**', ' the correct box.'])
     expect(ohneKreuzZeichen('Mark (x) the right picture.')).toBe('Mark the right picture.')
     expect(ohneKreuzZeichen('Read the text (M1) and answer.')).toBe('Read the text (M1) and answer.')
+  })
+  it('gelöstes Beispiel in der Anweisung: kein zusätzliches Kästchen (18.11.2026)', () => {
+    expect(hatEigeneMarke('Read M{blog}. **Tick** (✓) the correct answer.\n\nExample: How old is Maya? ☐ nine ☑ eleven ☐ ten')).toBe(true)
+    expect(hatEigeneMarke('Read M{blog}. **Tick** (✓) the correct answer.')).toBe(false)
+    expect(hatEigeneMarke('**Tick** the correct answer.')).toBe(false)
   })
   it('nur ganze Wörter, sonst null', () => {
     expect(ankreuzTeilung('Read the ticket and answer the questions.')).toBeNull()

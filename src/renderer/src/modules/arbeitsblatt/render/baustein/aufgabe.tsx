@@ -14,7 +14,7 @@ import { taskItems } from '../../model/items'
 import { exampleNote } from '../../../../shared/exampleNote'
 import { continuedNote } from '../../../../shared/continuedNote'
 import { bereinigeSkizze } from '../../generation/solution'
-import { ankreuzTeilung, istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneKreuzZeichen, ohneOperator } from '../mcGrid'
+import { ankreuzTeilung, hatEigeneMarke, istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneKreuzZeichen, ohneOperator } from '../mcGrid'
 import { linieGebunden, stars, useSetter } from './hilfen'
 import { stufenZeile } from '../../../../shared/verstehen/anzeige'
 import { fundstellen, hoertextZu, hoerzeit } from '../../../../shared/verstehen/hoerzeit'
@@ -54,7 +54,8 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   // Fragenreihe zum Ankreuzen? Dann Gitterdarstellung und Kästchen an der Anweisung.
   const mcListe = istMcListe(block.parts)
   // Das Kästchen an der Anweisung gilt auch für eine einzelne Ankreuzfrage
-  const ankreuzen = istAnkreuzAufgabe(block)
+  // Zeigt die Anweisung schon ein gelöstes Beispiel mit Haken/Kreuz, kommt kein Kästchen dazu (18.11.2026)
+  const ankreuzen = istAnkreuzAufgabe(block) && !hatEigeneMarke(block.instruction ?? '')
   // Kästchen hinter dem Ankreuz-Wort der Anweisung („tick ☒"), wenn es eines gibt (02.11.2026)
   const kreuzTeilung = ankreuzen ? ankreuzTeilung(block.instruction ?? '', block.operator) : null
 
@@ -605,7 +606,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
             ) : (
               <RichText
                 // Mit Kästchen vorn kein zusätzliches „(✓)" im Text (18.11.2026)
-                value={ankreuzen && block.instruction ? ohneKreuzZeichen(block.instruction) : block.instruction}
+                value={istAnkreuzAufgabe(block) && block.instruction ? ohneKreuzZeichen(block.instruction) : block.instruction}
                 editable={schreiben}
                 onChange={set((d, v) => ((d as TaskBlock).instruction = v))}
                 // Ohne Sternchen: Der Platzhalter laeuft jetzt durch RichText und wuerde sie sonst woertlich zeigen

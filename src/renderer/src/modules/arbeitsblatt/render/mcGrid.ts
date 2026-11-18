@@ -119,6 +119,13 @@ const KREUZ_ZEICHEN = /[ \t]*\(\s*(?:✓|✔️?|✗|✘|☒|☑️?|[xX])\s*\)/
 export const ohneKreuzZeichen = (instruction: string): string => instruction.replace(KREUZ_ZEICHEN, '')
 
 /**
+ * Zeigt die Anweisung schon selbst eine Markierung – ein gelöstes Beispiel („Example: … ☐ nine ☑ eleven"), einen Haken
+ * oder ein angekreuztes Kästchen? Dann kommt KEIN zusätzliches Kästchen dazu (18.11.2026, Lehrkraft: entweder ein
+ * angekreuztes Kästchen oder ein Haken, nicht beides).
+ */
+export const hatEigeneMarke = (instruction: string): boolean => /[☑☒✅✓✔]/u.test(ohneKreuzZeichen(instruction))
+
+/**
  * Stelle für das angekreuzte Kästchen IN der Arbeitsanweisung (02.11.2026, Wunsch der Lehrkraft): direkt hinter dem
  * Ankreuz-Wort – „Read M1. Then decide and **tick** ☒ the correct answer …" statt des Kästchens vor dem ganzen Satz.
  * Steht das Wort in einer längeren Fettung („**decide and tick**"), kommt das Kästchen hinter deren Ende, damit die
