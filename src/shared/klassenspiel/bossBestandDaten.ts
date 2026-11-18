@@ -7,12 +7,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "alchemist",
   "band": "5-6",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "alchemist-1113",
   "band": "11-13",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "alchemist-78",
@@ -26,11 +26,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "ballkuenstler",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "ballkuenstler-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "ballkuenstler-78",
@@ -45,12 +47,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "barde",
   "band": "5-6",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "barde-1113",
   "band": "11-13",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "barde-78",
@@ -64,11 +66,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "bogen",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "bogen-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "bogen-78",
@@ -82,11 +86,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "brettfahrer",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "brettfahrer-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "brettfahrer-78",
@@ -100,11 +106,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "eis",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "eis-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "eis-78",
@@ -118,11 +126,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "feuer",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "feuer-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "feuer-78",
@@ -136,11 +146,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "forscher",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "forscher-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "forscher-78",
@@ -155,12 +167,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "gaertner",
   "band": "5-6",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "gaertner-1113",
   "band": "11-13",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "gaertner-78",
@@ -174,11 +186,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "gelehrter",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "gelehrter-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "gelehrter-78",
@@ -193,7 +207,7 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heiler-1113",
   "band": "11-13",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "heiler-78",
@@ -206,6 +220,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "spezial": true
  },
  {
+  "id": "heiler-blumenheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-blumenheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-blumenheiler-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -214,6 +240,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heiler-blumenheiler-910",
   "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-feuerheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-feuerheiler-56",
+  "band": "5-6",
   "rolle": "heiler",
   "rollenposen": true
  },
@@ -230,6 +268,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-kraeuterkundige-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-kraeuterkundige-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-kraeuterkundige-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -242,6 +292,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-kristallheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-kristallheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-kristallheiler-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -250,6 +312,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heiler-kristallheiler-910",
   "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-lichtheiler-1113",
+  "band": "11-13",
   "rolle": "heiler",
   "rollenposen": true
  },
@@ -272,6 +340,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-mondheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-mondheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-mondheiler-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -280,6 +360,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heiler-mondheiler-910",
   "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sangesheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sangesheiler-56",
+  "band": "5-6",
   "rolle": "heiler",
   "rollenposen": true
  },
@@ -296,6 +388,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-sani-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sani-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-sani-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -304,6 +408,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heiler-sani-910",
   "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sternenheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-sternenheiler-56",
+  "band": "5-6",
   "rolle": "heiler",
   "rollenposen": true
  },
@@ -320,6 +436,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-techheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-techheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-techheiler-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -332,6 +460,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-wasserheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-wasserheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-wasserheiler-78",
   "band": "7-8",
   "rolle": "heiler",
@@ -340,6 +480,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heiler-wasserheiler-910",
   "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-windheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-windheiler-56",
+  "band": "5-6",
   "rolle": "heiler",
   "rollenposen": true
  },
@@ -358,16 +510,17 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "heilerin",
   "band": "5-6",
-  "rolle": "heiler"
+  "spezial": true
  },
  {
   "id": "ingenieur",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "ingenieur-1113",
   "band": "11-13",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "ingenieur-78",
@@ -381,11 +534,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "kampfkunst",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "kampfkunst-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "kampfkunst-78",
@@ -399,11 +554,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "klang",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "klang-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "klang-78",
@@ -417,11 +574,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "kletterer",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "kletterer-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "kletterer-78",
@@ -435,11 +594,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "koch",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "koch-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "koch-78",
@@ -453,12 +614,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "lanze",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "lanze-1113",
   "band": "11-13",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "lanze-78",
@@ -472,11 +634,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "magier",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "magier-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "magier-78",
@@ -490,11 +654,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "maler",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "maler-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "maler-78",
@@ -509,7 +675,7 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "ritter-1113",
   "band": "11-13",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "ritter-78",
@@ -523,15 +689,18 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "ritterin",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "rollstuhl-bogen",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "rollstuhl-bogen-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "rollstuhl-bogen-78",
@@ -545,11 +714,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "rollstuhl-tueftler",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "rollstuhl-tueftler-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "rollstuhl-tueftler-78",
@@ -563,11 +734,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "schatten",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "schatten-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "schatten-78",
@@ -581,12 +754,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "schild",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "schild-1113",
   "band": "11-13",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "schild-78",
@@ -600,12 +774,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "schmied",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "schmied-1113",
   "band": "11-13",
-  "rolle": "tank"
+  "spezial": true
  },
  {
   "id": "schmied-78",
@@ -619,11 +794,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "spaeher",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "spaeher-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "spaeher-78",
@@ -637,11 +814,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "sterne",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "sterne-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "sterne-78",
@@ -655,11 +834,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "sturm",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "sturm-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "sturm-78",
@@ -670,6 +851,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "id": "sturm-910",
   "band": "9-10",
   "spezial": true
+ },
+ {
+  "id": "tank-bollwerk-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
  },
  {
   "id": "tank-bollwerk-56",
@@ -686,6 +873,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "tank-bollwerk-910",
   "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-eisenfaust-1113",
+  "band": "11-13",
   "rolle": "tank",
   "rollenposen": true
  },
@@ -708,6 +901,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "tank-felsenherz-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-felsenherz-56",
   "band": "5-6",
   "rolle": "tank",
@@ -722,6 +921,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "tank-felsenherz-910",
   "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-kristallwall-1113",
+  "band": "11-13",
   "rolle": "tank",
   "rollenposen": true
  },
@@ -744,6 +949,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "tank-nebelwacht-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-nebelwacht-56",
   "band": "5-6",
   "rolle": "tank",
@@ -758,6 +969,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "tank-nebelwacht-910",
   "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-panzerbot-1113",
+  "band": "11-13",
   "rolle": "tank",
   "rollenposen": true
  },
@@ -780,6 +997,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "tank-schildkroete-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-schildkroete-56",
   "band": "5-6",
   "rolle": "tank",
@@ -794,6 +1017,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "tank-schildkroete-910",
   "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-schildritter-1113",
+  "band": "11-13",
   "rolle": "tank",
   "rollenposen": true
  },
@@ -816,6 +1045,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "tank-sonnenschild-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-sonnenschild-56",
   "band": "5-6",
   "rolle": "tank",
@@ -830,6 +1065,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "tank-sonnenschild-910",
   "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-sturmwall-1113",
+  "band": "11-13",
   "rolle": "tank",
   "rollenposen": true
  },
@@ -852,6 +1093,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "tank-waechter-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-waechter-56",
   "band": "5-6",
   "rolle": "tank",
@@ -866,6 +1113,12 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  {
   "id": "tank-waechter-910",
   "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wurzelwacht-1113",
+  "band": "11-13",
   "rolle": "tank",
   "rollenposen": true
  },
@@ -889,11 +1142,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "trommler",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "trommler-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "trommler-78",
@@ -907,11 +1162,13 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "tueftler",
-  "band": "5-6"
+  "band": "5-6",
+  "spezial": true
  },
  {
   "id": "tueftler-1113",
-  "band": "11-13"
+  "band": "11-13",
+  "spezial": true
  },
  {
   "id": "tueftler-78",

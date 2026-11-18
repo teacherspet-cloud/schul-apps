@@ -92,7 +92,7 @@ for datei in sorted(os.listdir(ROH)):
         continue
     name = datei[:-4]
     im = Image.open(os.path.join(ROH, datei))
-    if name == "arena" or name.startswith("hg-"):
+    if name == "arena" or name.startswith("hg-") or name.startswith("szene-"):
         # Hintergründe: auf 1600 px Breite, ohne Freistellen
         bild = im.convert("RGB")
         if bild.width > 1600:
@@ -110,6 +110,19 @@ for datei in sorted(os.listdir(ROH)):
     elif name.startswith("rolle-"):
         teile_ = zip(["rolle1", "rolle2"], teile(frei, 2, 1))
         name = "held-" + name[6:]
+    elif name.startswith("bewegung-"):
+        # Klassenspiele (18.11.2026): vier Posen je Figur
+        teile_ = zip(["klettern", "ziehen", "laufen", "jubeln"], teile(frei, 2, 2))
+        name = "held-" + name[9:]
+    elif name.startswith("lager-"):
+        teile_ = zip(["lager", "fahne", "gipfel", "sturm"], teile(frei, 2, 2))
+        name = "ex-" + name[6:]
+    elif name in ("fahnen-a", "fahnen-b"):
+        teile_ = zip(["rot", "blau", "teal", "gelb"] if name == "fahnen-a" else ["lila", "orange", "weiss", "blitz"], teile(frei, 2, 2))
+        name = "fahne"
+    elif name in ("requisiten-a", "requisiten-b"):
+        teile_ = zip(["seil", "ziel", "staub", "pokal"] if name == "requisiten-a" else ["tisch", "podest", "geist", "konfetti"], teile(frei, 2, 2))
+        name = "req"
     elif name.startswith("spezial-"):
         teile_ = [("spezial", frei)]
         name = "held-" + name[8:]
