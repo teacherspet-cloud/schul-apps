@@ -161,6 +161,8 @@ export interface BossEreignis {
   /** Schlag: davon vom Schild abgefangen, Schild gebrochen */
   abgefangen?: number
   bruch?: boolean
+  /** Grundangriff ohne Kugel (18.11.2026) */
+  grund?: boolean
   wert?: number
   slot?: number
   krit?: boolean

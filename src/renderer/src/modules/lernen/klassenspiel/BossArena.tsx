@@ -348,28 +348,35 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       bossPose('angriff', 750)
       stoss(bossPlatz.current, -10, 500)
       const abgefangen = e.abgefangen ?? 0
-      fliegendeKugeln(Math.max(1, Math.round(((e.wert ?? 0) + abgefangen) / 2)), abgefangen > 0 && !(e.wert ?? 0) ? 53 : undefined)
+      // Grundangriff ohne Kugel: eine kleine Kugel, kein Wackeln (18.11.2026)
+      const grund = Boolean(e.grund)
+      fliegendeKugeln(grund ? 1 : Math.max(1, Math.round(((e.wert ?? 0) + abgefangen) / 2)), abgefangen > 0 && !(e.wert ?? 0) ? 53 : undefined)
       setTimeout(() => {
         // Schild der Tanks fängt ab – bricht er, gehen die Tanks kurz in die Knie
         if (abgefangen > 0) {
           const w = schildwand.current
           if (w) (w.classList.remove('blitz'), void w.offsetWidth, w.classList.add('blitz'))
-          zahl(`🛡️ ${Math.round(abgefangen)}`, 53, 34, '#7dd3fc', true)
+          zahl(`🛡️ ${abgefangen < 3 ? Math.round(abgefangen * 10) / 10 : Math.round(abgefangen)}`, 53, 34, '#7dd3fc', !grund)
           if (e.bruch) {
             effekt('schild', 53, 55, 16, 700)
             for (const i of slotsMit('tank')) if (!aktuell.current.ausgang) figurPose(i, 'rolle2', 1300)
           } else for (const i of slotsMit('tank')) if (!aktuell.current.ausgang) figurPose(i, 'rolle1', 650)
         }
         if ((e.wert ?? 0) > 0) {
+          // Grundangriff: nur zwei, drei Figuren zucken – sonst bewegte sich alle paar Sekunden die ganze Klasse
+          const ziele = grund ? new Set(Array.from({ length: Math.min(3, n) }, () => Math.floor(Math.random() * n))) : null
           for (let i = 0; i < n; i++) {
+            if (ziele && !ziele.has(i)) continue
             // Tanks mit gebrochenem Schild bleiben in der Knie-Pose
             if (!aktuell.current.ausgang && !(e.bruch && x.figuren[i]?.rolle === 'tank')) figurPose(i, 'getroffen', 520)
             blitz(figurBilder.current[i], 'ba-rot', 200)
             stoss(figurPlaetzeEl.current[i], -8, 380)
           }
-          effekt('stern', 26, 60, 12, 400)
-          wackeln()
-          zahl(`−${Math.round(e.wert ?? 0)}`, 24, 30, '#f87171', true)
+          effekt('stern', 26, 60, grund ? 8 : 12, 400)
+          if (!grund) wackeln()
+          // Kleine Werte mit einer Nachkommastelle (Grundangriff ≈ 0,4)
+          const w = e.wert ?? 0
+          zahl(`−${w < 3 ? Math.round(w * 10) / 10 : Math.round(w)}`, 24, 30, '#f87171', !grund)
         }
       }, 520)
     } else if (e.art === 'phase') {
@@ -451,7 +458,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
           {!b.ausgang && (
             <>
               {b.texte?.naechster}
-              <b>{b.kugeln.some((k) => k.reif) ? `${sek} s` : '–'}</b>
+              {/* Seit dem Grundangriff (18.11.2026) trifft jeder Takt – die Uhr läuft immer */}
+              <b>{`${sek} s`}</b>
             </>
           )}
         </div>

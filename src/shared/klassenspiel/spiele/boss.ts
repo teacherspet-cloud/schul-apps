@@ -78,7 +78,9 @@ const angreiferZahl = (z: KBasis): number => Object.keys(z.personen).filter((id)
  */
 export const lebenFuer = (z: KBasis): number => {
   const leute = z.einst.bossRollen ? Math.max(1, angreiferZahl(z)) * ANGREIFER_FAKTOR : Object.keys(z.personen).length
-  return Math.max(30, Math.round(leute * z.einst.dauer * 3.2 * (z.einst.schwierigkeit === 'leiter' ? 1.3 : 1)))
+  // Feste Stufe „leicht" (18.11.2026, Simulation): nur einfache Treffer – mit vollem Leben war der Boss bei 78 % nicht in der Zeit zu schaffen
+  const leicht = z.einst.schwierigkeit === 'fest' && z.einst.feste === 'leicht' ? 0.8 : 1
+  return Math.max(30, Math.round(leute * z.einst.dauer * 3.2 * (z.einst.schwierigkeit === 'leiter' ? 1.3 : 1) * leicht))
 }
 /** Mit Rollen schlägt der Boss härter zu – Tanks und Heiler sollen wirklich etwas zu tun haben (Simulation 17.11.2026) */
 export const ROLLEN_BOSSSCHADEN = 2
@@ -86,6 +88,19 @@ export const ROLLEN_BOSSSCHADEN = 2
 export const grundKugel = (z: KBasis): number => Math.min(8, 100 / (Math.max(1, Object.keys(z.personen).length) * z.einst.dauer * 0.8))
 export const schadenJeKugel = (z: KBasis): number =>
   Math.min(z.einst.bossRollen ? 12 : 8, (100 / (Math.max(1, Object.keys(z.personen).length) * z.einst.dauer * 0.8)) * (z.einst.bossRollen ? ROLLEN_BOSSSCHADEN : 1))
+/**
+ * Grundangriff (18.11.2026, Wunsch der Lehrkraft): Der Boss schlägt in JEDEM Takt zu, auch ohne Fehler – vorher kam ein
+ * Angriff nur aus Kugeln (Fehlern), und ohne Fehler stand „Nächster Angriff –". Ausbalanciert über die ganze Spielzeit:
+ * Eine fehlerfreie Klasse verliert so insgesamt etwa 15 % (leicht), 22 % (mittel) bzw. 30 % (schwer) ihres Lebens – der
+ * Boss bleibt besiegbar, Fehler (Kugeln) kommen obendrauf. Schwierigkeit: die feste Stufe, sonst mittel.
+ * FAUSTREGEL: Takte über die Spielzeit mit dem mittleren Takt (10 s) gerechnet.
+ */
+export const GRUND_ANTEIL: Record<'leicht' | 'mittel' | 'schwer', number> = { leicht: 0.15, mittel: 0.22, schwer: 0.3 }
+export const grundAngriff = (z: KBasis): number => {
+  const stufe = z.einst.schwierigkeit === 'fest' && z.einst.feste in GRUND_ANTEIL ? (z.einst.feste as keyof typeof GRUND_ANTEIL) : 'mittel'
+  const takte = Math.max(1, (z.einst.dauer * 60_000) / TAKT_MS[1])
+  return (100 * GRUND_ANTEIL[stufe]) / takte
+}
 export const phaseVon = (z: Boss): number => (z.hp > z.max * 0.66 ? 1 : z.hp > z.max * 0.33 ? 2 : 3)
 
 const zuf = (z: KBasis): number => zufall(z)
@@ -242,8 +257,8 @@ export const boss: KlassenRegeln<Boss> = {
     if (z.ende) return false
     const reif = z.angriffe.filter((k) => !k.getroffen && jetzt >= reifAb(z, k))
     let geaendert = false
-    // Vorwarnung: nur wenn wirklich etwas trifft
-    const warnen = reif.length > 0 && z.naechster - jetzt <= WARNUNG_MS
+    // Vorwarnung vor jedem Schlag (seit dem Grundangriff trifft jeder Takt)
+    const warnen = z.naechster - jetzt <= WARNUNG_MS
     if (warnen !== z.gewarnt) {
       z.gewarnt = warnen
       geaendert = true
@@ -251,17 +266,18 @@ export const boss: KlassenRegeln<Boss> = {
     if (jetzt < z.naechster) return geaendert
     z.naechster = jetzt + TAKT_MS[phaseVon(z) - 1]
     z.gewarnt = false
-    if (!reif.length) return true
     for (const k of reif) k.getroffen = true
-    const gesamt = reif.length * schadenJeKugel(z)
+    // Grundangriff in jedem Takt, Kugeln aus Fehlern obendrauf
+    const gesamt = grundAngriff(z) + reif.length * schadenJeKugel(z)
     // Mit Rollen: der Schild der Tanks fängt zuerst ab
     const abgefangen = Math.min(z.schild ?? 0, gesamt)
     const bruch = abgefangen > 0 && abgefangen >= (z.schild ?? 0) && gesamt > abgefangen
     z.schild = (z.schild ?? 0) - abgefangen
     const schaden = gesamt - abgefangen
     z.held = Math.max(0, z.held - schaden)
-    z.schlag = { nr: ++z.nr, schaden: Math.round(schaden) }
-    ereignis(z, { art: 'schlag', wert: Math.round(schaden * 10) / 10, krit: reif.length > 5, abgefangen: Math.round(abgefangen * 10) / 10, bruch })
+    // Geräte: roter Rand nur bei Kugel-Treffern – sonst flackerte es bei jedem Grundangriff
+    if (reif.length) z.schlag = { nr: ++z.nr, schaden: Math.round(schaden) }
+    ereignis(z, { art: 'schlag', wert: Math.round(schaden * 10) / 10, krit: reif.length > 5, abgefangen: Math.round(abgefangen * 10) / 10, bruch, ...(reif.length ? {} : { grund: true }) })
     if (z.held <= 0) {
       niederlage(z)
       meldung(z, kt(z.sprache, 'boNiederlage', z.boss.name, Math.round(((z.max - z.hp) / z.max) * 100)), 'warn')

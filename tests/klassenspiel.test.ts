@@ -3,6 +3,7 @@ import { gramItems, vokItems, leererInhalt } from '../src/shared/mehrspieler/inh
 import { frageAus } from '../src/shared/mehrspieler/kern'
 import { formatFuer, leiterVon } from '../src/shared/klassenspiel/leiter'
 import { figurenFuer, monsterFuer } from '../src/shared/klassenspiel/bossBestand'
+import { grundAngriff } from '../src/shared/klassenspiel/spiele/boss'
 import type { Band } from '../src/shared/mehrspieler/typen'
 import type { Vokabel } from '../src/shared/vokabeltrainer'
 import { eloSchritt, startTheta, stufenFuer, wahrscheinlichkeit } from '../src/shared/klassenspiel/adaptiv'
@@ -199,6 +200,26 @@ describe('Klassenspiele – Spiele mit 30 Kindern', () => {
     expect(schwach.niederlage).toBe(true)
     expect(KLASSEN_REGELN.boss!.ergebnis(schwach).text).toMatch(/won/)
   })
+  it('Boss-Arena: Grundangriff (18.11.2026) – fehlerfrei bleibt der Boss besiegbar, Schaden nach Schwierigkeit', () => {
+    const lauf = (feste: 'leicht' | 'mittel' | 'schwer') => {
+      const z = spiel('boss', 1, { dauer: 10, schwierigkeit: 'fest', feste }) as KBasis & { held: number; hp: number; ereignisse: { art: string; grund?: boolean }[] }
+      // Ohne Antworten: nur Grundangriffe über die ganze Zeit
+      for (let t = 1000; t <= 10 * 60_000 && !z.ende; t += 1000) kTakt(z, KLASSEN_REGELN.boss!, t)
+      return z
+    }
+    const verlust = (z: { held: number }): number => 100 - z.held
+    const [l, m, s] = [lauf('leicht'), lauf('mittel'), lauf('schwer')]
+    expect(verlust(l)).toBeLessThan(verlust(m))
+    expect(verlust(m)).toBeLessThan(verlust(s))
+    // Phasen bleiben bei 1 (keine Treffer) → Takt 12 s: etwas weniger als der Anteil
+    expect(verlust(s)).toBeLessThanOrEqual(31)
+    expect(verlust(l)).toBeGreaterThan(8)
+    expect(m.ereignisse.some((e) => e.art === 'schlag' && e.grund)).toBe(true)
+    // Mit Antworten: bei Zielquote weiter klarer Sieg
+    const gut = bossLauf(25, 0.78)
+    expect(gut.niederlage).toBe(false)
+    expect(gut.hp).toBe(0)
+  })
   it('Boss-Arena: Beamer kennt Plätze, nie Personen; Fehler nur bei „auch Fehler" mit Platz', () => {
     const z = bossLauf(8, 0.7, 3)
     const b = KLASSEN_REGELN.boss!.beamer(z, 0)[0] as { figuren: unknown[]; ereignisse: { art: string; slot?: number }[] }
@@ -218,10 +239,11 @@ describe('Klassenspiele – Spiele mit 30 Kindern', () => {
     const r = KLASSEN_REGELN.boss!
     z.angriffe.push({ id: 1, item: z.inhalt.vok.items[0].id, von: 'p0', seit: 9_000 })
     r.tick!(z, 12_000)
-    expect(z.held).toBe(100)
+    // Nur der Grundangriff (18.11.2026), die Kugel ist noch nicht reif
+    expect(z.held).toBeCloseTo(100 - grundAngriff(z), 5)
     z.angriffe.push({ id: 2, item: z.inhalt.vok.items[1].id, von: 'p0', seit: 10_000 })
     r.tick!(z, 24_000)
-    expect(z.held).toBeLessThan(100)
+    expect(z.held).toBeLessThan(100 - 2 * grundAngriff(z) - 1)
   })
   it('Fehler kommen wieder (nach 3–5 Aufgaben) und landen in der Fehlerliste', () => {
     const z = spiel('expedition', 1)
@@ -277,9 +299,10 @@ describe('Klassenspiele – Tempo-Schutz (Hämmern auf dem iPad)', () => {
     z.angriffe.push({ id: 99, item: z.inhalt.vok.items[0].id, von: 'p0', seit: 10_000 })
     r.tick!(z, 12_000)
     r.tick!(z, 18_000)
-    expect(z.held).toBe(100)
+    // Bis 18 s nur der Grundangriff (ein Takt), die Kugel trifft erst nach 12 s
+    expect(z.held).toBeCloseTo(100 - grundAngriff(z), 5)
     r.tick!(z, 30_000)
-    expect(z.held).toBeLessThan(100)
+    expect(z.held).toBeLessThan(100 - 2 * grundAngriff(z) - 1)
   })
   it('Boss: jede falsche Antwort lädt eine Kugel, die eigene Wiederholung wehrt sie nicht ab', () => {
     const z = spiel('boss', 1) as KBasis & { angriffe: { item: string; getroffen?: boolean }[]; held: number }
