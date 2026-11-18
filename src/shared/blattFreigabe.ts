@@ -9,6 +9,7 @@
  *  - `blattAbgabeText`: macht aus den Feldern einen lesbaren Text je Aufgabe (für Bogen und KI).
  *  - `aufgabenFeedbackAnfrage`: kurzes Feedback zu EINER Aufgabe, ohne die Lösung zu verraten.
  */
+import { sinngemaesseLuecken } from './blattPruefung'
 import { NICHT_IM_TEXT_REGEL } from './nichtImTextRegel'
 import type { StructuredRequest } from './types'
 import type { AbschriftBefund } from './abschrift'
@@ -143,8 +144,10 @@ export function vorherigesFeedbackText(vorher: NonNullable<FeedbackZusatz['vorhe
  */
 export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder: string[], sprache?: string, zusatz: FeedbackZusatz = {}): StructuredRequest {
   const zeichen = (zusatz.zeichen ?? []).filter((z) => z.zeichen && z.bedeutung && !/✓|\^/.test(z.zeichen))
+  // Verstehensaufgabe mit sinngemäßen Lücken (18.11.2026): Übernahmen aus dem Text sind dort kein Mangel
+  const sinn = sinngemaesseLuecken(a)
   const ab = zusatz.abschrift
-  const abgeschrieben = ab && ab.anteil >= 0.4
+  const abgeschrieben = !sinn && ab && ab.anteil >= 0.4
   // KI-Sicherheitsprüfung (22.10.2026): Text des Kindes zwischen Zufalls-Marken statt <<< >>> (die ein Kind selbst schließen konnte)
   const marke = zusatz.marke ?? neueMarke('ANTWORT')
   return {
@@ -161,9 +164,14 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       '- INHALT VOR FORM: Prüfe, ob der Operator erfüllt ist („nenne" = Stichpunkte genügen; „erkläre", „beschreibe", „beurteile" = Zusammenhänge). Bemängle die Form (Fließtext, Stichpunkte) NUR, wenn die Aufgabe sie ausdrücklich verlangt.',
       '- Keine Allgemeinplätze („Schau noch einmal in die Quelle", „Achte auf Genauigkeit") ohne zu sagen, WORAUF genau.',
       '- markierungen: Stellen der Antwort mit wörtlichem Zitat (1–8 Wörter, genau wie geschrieben): art „lob" für Gelungenes, „fehler" für Falsches, „hinweis" für Unvollständiges; text = kurzer Randkommentar ohne die Lösung. Inhaltlich 1–6 Stellen.',
-      '- SPRACHE WIE IN EINER KORRIGIERTEN ARBEIT: Markiere JEDEN sprachlichen Fehler einzeln (Rechtschreibung, Zeichensetzung, Grammatik, Satzbau, Ausdruck …) als eigene Markierung mit art „fehler", dem Korrekturzeichen im Feld „zeichen" und als Zitat genau das fehlerhafte Wort bzw. die kurze Wortgruppe; text = kurz, was falsch ist (z. B. „das/dass", „Komma vor dem Nebensatz"), ohne die ganze Verbesserung vorzuschreiben. Höchstens 15 Sprachmarkierungen. Inhaltliche Markierungen: „zeichen" leer oder „Inh".',
+      sinn ? '' : '- SPRACHE WIE IN EINER KORRIGIERTEN ARBEIT: Markiere JEDEN sprachlichen Fehler einzeln (Rechtschreibung, Zeichensetzung, Grammatik, Satzbau, Ausdruck …) als eigene Markierung mit art „fehler", dem Korrekturzeichen im Feld „zeichen" und als Zitat genau das fehlerhafte Wort bzw. die kurze Wortgruppe; text = kurz, was falsch ist (z. B. „das/dass", „Komma vor dem Nebensatz"), ohne die ganze Verbesserung vorzuschreiben. Höchstens 15 Sprachmarkierungen. Inhaltliche Markierungen: „zeichen" leer oder „Inh".',
       zeichen.length ? `- Korrekturzeichen (nur diese verwenden): ${zeichen.map((z) => `${z.zeichen} = ${z.bedeutung}`).join('; ')}.` : '',
-      '- EIGENE LEISTUNG: Wörtlich aus dem Material Übernommenes ist KEINE Bearbeitung von Operatoren wie „fasse zusammen", „beschreibe", „erkläre", „ordne ein", „beurteile". Lobe Abgeschriebenes nicht als gelungen; benenne es unter „fehlt" und zeige im nächsten Schritt, wie man in eigenen Worten verdichtet.',
+      sinn
+        ? '- VERSTEHENSAUFGABE MIT LÜCKEN: Bewertet wird NUR, ob jede Ergänzung den Satz inhaltlich passend zum Text vervollständigt. Wörtlich aus dem Text übernommene Wörter sind genauso richtig wie eigene Formulierungen – Abschreiben ist hier KEIN Mangel und senkt die Einschätzung nicht, auch wenn die Anweisung eigene Worte empfiehlt (dann höchstens ein freundlicher Tipp im schritt). Ein anderer Wortlaut als die Musterlösung ist kein Fehler, wenn der Inhalt stimmt. Rechtschreibung und Grammatik zählen nicht: keine Sprachmarkierungen mit art „fehler" (höchstens „hinweis"). Markiere eine Ergänzung nur dann als „fehler", wenn sie inhaltlich nicht stimmt. Gleiche Antwort = gleiches Urteil.'
+        : '',
+      sinn
+        ? ''
+        : '- EIGENE LEISTUNG: Wörtlich aus dem Material Übernommenes ist KEINE Bearbeitung von Operatoren wie „fasse zusammen", „beschreibe", „erkläre", „ordne ein", „beurteile". Lobe Abgeschriebenes nicht als gelungen; benenne es unter „fehlt" und zeige im nächsten Schritt, wie man in eigenen Worten verdichtet.',
       zusatz.nurZeichenflaeche
         ? '- ANTWORTFORM: Diese Aufgabe hat nur eine Zeichenfläche (z. B. Zeitleiste) und KEINE Schreiblinien. Beurteile das Eintragen/Zuordnen/Zeichnen. Verlangt die Anweisung zusätzlich eine Erklärung, bemängle deren Fehlen NICHT – dafür war kein Platz vorgesehen.'
         : '',

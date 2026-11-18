@@ -89,6 +89,7 @@ import {
   einschaetzungAus,
   pruefRunden,
   schluesselBereinigt,
+  sinngemaesseLuecken,
   type AbgabeEintrag,
   type AbgabeFeedback
 } from '../shared/blattPruefung'
@@ -872,7 +873,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           }
           try {
             // Abgeschrieben? (03.10.2026) – nur die eigenen Einträge zählen, ohne Aufgabentext
-            const befund = abschriftZaehlt(aufgabe.anweisung) ? abschrift(eigen, blattText(z.html)) : undefined
+            // Verstehensaufgabe mit sinngemäßen Lücken (18.11.2026): Übernahmen aus dem Text zählen dort nicht als Abschrift
+            const befund = abschriftZaehlt(aufgabe.anweisung) && !sinngemaesseLuecken(aufgabe) ? abschrift(eigen, blattText(z.html)) : undefined
             const fachId = fachAusName((z as Zeile & { fach?: string }).fach ?? '')?.id ?? ''
             // Korrekturzeichen der Lehrkraft (Einstellungen › Material), sonst die Voreinstellung des Fachs
             const einst = (await imNutzer(alsNutzer(lehrkraft), () => aufruf('settings:get', [])).catch(() => undefined)) as Parameters<typeof zeichenFuer>[1]

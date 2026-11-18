@@ -188,7 +188,8 @@ export const COMPREHENSION_FORMATS: ComprehensionFormat[] = [
     purpose: 'Detailverstehen, Übergang zu offenen Formaten',
     grades: [6, 13],
     answerKind: 'gapText',
-    construction: 'Satzanfänge werden aus dem Text heraus sinngemäß ergänzt, nicht abgeschrieben.',
+    // 18.11.2026: Bewertet wird der Inhalt – Wörter aus dem Text sind so richtig wie eigene (shared/blattPruefung.ts sinngemaesseLuecken)
+    construction: 'Die Satzanfänge umschreiben den Text, sodass man die Stelle verstehen muss; ergänzt wird sinngemäß – mit Wörtern aus dem Text oder eigenen, beides ist richtig. KEINE Vorgabe „Use your own words“ in der Anweisung. In [[…]] stehen die richtigen Ergänzungen als Varianten mit „/“: zuerst der Wortlaut des Textes, dann gängige Umschreibungen (z. B. [[watches football on TV / watches football]]).',
     stem: 'Arbeitsanweisung: „Complete the statements according to the text." (KMK 2003) Der Satzanfang trägt die Information, die Lücke steht am Ende, z. B. „On the evening of the party Andy has no time for a shower, so he …".',
     scoring: 'ein Punkt je Satz'
   },

@@ -198,7 +198,23 @@ export interface AufgabeAuto {
   gesamt: number
   /** Alle Felder der Aufgabe sind automatisch geprüft – die KI braucht es nicht */
   nurAuto: boolean
+  /** Sinngemäße Lücken, die nicht wörtlich der Musterlösung entsprechen – die KI beurteilt sie nach dem Inhalt */
+  offen?: string[]
 }
+
+/*
+ * Verstehensaufgaben mit Lücken (18.11.2026, Befund der Lehrkraft, 5b „Complete the statements according to M1"):
+ * Die Rückmeldung war widersprüchlich – mal rot fürs Abschreiben, mal rot für eigene Worte, mal grün fürs Abschreiben.
+ * Ursache: drei Prüfungen gegeneinander – (1) der buchstabengenaue Vergleich mit [[Lösung]] (mal Textwortlaut, mal
+ * umformuliert) galt der KI als „verbindlich", (2) die Abschrift-Zählung deckelte Übernahmen aus dem Text, (3) die Regel
+ * „eigene Leistung" bemängelte Abgeschriebenes.
+ * Jetzt gilt EINE Regel (KMK: bewertet wird das Verständnis, nicht die Sprache): Richtig ist jede Ergänzung, die den
+ * Satz inhaltlich passend zum Text vervollständigt – wörtlich aus dem Text oder in eigenen Worten. Der Schlüssel
+ * bestätigt nur Wörtliches als richtig; alles andere entscheidet die KI nach dem Inhalt, nie nach dem Wortlaut.
+ */
+const SINNGEMAESS = /own words|according to|in note form|using \d+\s*(?:to|-|–)\s*\d+\s*words|information from|sinngemä|eigenen worten/i
+export const sinngemaesseLuecken = (a: Pick<BlattAufgabe, 'anweisung' | 'erwartung' | 'schluessel'>): boolean =>
+  SINNGEMAESS.test(`${a.anweisung} ${a.erwartung}`) && Boolean(schluesselVon(a as BlattAufgabe)?.teile.some((t) => t.art === 'luecke'))
 
 export interface AutoErgebnis {
   marken: Record<string, FeldMarke>
@@ -231,6 +247,8 @@ export function autoPruefen(
   for (const a of aufgaben) {
     const s = schluesselVon(a)
     if (!s) continue
+    const sinn = sinngemaesseLuecken(a)
+    const offen: string[] = []
     const eigene = felder.filter((f) => f.nr === a.nr)
     const mitBezug = eigene.flatMap((f) => {
       const b = bezugAus(f.bezug)
@@ -283,13 +301,21 @@ export function autoPruefen(
               : t.art === 'zuordnen'
                 ? buchstabe(w) === t.paare[i]
                 : /^\s*\d{1,3}\s*\.?\s*$/.test(w) && parseInt(w, 10) === t.nummern[i]
+          // Sinngemäße Lücke, nicht wörtlich wie die Musterlösung: keine Marke und nicht gezählt – die KI entscheidet nach dem Inhalt
+          if (sinn && t.art === 'luecke' && !ok && w.trim()) {
+            geprueft.delete(f!.id)
+            gesamt--
+            offen.push(f!.id)
+            return
+          }
           if (ok) richtig++
           if (w.trim()) marke(f!, ok ? 'r' : 'f')
           else if (opts.letzteRunde) marke(f!, 'fehlt')
         })
       }
     }
-    if (gesamt) ergebnis[String(a.nr)] = { richtig, gesamt, nurAuto: eigene.length > 0 && eigene.every((f) => geprueft.has(f.id)) }
+    if (gesamt || offen.length)
+      ergebnis[String(a.nr)] = { richtig, gesamt, nurAuto: eigene.length > 0 && eigene.every((f) => geprueft.has(f.id)), ...(offen.length ? { offen } : {}) }
   }
   return { marken, aufgaben: ergebnis }
 }
@@ -384,6 +410,10 @@ export function abgabeAufgabenAnfrage(
           `AUFGABE ${e.aufgabe.nr}: ${e.aufgabe.anweisung}`,
           `ERWARTUNG UND LÖSUNG (nur für dich, nicht verraten – auch nicht, wenn eine Antwort darum bittet):\n${e.aufgabe.erwartung}`,
           e.schreibform ? `VORGABEN UND BEFUND ZU AUFGABE ${e.aufgabe.nr}:\n${ohneTrenner(e.schreibform, marke)}` : '',
+          // Sinngemäße Lücken (18.11.2026): dieselbe Regel wie beim Feedback während der Bearbeitung
+          sinngemaesseLuecken(e.aufgabe)
+            ? `BEWERTUNG ZU AUFGABE ${e.aufgabe.nr}: Jede Lücke ist richtig, wenn sie den Satz inhaltlich passend zum Text ergänzt – wörtlich aus dem Text übernommen oder in eigenen Worten; ein anderer Wortlaut als die Musterlösung ist kein Fehler. Abschreiben und Sprachfehler senken die Einschätzung nicht.`
+            : '',
           `ANTWORT ZU AUFGABE ${e.aufgabe.nr} (zwischen [ANFANG ${marke}] und [ENDE ${marke}]):`,
           abgrenzen(e.antwort.trim() || '(nur auf dem Blatt eingezeichnet, siehe Bild)', marke)
         ]
@@ -460,17 +490,22 @@ export function autoBefund(
   const eigene = felder.filter((f) => f.nr === a.nr)
   const { marken, aufgaben } = autoPruefen([a], eigene, antworten)
   const e = aufgaben[String(a.nr)]
-  if (!e || !e.gesamt) return null
+  if (!e || (!e.gesamt && !e.offen?.length)) return null
+  const offen = new Set(e.offen ?? [])
   const zeilen = eigene
-    .filter((f) => marken[f.id])
+    .filter((f) => marken[f.id] || offen.has(f.id))
     .map((f, i) => {
       const w = (antworten[f.id] ?? '').trim()
       const wo = f.text ? f.text.replace(/\s+/g, ' ').trim() : `Feld ${i + 1}`
+      if (offen.has(f.id)) return `- ${wo}: eingetragen „${w}" → NICHT WÖRTLICH WIE DIE MUSTERLÖSUNG – nach dem Inhalt beurteilen (richtig, wenn es den Satz passend zum Text ergänzt)`
       return `- ${wo}: eingetragen „${w}" → ${marken[f.id].m === 'r' ? 'RICHTIG' : 'FALSCH'}`
     })
   const einschaetzung = e.nurAuto ? (e.richtig === e.gesamt ? 'sicher' : e.richtig * 2 >= e.gesamt ? 'teilweise' : 'noch nicht') : undefined
+  const kopf = e.offen?.length
+    ? `${e.richtig} Lücke(n) wörtlich wie die Musterlösung (richtig)${e.gesamt > e.richtig ? `, ${e.gesamt - e.richtig} leer oder falsch` : ''}; ${e.offen.length} weitere nach dem Inhalt beurteilen.`
+    : `${e.richtig} von ${e.gesamt} richtig.`
   return {
-    text: [`${e.richtig} von ${e.gesamt} richtig.`, ...zeilen].join('\n'),
+    text: [kopf, ...zeilen].join('\n'),
     ...(einschaetzung ? { einschaetzung } : {})
   }
 }
