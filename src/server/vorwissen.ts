@@ -79,7 +79,7 @@ export function kursDaten(g: Lerngruppe, nur: Set<string> | null, jetzt = Date.n
       fehler: t.probleme
         .filter((p) => p.typisch[0] && p.loesung && p.quote >= 0.3)
         .slice(0, 2)
-        .map((p) => `${t.thema || t.titel}: „${p.typisch[0]}" statt „${p.loesung}"`)
+        .map((p) => `${t.thema || t.titel}: „${p.typisch[0]}" statt „${p.statt ?? p.loesung}"`)
     })),
     testSchwerpunkte,
     lehrwerk: lehrwerkText(lehrwerkVon(g)),

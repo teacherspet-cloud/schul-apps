@@ -735,6 +735,108 @@ function pruefeGrammatikOhneHinweis(a: GrammatikAufgabe, antwort: string, gewaeh
   return { urteil: 'falsch', richtig }
 }
 
+/**
+ * Eine falsche Antwort lesbar machen (18.11.2026, Befund der Lehrkraft im „Vorwissen der Lerngruppe": „Häufiger Fehler:
+ * Possessivbegleiter: „[0,2,1,4,3]" statt „I my | we our …"").
+ *
+ * Gespeichert wird die Antwort so, wie die Übung sie prüft – bei Zuordnen, Sortieren, Markieren, Lückentext, Mehrfach,
+ * Bestimmen, Tabelle und Richtig/Falsch als JSON (Nummern, Listen). Für Menschen und für die KI, die damit Material
+ * plant, sagt das nichts. Hier wird daraus Text, und zwar nur der FALSCHE Teil samt seiner richtigen Entsprechung:
+ * „uniform → an, horse → an" statt „uniform → a, horse → a".
+ *
+ * null = nichts Brauchbares (unlesbar, z. B. eine beim Speichern auf 60 Zeichen gekürzte JSON-Antwort, oder kein
+ * falscher Teil erkennbar) – dann lieber gar keine Zeile als Zahlensalat.
+ */
+export function fehlerLesbar(a: GrammatikAufgabe, antwort: string): { antwort: string; richtig: string } | null {
+  const roh = String(antwort ?? '').trim()
+  if (!roh) return null
+  const json = /^[[{]/.test(roh)
+  let wert: unknown
+  if (json) {
+    try {
+      wert = JSON.parse(roh)
+    } catch {
+      return null
+    }
+  }
+  const liste = Array.isArray(wert) ? (wert as unknown[]) : []
+  const leer = (s: string | undefined): string => (s && s.trim() ? s.trim() : '–')
+  const ergebnis = (falsch: string[], richtig: string[], trenner = ' | '): { antwort: string; richtig: string } | null =>
+    falsch.length ? { antwort: falsch.join(trenner), richtig: richtig.join(trenner) } : null
+  switch (a.art) {
+    case 'zuordnen': {
+      if (!json) break
+      const paare = a.paare ?? []
+      const idx = paare.map((_, i) => i).filter((i) => Number(liste[i]) !== i)
+      return ergebnis(
+        idx.map((i) => `${paare[i].links} ${leer(paare[Number(liste[i])]?.rechts)}`),
+        idx.map((i) => `${paare[i].links} ${paare[i].rechts}`)
+      )
+    }
+    case 'lueckentext': {
+      if (!json) break
+      const luecken = a.luecken ?? []
+      const idx = luecken.map((_, i) => i).filter((i) => !luecken[i].loesungen.some((l) => gleich(l, String(liste[i] ?? ''))))
+      return ergebnis(
+        idx.map((i) => leer(String(liste[i] ?? ''))),
+        idx.map((i) => luecken[i].loesungen[0] ?? '')
+      )
+    }
+    case 'sortieren': {
+      if (!json) break
+      const el = a.elemente ?? []
+      const gruppen = a.gruppen ?? []
+      const idx = el.map((_, i) => i).filter((i) => Number(liste[i]) !== el[i].gruppe)
+      return ergebnis(
+        idx.map((i) => `${el[i].text} → ${leer(gruppen[Number(liste[i])])}`),
+        idx.map((i) => `${el[i].text} → ${gruppen[el[i].gruppe] ?? ''}`),
+        ', '
+      )
+    }
+    case 'markieren': {
+      if (!json) break
+      const woerter = woerterVon(a.satz)
+      return {
+        antwort: liste.map((i) => woerter[Number(i)]).filter(Boolean).join(', ') || 'nichts markiert',
+        richtig: (a.ziele ?? []).map((i) => woerter[i]).filter(Boolean).join(', ')
+      }
+    }
+    case 'mehrfach':
+      if (!json) break
+      return { antwort: liste.map(String).join(', ') || 'nichts gewählt', richtig: a.loesungen.join(', ') }
+    case 'bestimmen':
+      if (!json) break
+      return {
+        antwort: liste.map((l) => (Array.isArray(l) ? l.join(' ') : String(l))).join(' / ') || 'nichts bestimmt',
+        richtig: (a.lesarten ?? []).map((l) => l.join(' ')).join(' / ')
+      }
+    case 'tabelle': {
+      if (!json) break
+      const falsch: string[] = []
+      const richtig: string[] = []
+      for (const [i, z] of (a.zeilen ?? []).entries())
+        for (const [j, l] of z.loesungen.entries()) {
+          if (!l || z.vorgabe?.[j]) continue
+          const ant = String((liste[i] as unknown[] | undefined)?.[j] ?? '')
+          if (gleich(l, ant) || l.split('/').some((v) => gleich(v, ant))) continue
+          const wo = `${z.name}${a.spalten?.[j] ? ` ${a.spalten[j]}` : ''}`
+          falsch.push(`${wo}: ${leer(ant)}`)
+          richtig.push(`${wo}: ${l}`)
+        }
+      return ergebnis(falsch, richtig)
+    }
+    case 'richtigfalsch': {
+      if (!json || !wert || typeof wert !== 'object') break
+      const w = wert as { richtig?: unknown; wort?: unknown; korrektur?: unknown }
+      const soll = a.korrekt ? 'Satz ist richtig' : `${a.fehlerWort ?? ''} → ${a.loesungen[0] ?? ''}`
+      const sagtRichtig = w.richtig === true || w.richtig === 'true'
+      return { antwort: sagtRichtig ? 'Satz für richtig gehalten' : `${leer(String(w.wort ?? ''))} → ${leer(String(w.korrektur ?? ''))}`, richtig: soll }
+    }
+  }
+  // Textantworten (Lücke, Auswahl, Umformen, Fehler, Satzbau …) sind schon lesbar; JSON bei anderen Arten nicht
+  return json ? null : { antwort: roh, richtig: a.loesungen[0] ?? '' }
+}
+
 /** Ids der Aufgaben als „Vokabeln" – damit Übersicht und Tagesration des Vokabeltrainers sie verwalten können */
 export const alsKarten = (aufgaben: GrammatikAufgabe[]): { id: string; term: string; translation: string }[] =>
   aufgaben.map((a) => ({ id: a.id, term: a.satz || a.form || a.anweisung || a.loesungen[0], translation: a.loesungen[0] }))

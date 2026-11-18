@@ -19,6 +19,7 @@ import {
   paketBereinigt,
   pruefeGrammatik,
   alsKarten,
+  fehlerLesbar,
   type GrammatikAufgabe,
   type GrammatikPaket,
   type GrammatikSpielId
@@ -497,6 +498,14 @@ function lernendeAlle(z: Zeile): NutzerInfo[] {
 
 const karten = (p: GrammatikPaket): Vokabel[] => alsKarten(p.aufgaben) as Vokabel[]
 
+/** Eine gespeicherte falsche Antwort lesbar zählen (18.11.2026) – unlesbare (gekürztes JSON) fallen weg */
+function zaehleFehler(a: GrammatikAufgabe, roh: string, texte: Map<string, number>, statt: Map<string, string>): void {
+  const l = fehlerLesbar(a, roh)
+  if (!l) return
+  texte.set(l.antwort, (texte.get(l.antwort) ?? 0) + 1)
+  if (!statt.has(l.antwort)) statt.set(l.antwort, l.richtig)
+}
+
 /** „Am häufigsten falsch" eines Trainings (ohne Grenze): ab 3 Versuchen mit Fehlern, höchste Fehlerquote zuerst */
 function haeufigFalsch(p: GrammatikPaket, staende: Record<string, WortStand>[]) {
   return p.aufgaben
@@ -504,13 +513,19 @@ function haeufigFalsch(p: GrammatikPaket, staende: Record<string, WortStand>[]) 
       let versuche = 0
       let falsch = 0
       const texte = new Map<string, number>()
+      const statt = new Map<string, string>()
       for (const st of staende) {
         const s = st[a.id]
         if (!s) continue
         versuche += s.versuche
         falsch += s.falsch
-        for (const t of s.fehlerTexte) texte.set(t, (texte.get(t) ?? 0) + 1)
+        // Lesbar statt JSON-Nummern (18.11.2026, shared/grammatiktrainer.ts fehlerLesbar)
+        for (const t of s.fehlerTexte) zaehleFehler(a, t, texte, statt)
       }
+      const typisch = [...texte.entries()]
+        .sort((x, y) => y[1] - x[1])
+        .slice(0, 3)
+        .map(([t]) => t)
       return {
         id: a.id,
         art: a.art,
@@ -519,10 +534,8 @@ function haeufigFalsch(p: GrammatikPaket, staende: Record<string, WortStand>[]) 
         versuche,
         falsch,
         quote: versuche ? falsch / versuche : 0,
-        typisch: [...texte.entries()]
-          .sort((x, y) => y[1] - x[1])
-          .slice(0, 3)
-          .map(([t]) => t)
+        typisch,
+        ...(typisch[0] && statt.get(typisch[0]) ? { statt: statt.get(typisch[0]) } : {})
       }
     })
     .filter((x) => x.versuche >= 3 && x.falsch > 0)
@@ -782,7 +795,10 @@ export function grammatikProfil(n: NutzerInfo, sprache: string, lehrkraftId: str
         e.fachSumme += s.fach
         e.geuebt++
         e.zuletzt = Math.max(e.zuletzt ?? 0, s.zuletzt ?? 0)
-        for (const t of s.fehlerTexte ?? []) e.fehler.push({ antwort: t, richtig: a.loesungen[0] ?? '' })
+        for (const t of s.fehlerTexte ?? []) {
+          const l = fehlerLesbar(a, t)
+          if (l) e.fehler.push(l)
+        }
       }
       e.quote = e.versuche ? richtig / e.versuche : 0
       if (!e.themen.includes(z.thema)) e.themen.push(z.thema)
@@ -1020,7 +1036,8 @@ export function grammatikDerGruppe(
     bank?: boolean
     lernende: number
     aktiv7: number
-    probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
+    /** `statt`: richtige Entsprechung der häufigsten falschen Antwort (bei Zuordnen, Sortieren … nur der falsche Teil) */
+    probleme: { satz: string; loesung: string; quote: number; typisch: string[]; statt?: string }[]
     /** Kurs (Vokabeltraining), zu dem die Grammatik gehört – '' = eigenständig (08.10.2026) */
     vokId: string
     /** Extra-Aufgabe für einzelne (Förder-/Forderaufgabe) */
@@ -1054,7 +1071,8 @@ export function grammatikDerGruppe(
     const lernende = lernendeVon(z)
     let aktiv7 = 0
     const geplant = geplantAb('gram', z.id, jetzt)
-    const jeAufgabe = new Map<string, { versuche: number; falsch: number; texte: Map<string, number> }>()
+    const jeAufgabe = new Map<string, { versuche: number; falsch: number; texte: Map<string, number>; statt: Map<string, string> }>()
+    const aufgabeVon = new Map(p.aufgaben.map((a) => [a.id, a]))
     const anteile = lernende.map((n) => {
       const st = standVon(z.id, n.id)
       // „Sicher" nach der Form-Regel (12.10.2026, shared/grammatikSicher.ts) statt je Aufgabe nach dem Karteikasten
@@ -1062,10 +1080,11 @@ export function grammatikDerGruppe(
       if (st.tage.some((t) => t >= vor7)) aktiv7++
       for (const [id, s] of Object.entries(st.aufgaben)) {
         if (!s.versuche) continue
-        const j = jeAufgabe.get(id) ?? { versuche: 0, falsch: 0, texte: new Map<string, number>() }
+        const j = jeAufgabe.get(id) ?? { versuche: 0, falsch: 0, texte: new Map<string, number>(), statt: new Map<string, string>() }
         j.versuche += s.versuche
         j.falsch += s.falsch
-        for (const t of s.fehlerTexte ?? []) j.texte.set(t, (j.texte.get(t) ?? 0) + 1)
+        const a = aufgabeVon.get(id)
+        if (a) for (const t of s.fehlerTexte ?? []) zaehleFehler(a, t, j.texte, j.statt)
         jeAufgabe.set(id, j)
       }
       // Extras (einzelne Lernende) zählen nicht in den Grammatik-Stand der Person – Geplantes (09.10.2026) auch nicht
@@ -1095,20 +1114,25 @@ export function grammatikDerGruppe(
       geplantAb: geplant,
       probleme: p.aufgaben
         .map((a) => ({ a, j: jeAufgabe.get(a.id) }))
-        .filter((x): x is { a: (typeof p.aufgaben)[number]; j: { versuche: number; falsch: number; texte: Map<string, number> } } =>
+        .filter((x): x is { a: (typeof p.aufgaben)[number]; j: { versuche: number; falsch: number; texte: Map<string, number>; statt: Map<string, string> } } =>
           Boolean(x.j && x.j.versuche >= 3 && x.j.falsch > 0)
         )
         .sort((x, y) => y.j.falsch / y.j.versuche - x.j.falsch / x.j.versuche)
         .slice(0, 5)
-        .map(({ a, j }) => ({
-          satz: a.satz || (a.teile ?? []).join(' / '),
-          loesung: a.loesungen[0] ?? '',
-          quote: j.falsch / j.versuche,
-          typisch: [...j.texte.entries()]
+        .map(({ a, j }) => {
+          const typisch = [...j.texte.entries()]
             .sort((x, y) => y[1] - x[1])
             .slice(0, 2)
             .map(([t]) => t)
-        }))
+          const statt = typisch[0] ? j.statt.get(typisch[0]) : undefined
+          return {
+            satz: a.satz || (a.teile ?? []).join(' / '),
+            loesung: a.loesungen[0] ?? '',
+            quote: j.falsch / j.versuche,
+            typisch,
+            ...(statt ? { statt } : {})
+          }
+        })
     }
   })
   return { trainings, jePerson }
