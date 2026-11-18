@@ -189,6 +189,10 @@ export function singleTaskFocus(meta: WorksheetMeta): boolean {
 }
 
 /** Beschreibung des Auftrags (Thema, Art, Umfang) für Gliederung und Ausformulierung. */
+/** Regel für jede erzeugte Aufgabe (18.11.2026): Anweisung + Beispiel allein ist keine Aufgabe */
+export const VOLLSTAENDIGE_AUFGABE =
+  `VOLLSTÄNDIGE AUFGABEN: Jede Aufgabe enthält ALLE Items, die die Lernenden bearbeiten – Satzanfänge, Lückensätze, Aussagen, Optionen, Paare, Fragen. Sie stehen im Antwortbereich (gapText mit [[Lösung]] je Lücke, statements, options, left/right, items) oder als Teilaufgaben (parts), nie nur in der Lösung. Das Beispiel in der Anweisung zählt nicht als Item. „Complete the statements/sentences" = answer.kind "gapText", gapText enthält jeden Satzanfang als eigene Zeile mit der Lücke am Ende („1 Tom's room is [[small]].").`
+
 export function taskContext(meta: WorksheetMeta, profile: LearnerProfile): string {
   const seiten = seitenBereich(meta)
   const vorgabe = seitenVorgabe(meta)
@@ -208,6 +212,8 @@ export function taskContext(meta: WorksheetMeta, profile: LearnerProfile): strin
   const single = singleTaskFocus(meta)
   return [
     `Thema: ${meta.topic}`,
+    // Gilt für Arbeitsblatt, Klassenarbeit, LZK und jede Einzelerzeugung – alle bauen ihren Auftrag mit taskContext
+    VOLLSTAENDIGE_AUFGABE,
     meta.learningGoals ? `Vorgegebene Lernziele: ${meta.learningGoals}` : '',
     /*
      * Vorwissen nach Wirkung getrennt: voraussetzen, Fehlvorstellungen aufgreifen, nicht

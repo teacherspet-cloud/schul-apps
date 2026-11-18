@@ -128,7 +128,7 @@ const ANSWER = obj({
   diagram: DIAGRAM,
   count: int('lines/labels: Anzahl Linien; grid: Kästchenzeilen'),
   heightMm: int('space: Höhe in mm'),
-  gapText: str('gapText: Text mit [[Lösung]] je Lücke'),
+  gapText: str('gapText: der VOLLSTÄNDIGE Lückentext – jeder Satz bzw. Satzanfang (eigene Zeile) mit [[Lösung]] je Lücke; bei kind gapText nie leer'),
   left: arr(str(), 'matching: linke Seite'),
   right: arr(str(), 'matching: rechte Seite (mit 1–2 überzähligen Einträgen)'),
   pairs: arr(int(), 'matching: Index in right für jedes Element von left'),

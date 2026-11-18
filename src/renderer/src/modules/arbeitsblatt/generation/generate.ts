@@ -8,7 +8,7 @@ import { runLimited } from '../../../shared/async'
 import { obj, str } from '../../../shared/aiSchema'
 import { plainText } from '../../../shared/richtext/parse'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
-import { checkIntegrity, checkListening, checkVideo, setzeVideoAdresse, verschluesseleMaterialverweise } from '../didactics/integrity'
+import { aufgabeOhneInhalt, checkIntegrity, checkListening, checkVideo, setzeVideoAdresse, verschluesseleMaterialverweise } from '../didactics/integrity'
 import { markiereLoesungsbausteine } from '../didactics/loesungsteil'
 import { lernzieleFormulieren } from './lernziele'
 import { useThemen } from '../../../shared/themenbereiche'
@@ -67,6 +67,7 @@ import { expandObserverGroups } from '../render/observerGroups'
 import { linkVideoTasks, sortViewingTasks } from './video'
 // Unregelmäßige Verben (30.09.2026): die App hängt die Aufgaben aus der Verbliste an
 import { mitVerbAufgabe } from './verbAufgabe'
+
 import { blindprobeAktiv, blindprobeBloecke } from '../../../shared/verstehen/blindprobe'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
@@ -470,6 +471,35 @@ export async function regenerateBlock(
   instruction = '',
   art: WunschArt = 'ueberarbeiten'
 ): Promise<WsBlock> {
+  /*
+   * Aufgabe ohne ihre Items (18.11.2026, Befund 5b): Auch das Neuerzeugen lieferte „Complete the statements …" ohne
+   * Sätze – dieser Weg lief an jeder Vollständigkeitsprüfung vorbei. Jetzt: prüfen, einmal mit dem Befund nachfordern,
+   * und wenn auch das nicht hilft, den Befund sichtbar an den Baustein hängen statt still ein leeres Ergebnis zu liefern.
+   */
+  let block = await regenerateBlockEinmal(ws, sheet, blockId, profile, ai, feedback, instruction, art)
+  const umfeld = (b: WsBlock): WsBlock[] => sheet.blocks.map((x) => (x.id === blockId ? b : x))
+  let befunde = aufgabeOhneInhalt(block, umfeld(block))
+  if (!befunde.length) return block
+  const nachforderung = `${feedback ? `${feedback} ` : ''}PFLICHT: ${befunde.join(' ')} Liefere alle Items vollständig.`
+  try {
+    block = await regenerateBlockEinmal(ws, sheet, blockId, profile, ai, nachforderung, instruction, art)
+    befunde = aufgabeOhneInhalt(block, umfeld(block))
+  } catch {
+    // Die erste Fassung bleibt, mit Befund
+  }
+  return befunde.length ? { ...block, warnings: [...(block.warnings ?? []), ...befunde.map((m) => `[Vollständigkeit] ${m}`)] } : block
+}
+
+async function regenerateBlockEinmal(
+  ws: Worksheet,
+  sheet: Sheet,
+  blockId: string,
+  profile: LearnerProfile,
+  ai: AiCall,
+  feedback: string,
+  instruction: string,
+  art: WunschArt
+): Promise<WsBlock> {
   const index = sheet.blocks.findIndex((b) => b.id === blockId)
   const old = sheet.blocks[index]
   /*
@@ -484,7 +514,9 @@ export async function regenerateBlock(
     user: [
       feedback && !instruction
         ? `Überarbeite Baustein (${index + 1}) des folgenden Arbeitsblatts. Behalte Typ${old.type === 'task' ? ', Anforderungsbereich' : ''} und Zweck bei und passe ihn in den Zusammenhang ein.\nZu behebende Probleme: ${feedback}`
-        : `${wunschAuftrag(art, instruction, index + 1)}\nBehalte Typ${old.type === 'task' ? ', Anforderungsbereich' : ''} und Zweck bei und passe ihn in den Zusammenhang des folgenden Arbeitsblatts ein.`,
+        : `${wunschAuftrag(art, instruction, index + 1)}\nBehalte Typ${old.type === 'task' ? ', Anforderungsbereich' : ''} und Zweck bei und passe ihn in den Zusammenhang des folgenden Arbeitsblatts ein.${
+            feedback ? `\nZusätzlich zu beheben: ${feedback}` : ''
+          }`,
       levelInstruction(ws.meta, sheet.stars ?? null, profile),
       taskContext(ws.meta, profile),
       originalSourceRules(ws.meta, sheet.stars ?? null),

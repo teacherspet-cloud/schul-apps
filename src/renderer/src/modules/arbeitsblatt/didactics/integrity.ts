@@ -11,6 +11,7 @@
 import type { Sheet, WorksheetMeta, WsBlock } from '../model/types'
 import { DURING_ANSWER_KINDS, duringPolicy } from './videoTasks'
 import { verweiseUmschreiben } from './aufgabenVerweise'
+import { fehlenderAufgabeninhalt } from './antwortInhalt'
 
 export interface IntegrityFinding {
   /** Baustein, der nachgebessert werden muss */
@@ -331,6 +332,16 @@ export function materialNummern(blocks: WsBlock[]): Map<string, string> {
  * Originaltextes. Die Reihenfolge Aufgabe → Material (Klausur) ist ausdrücklich erlaubt: Es
  * zählt, ob das Material im Dokument steht, nicht ob es davor steht.
  */
+/**
+ * Befunde „Aufgabe ohne ihre Items" (antwortInhalt.ts) – mit Blick ins verwiesene Material: Stehen die Lücken dort
+ * („Fill in the gaps in M2" mit „___" im Text), ist die Aufgabe vollständig.
+ */
+export function aufgabeOhneInhalt(block: WsBlock, dokument: WsBlock[]): string[] {
+  if (block.type !== 'task') return []
+  const material = verwieseneMaterialien(block, dokument, materialNummern(dokument))
+  return fehlenderAufgabeninhalt(block, material.some((m) => /_{3,}|\[\[/.test(JSON.stringify(m))))
+}
+
 export function checkIntegrity(sheet: Sheet, dokument: WsBlock[] = sheet.blocks): IntegrityFinding[] {
   const findings: IntegrityFinding[] = []
   const nummern = materialNummern(dokument)
@@ -367,6 +378,9 @@ export function checkIntegrity(sheet: Sheet, dokument: WsBlock[] = sheet.blocks)
     if (block.type === 'table' && !(block.headers ?? []).some((h) => String(h ?? '').trim()) && !(block.rows ?? []).some((r) => r.some((z) => String(z ?? '').trim()))) {
       findings.push({ blockId: block.id, severity: 'hoch', message: `Die Tabelle${block.title ? ` „${block.title}“` : ''} ist leer – weder Spaltenköpfe noch Zeilen.` })
     }
+
+    // 3c. Aufgabe ohne ihre Items (18.11.2026, Befund 5b: „Complete the statements …" ohne einen einzigen Satz)
+    for (const m of aufgabeOhneInhalt(block, dokument)) findings.push({ blockId: block.id, severity: 'hoch', message: m })
 
     // 4. Gleiche Reihenfolge in zwei Aufzählungen (Vergleichsaufgaben)
     if (block.type === 'text') {
