@@ -268,6 +268,30 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-glockenheiler-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-glockenheiler-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-glockenheiler-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-glockenheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-kraeuterkundige-1113",
   "band": "11-13",
   "rolle": "heiler",
@@ -364,6 +388,54 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "heiler-nordlicht-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-nordlicht-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-nordlicht-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-nordlicht-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-rollstuhl-lichtrad-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-rollstuhl-lichtrad-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-rollstuhl-lichtrad-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-rollstuhl-lichtrad-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
   "id": "heiler-sangesheiler-1113",
   "band": "11-13",
   "rolle": "heiler",
@@ -431,6 +503,30 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "heiler-sternenheiler-910",
+  "band": "9-10",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-taukraut-1113",
+  "band": "11-13",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-taukraut-56",
+  "band": "5-6",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-taukraut-78",
+  "band": "7-8",
+  "rolle": "heiler",
+  "rollenposen": true
+ },
+ {
+  "id": "heiler-taukraut-910",
   "band": "9-10",
   "rolle": "heiler",
   "rollenposen": true
@@ -713,6 +809,26 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "spezial": true
  },
  {
+  "id": "rollstuhl-sternenrad-1113",
+  "band": "11-13",
+  "spezial": true
+ },
+ {
+  "id": "rollstuhl-sternenrad-56",
+  "band": "5-6",
+  "spezial": true
+ },
+ {
+  "id": "rollstuhl-sternenrad-78",
+  "band": "7-8",
+  "spezial": true
+ },
+ {
+  "id": "rollstuhl-sternenrad-910",
+  "band": "9-10",
+  "spezial": true
+ },
+ {
   "id": "rollstuhl-tueftler",
   "band": "5-6",
   "spezial": true
@@ -853,6 +969,30 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "spezial": true
  },
  {
+  "id": "tank-bergwacht-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-bergwacht-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-bergwacht-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-bergwacht-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-bollwerk-1113",
   "band": "11-13",
   "rolle": "tank",
@@ -925,6 +1065,30 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
   "rollenposen": true
  },
  {
+  "id": "tank-glanzschild-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-glanzschild-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-glanzschild-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-glanzschild-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
   "id": "tank-kristallwall-1113",
   "band": "11-13",
   "rolle": "tank",
@@ -992,6 +1156,30 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "tank-panzerbot-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-rollstuhl-schildrad-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-rollstuhl-schildrad-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-rollstuhl-schildrad-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-rollstuhl-schildrad-910",
   "band": "9-10",
   "rolle": "tank",
   "rollenposen": true
@@ -1112,6 +1300,30 @@ export const FIGUREN_DATEN: { id: string; band: BossBand; rolle?: 'tank' | 'heil
  },
  {
   "id": "tank-waechter-910",
+  "band": "9-10",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wellenwall-1113",
+  "band": "11-13",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wellenwall-56",
+  "band": "5-6",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wellenwall-78",
+  "band": "7-8",
+  "rolle": "tank",
+  "rollenposen": true
+ },
+ {
+  "id": "tank-wellenwall-910",
   "band": "9-10",
   "rolle": "tank",
   "rollenposen": true
