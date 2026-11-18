@@ -77,11 +77,64 @@ def zuschneiden(im, rand=12):
     return im.crop((max(0, x0 - rand), max(0, y0 - rand), min(im.width, x1 + rand), min(im.height, y1 + rand)))
 
 
-def teile(im, spalten, zeilen):
+def teile_hart(im, spalten, zeilen):
     w, h = im.size
     for j in range(zeilen):
         for i in range(spalten):
             yield im.crop((i * w // spalten, j * h // zeilen, (i + 1) * w // spalten, (j + 1) * h // zeilen))
+
+
+def teile(im, spalten, zeilen):
+    """Bogen in Felder zerlegen, OHNE Hände, Füße oder Waffen an der Feldgrenze abzuschneiden (18.11.2026: am Beamer
+    fehlten Fuß/Hand). Zusammenhängende Teile gehören ganz zu dem Feld, in dem der größte Teil von ihnen liegt. Berühren
+    sich zwei Posen (ein Teil liegt zu ≥ 30 % in einem zweiten Feld), wird dieses Teil wie früher an der Grenze geteilt."""
+    from collections import deque
+    w, h = im.size
+    al = np.asarray(im.getchannel("A"))
+    K = 4
+    hk, wk = h // K, w // K
+    grob = (al[: hk * K, : wk * K] > 20).reshape(hk, K, wk, K).any(axis=(1, 3))
+    feld_y = np.minimum((np.arange(hk) * K) * zeilen // h, zeilen - 1)
+    feld_x = np.minimum((np.arange(wk) * K) * spalten // w, spalten - 1)
+    feld = feld_y[:, None] * spalten + feld_x[None, :]
+    lab = np.zeros((hk, wk), np.int32)
+    zelle_feld = np.full((hk, wk), -1, np.int32)  # Zuordnung je Rasterzelle
+    n = 0
+    for y0 in range(hk):
+        for x0 in range(wk):
+            if not grob[y0, x0] or lab[y0, x0]:
+                continue
+            n += 1
+            q = deque([(y0, x0)]); lab[y0, x0] = n; zellen = []
+            while q:
+                y, x = q.popleft(); zellen.append((y, x))
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        yy, xx = y + dy, x + dx
+                        if 0 <= yy < hk and 0 <= xx < wk and grob[yy, xx] and not lab[yy, xx]:
+                            lab[yy, xx] = n; q.append((yy, xx))
+            ys, xs = np.array([z[0] for z in zellen]), np.array([z[1] for z in zellen])
+            f = feld[ys, xs]
+            anteile = np.bincount(f, minlength=spalten * zeilen) / len(f)
+            haupt = int(anteile.argmax())
+            if np.sort(anteile)[-2] >= 0.3:
+                zelle_feld[ys, xs] = f  # zwei Posen berühren sich: an der Grenze teilen
+            else:
+                zelle_feld[ys, xs] = haupt
+    voll = np.full((h, w), -1, np.int32)
+    voll[: hk * K, : wk * K] = np.repeat(np.repeat(zelle_feld, K, 0), K, 1)
+    for j in range(zeilen):
+        for i in range(spalten):
+            nr = j * spalten + i
+            a = np.where(voll == nr, al, 0).astype(np.uint8)
+            t = im.copy()
+            t.putalpha(Image.fromarray(a))
+            # Ausschnitt: das eigene Feld, erweitert um alles, was diesem Feld zugeordnet ist
+            ys, xs = np.where(a > 20)
+            x0, y0, x1, y1 = i * w // spalten, j * h // zeilen, (i + 1) * w // spalten, (j + 1) * h // zeilen
+            if len(xs):
+                x0, y0, x1, y1 = min(x0, xs.min()), min(y0, ys.min()), max(x1, xs.max() + 1), max(y1, ys.max() + 1)
+            yield t.crop((x0, y0, x1, y1))
 
 
 POSEN4 = ["ruhe", "angriff", "getroffen", "besiegt"]
