@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ankreuzTeilung } from '../src/renderer/src/modules/arbeitsblatt/render/mcGrid'
+import { ankreuzTeilung, ohneKreuzZeichen } from '../src/renderer/src/modules/arbeitsblatt/render/mcGrid'
 
 describe('ankreuzTeilung – Kästchen hinter dem Ankreuz-Wort', () => {
   it('setzt hinter „tick"', () => {
@@ -11,6 +11,13 @@ describe('ankreuzTeilung – Kästchen hinter dem Ankreuz-Wort', () => {
   it('hinter das Ende einer Fettung', () => {
     expect(ankreuzTeilung('Read M1. Then **decide and tick** the correct answer.')?.[0]).toBe('Read M1. Then **decide and tick**')
     expect(ankreuzTeilung('**Tick** the correct box.')?.[0]).toBe('**Tick**')
+  })
+  it('kein zusätzliches „(✓)" neben dem Kästchen (18.11.2026)', () => {
+    expect(ankreuzTeilung('Read the text. Then tick (✓) the correct answer.')).toEqual(['Read the text. Then tick', ' the correct answer.'])
+    expect(ankreuzTeilung('**Tick (✓)** the correct answer.')?.[0]).toBe('**Tick**')
+    expect(ankreuzTeilung('**Tick** (✔) the correct box.')).toEqual(['**Tick**', ' the correct box.'])
+    expect(ohneKreuzZeichen('Mark (x) the right picture.')).toBe('Mark the right picture.')
+    expect(ohneKreuzZeichen('Read the text (M1) and answer.')).toBe('Read the text (M1) and answer.')
   })
   it('nur ganze Wörter, sonst null', () => {
     expect(ankreuzTeilung('Read the ticket and answer the questions.')).toBeNull()

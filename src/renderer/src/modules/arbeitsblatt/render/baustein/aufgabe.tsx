@@ -14,7 +14,7 @@ import { taskItems } from '../../model/items'
 import { exampleNote } from '../../../../shared/exampleNote'
 import { continuedNote } from '../../../../shared/continuedNote'
 import { bereinigeSkizze } from '../../generation/solution'
-import { ankreuzTeilung, istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
+import { ankreuzTeilung, istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneKreuzZeichen, ohneOperator } from '../mcGrid'
 import { linieGebunden, stars, useSetter } from './hilfen'
 import { stufenZeile } from '../../../../shared/verstehen/anzeige'
 import { fundstellen, hoertextZu, hoerzeit } from '../../../../shared/verstehen/hoerzeit'
@@ -604,7 +604,8 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
               </span>
             ) : (
               <RichText
-                value={block.instruction}
+                // Mit Kästchen vorn kein zusätzliches „(✓)" im Text (18.11.2026)
+                value={ankreuzen && block.instruction ? ohneKreuzZeichen(block.instruction) : block.instruction}
                 editable={schreiben}
                 onChange={set((d, v) => ((d as TaskBlock).instruction = v))}
                 // Ohne Sternchen: Der Platzhalter laeuft jetzt durch RichText und wuerde sie sonst woertlich zeigen

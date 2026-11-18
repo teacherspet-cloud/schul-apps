@@ -112,12 +112,20 @@ export function mcZeilen<T>(items: T[], spalten: number): (T | null)[][] {
 const ANKREUZ_OPERATOREN = ['tick', 'choose', 'select', 'mark', 'kreuze an', 'kreuze', 'ankreuzen', 'wähle', 'coche', 'choisis', 'marca', 'elige', 'segna']
 
 /**
+ * Geschriebenes Ankreuzzeichen in Klammern („Tick (✓) the correct answer") aus der Anweisung nehmen (18.11.2026,
+ * gemeldet von der Lehrkraft): Das Blatt zeigt schon das angekreuzte Kästchen – beides zusammen ist doppelt.
+ */
+const KREUZ_ZEICHEN = /[ \t]*\(\s*(?:✓|✔️?|✗|✘|☒|☑️?|[xX])\s*\)/gu
+export const ohneKreuzZeichen = (instruction: string): string => instruction.replace(KREUZ_ZEICHEN, '')
+
+/**
  * Stelle für das angekreuzte Kästchen IN der Arbeitsanweisung (02.11.2026, Wunsch der Lehrkraft): direkt hinter dem
  * Ankreuz-Wort – „Read M1. Then decide and **tick** ☒ the correct answer …" statt des Kästchens vor dem ganzen Satz.
  * Steht das Wort in einer längeren Fettung („**decide and tick**"), kommt das Kästchen hinter deren Ende, damit die
  * Auszeichnung nicht zerbricht. Ohne Ankreuz-Wort: null (dann bleibt das Kästchen vorn).
  */
 export function ankreuzTeilung(instruction: string, operator = ''): [string, string] | null {
+  instruction = ohneKreuzZeichen(instruction)
   const woerter = [...new Set([operator.trim().toLowerCase(), ...ANKREUZ_OPERATOREN].filter((w) => w && ANKREUZ_OPERATOREN.includes(w)))]
   let ende = -1
   let anfang = Infinity
