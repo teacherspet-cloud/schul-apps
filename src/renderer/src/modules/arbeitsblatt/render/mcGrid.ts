@@ -118,12 +118,17 @@ const ANKREUZ_OPERATOREN = ['tick', 'choose', 'select', 'mark', 'kreuze an', 'kr
 const KREUZ_ZEICHEN = /[ \t]*\(\s*(?:✓|✔️?|✗|✘|☒|☑️?|[xX])\s*\)/gu
 export const ohneKreuzZeichen = (instruction: string): string => instruction.replace(KREUZ_ZEICHEN, '')
 
+
 /**
- * Zeigt die Anweisung schon selbst eine Markierung – ein gelöstes Beispiel („Example: … ☐ nine ☑ eleven"), einen Haken
- * oder ein angekreuztes Kästchen? Dann kommt KEIN zusätzliches Kästchen dazu (18.11.2026, Lehrkraft: entweder ein
- * angekreuztes Kästchen oder ein Haken, nicht beides).
+ * EIN Zeichen für „angekreuzt" (18.11.2026, Befund der Lehrkraft in der Schüleransicht: hinter „tick" fehlte das
+ * Kästchen, im Beispiel stand ein Haken im Kasten, beim Anklicken erschien aber ein Kreuz). Das Blatt kreuzt überall
+ * mit ✗ im Kästchen an – also wird jede Markierung im Beispiel (✓ ✔ ☑ ✅ ✘ ✗) zum angekreuzten Kästchen ☒.
  */
-export const hatEigeneMarke = (instruction: string): boolean => /[☑☒✅✓✔]/u.test(ohneKreuzZeichen(instruction))
+const MARKE = /☑️?|✅|✔️?|✓|✘|✗/gu
+export const einheitlicheMarke = (s: string): string => s.replace(MARKE, '☒')
+
+/** Anweisung einer Ankreuzaufgabe, wie das Blatt sie zeigt: ohne „(✓)" und mit einheitlicher Markierung */
+export const ankreuzAnzeige = (instruction: string): string => einheitlicheMarke(ohneKreuzZeichen(instruction))
 
 /**
  * Stelle für das angekreuzte Kästchen IN der Arbeitsanweisung (02.11.2026, Wunsch der Lehrkraft): direkt hinter dem
@@ -151,7 +156,8 @@ export function ankreuzTeilung(instruction: string, operator = ''): [string, str
     const zu = instruction.indexOf('**', ende)
     if (zu >= 0) ende = zu + 2
   }
-  return [instruction.slice(0, ende), instruction.slice(ende)]
+  // Schreibt die Anweisung selbst ein Kästchen hinter das Wort („tick ☒ the …"), steht es nicht doppelt da
+  return [instruction.slice(0, ende), instruction.slice(ende).replace(/^(\s*)[☒☑✓✔✗✘]️?(?=\s|$)/u, '$1').replace(/^\s{2,}/, ' ')]
 }
 
 /**

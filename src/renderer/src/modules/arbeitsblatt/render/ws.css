@@ -2729,6 +2729,17 @@ html[data-griff-zug] * {
 .ws-gap-zeile .rt-list {
   margin: 0;
 }
+/* Zwischenüberschrift einer Ausfüll-Liste („Maya's flat", 18.11.2026): fett, mit etwas Luft davor */
+.ws-gap-titel {
+  font-weight: 700;
+}
+.ws-gap-zeile + .ws-gap-titel {
+  padding-top: 0.6em;
+}
+/* Listenzeilen einer Ausfüll-Liste: etwas Zeilenluft, damit die Lücken nicht aneinanderstoßen */
+.ws-gap-punkt + .ws-gap-punkt {
+  padding-top: 0.15em;
+}
 .ws-gap-zeile + .ws-gap-absatz,
 .ws-gap-absatz + .ws-gap-zeile,
 .ws-info-absatz + .ws-info-absatz {

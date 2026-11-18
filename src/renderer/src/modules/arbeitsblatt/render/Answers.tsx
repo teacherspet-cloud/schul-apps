@@ -233,7 +233,23 @@ export interface LueckenStueck {
   start: number
   ende: number
   text: string
-  art: 'absatz' | 'punkt' | 'formel'
+  art: 'absatz' | 'punkt' | 'formel' | 'titel'
+}
+
+/*
+ * Ausfüll-Listen (18.11.2026, Befund der Lehrkraft: „Maya's flat 1 Books on Maya's shelves: ___ 2 Colour of the cooker:
+ * ___ Leo's house 3 …" stand in EINER Zeile). Die KI schreibt solche Aufgaben Zeile für Zeile – mit Nummer ohne Punkt
+ * („1 Books …"), als „Stichwort: [[Lösung]]" und mit Zwischenüberschriften. Als Absatz gelesen floss alles zusammen.
+ */
+/** Listenzeile: Aufzählungszeichen, „1." / „1)" oder eine bloße Nummer vor einer Zeile mit Lücke oder Doppelpunkt */
+const istPunktZeile = (z: string): boolean =>
+  /^\s*[-•*]\s+/.test(z) || /^\s*\d+[.)]\s+/.test(z) || (/^\s*\d{1,2}\s+\S/.test(z) && /\[\[|:/.test(z))
+/** „Stichwort: [[Lösung]]" bzw. „Stichwort: … [[Lösung]]" – eine Zeile einer Ausfüll-Liste */
+const istEintragZeile = (z: string): boolean => /^[^.!?\[]{1,60}:\s*\S/.test(z.trim()) && /\[\[/.test(z)
+/** Zwischenüberschrift: kurz, ohne Lücke, ohne Satzende – nur vor einer Listenzeile */
+const istTitelZeile = (z: string): boolean => {
+  const t = z.trim()
+  return t.length > 0 && t.length <= 60 && !/\[\[/.test(t) && !/[.!?,;]$/.test(t) && !istPunktZeile(t)
 }
 
 export function lueckenStuecke(source: string): LueckenStueck[] {
@@ -252,7 +268,7 @@ export function lueckenStuecke(source: string): LueckenStueck[] {
       aus.push({ start: i, ende: i + 1, text: z, art: 'formel' })
       return
     }
-    if (/^\s*[-•*]\s+/.test(z) || /^\s*\d+[.)]\s+/.test(z)) {
+    if (istPunktZeile(z)) {
       schliessen(i)
       aus.push({ start: i, ende: i + 1, text: z, art: 'punkt' })
       return
@@ -260,7 +276,18 @@ export function lueckenStuecke(source: string): LueckenStueck[] {
     if (absatz === null) absatz = i
   })
   schliessen(zeilen.length)
-  return aus
+  // Absätze, deren Zeilen alle „Stichwort: [[Lösung]]" sind (oder Überschriften davor), Zeile für Zeile setzen
+  const fein: LueckenStueck[] = []
+  for (const st of aus) {
+    const zz = zeilen.slice(st.start, st.ende)
+    if (st.art === 'absatz' && zz.length > 1 && zz.every((z) => istEintragZeile(z) || istTitelZeile(z)) && zz.some(istEintragZeile)) {
+      zz.forEach((z, k) => fein.push({ start: st.start + k, ende: st.start + k + 1, text: z, art: 'punkt' }))
+    } else fein.push(st)
+  }
+  // Einzeilige Absätze ohne Lücke direkt vor einer Listenzeile sind Zwischenüberschriften („Maya's flat")
+  return fein.map((st, k) =>
+    st.art !== 'formel' && st.ende - st.start === 1 && istTitelZeile(st.text) && fein[k + 1]?.art === 'punkt' ? { ...st, art: 'titel' } : st
+  )
 }
 
 /**
@@ -501,9 +528,10 @@ export function teilbareAntwort(
       }
     }
     case 'gapText': {
-      // Ein einziger Absatz bleibt die gewohnte Darstellung (siehe AnswerView)
+      // Ein einziger Absatz bleibt die gewohnte Darstellung (siehe AnswerView); ohne Einheiten (innerhalb einer
+      // anderen Einheit) werden dieselben Zeilen gesetzt – sonst flösse eine Ausfüll-Liste in eine Zeile (18.11.2026)
       const stuecke = lueckenStuecke(answer.gapText)
-      if (!einheit || stuecke.length < 2) return null
+      if (stuecke.length < 2) return null
       const renderText = gapRenderText(key)
       const einheiten = stuecke.map((s, i) => (
         <div key={i} className={`ws-gap-zeile ws-gap-${s.art}`} {...u}>

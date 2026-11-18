@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ankreuzTeilung, hatEigeneMarke, ohneKreuzZeichen } from '../src/renderer/src/modules/arbeitsblatt/render/mcGrid'
+import { ankreuzAnzeige, ankreuzTeilung, ohneKreuzZeichen } from '../src/renderer/src/modules/arbeitsblatt/render/mcGrid'
 
 describe('ankreuzTeilung – Kästchen hinter dem Ankreuz-Wort', () => {
   it('setzt hinter „tick"', () => {
@@ -19,10 +19,14 @@ describe('ankreuzTeilung – Kästchen hinter dem Ankreuz-Wort', () => {
     expect(ohneKreuzZeichen('Mark (x) the right picture.')).toBe('Mark the right picture.')
     expect(ohneKreuzZeichen('Read the text (M1) and answer.')).toBe('Read the text (M1) and answer.')
   })
-  it('gelöstes Beispiel in der Anweisung: kein zusätzliches Kästchen (18.11.2026)', () => {
-    expect(hatEigeneMarke('Read M{blog}. **Tick** (✓) the correct answer.\n\nExample: How old is Maya? ☐ nine ☑ eleven ☐ ten')).toBe(true)
-    expect(hatEigeneMarke('Read M{blog}. **Tick** (✓) the correct answer.')).toBe(false)
-    expect(hatEigeneMarke('**Tick** the correct answer.')).toBe(false)
+  it('ein Zeichen für „angekreuzt": Beispiel mit ☒, Kästchen hinter „tick" bleibt (18.11.2026)', () => {
+    const roh = 'Read M{blog}. **Tick** (✓) the correct answer.\n\nExample: How old is Maya? ☐ nine ☑ eleven ☐ ten'
+    expect(ankreuzAnzeige(roh)).toBe('Read M{blog}. **Tick** the correct answer.\n\nExample: How old is Maya? ☐ nine ☒ eleven ☐ ten')
+    expect(ankreuzAnzeige('Example: How old is Maya? ten / eleven ✓ / twelve')).toBe('Example: How old is Maya? ten / eleven ☒ / twelve')
+    expect(ankreuzTeilung(ankreuzAnzeige(roh))?.[0]).toBe('Read M{blog}. **Tick**')
+    // Schreibt die Anweisung selbst ein Kästchen hinters Wort, steht es nicht doppelt da
+    expect(ankreuzTeilung('**Tick** ☒ the correct answer.')).toEqual(['**Tick**', ' the correct answer.'])
+    expect(ankreuzTeilung('Tick ✓ the correct answer.')).toEqual(['Tick', ' the correct answer.'])
   })
   it('nur ganze Wörter, sonst null', () => {
     expect(ankreuzTeilung('Read the ticket and answer the questions.')).toBeNull()

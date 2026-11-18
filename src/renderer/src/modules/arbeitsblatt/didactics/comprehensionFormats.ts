@@ -53,7 +53,7 @@ export const COMPREHENSION_FORMATS: ComprehensionFormat[] = [
     answerKind: 'multipleChoice',
     construction:
       'Drei bis vier Optionen je Item, die Items folgen der Reihenfolge des Textes; die Ablenker sind bei genauem Verständnis klar zu verwerfen, bei oberflächlichem Lesen aber plausibel.',
-    stem: 'Arbeitsanweisung: „Tick the correct answer." (ohne „(✓)" – das Blatt setzt selbst ein angekreuztes Kästchen hinter „tick".) Jedes Item ist eine vollständige FRAGE mit Fragezeichen („What is the writer trying to do in this text?", KMK 2003) oder ein Satzanfang, dessen Lücke am ENDE steht und an den alle Möglichkeiten grammatisch anschließen („Amelia wants to go to Bristol because …", ISB Bayern Jgst. 6).',
+    stem: 'Arbeitsanweisung: „Tick the correct answer." (ohne „(✓)" – das Blatt setzt selbst ein angekreuztes Kästchen hinter „tick"; ein Beispiel markiert die richtige Möglichkeit ebenso mit ☒, nie mit ✓ oder ☑.) Jedes Item ist eine vollständige FRAGE mit Fragezeichen („What is the writer trying to do in this text?", KMK 2003) oder ein Satzanfang, dessen Lücke am ENDE steht und an den alle Möglichkeiten grammatisch anschließen („Amelia wants to go to Bristol because …", ISB Bayern Jgst. 6).',
     scoring: 'ein Punkt je Item'
   },
   {
@@ -81,7 +81,7 @@ export const COMPREHENSION_FORMATS: ComprehensionFormat[] = [
     grades: [5, 10],
     answerKind: 'trueFalse',
     construction: 'Die Aussagen sind in der Regel paraphrasiert (ab Stufe 2); eine wörtlich übernommene Aussage ist bewusst sehr leicht (Stufe 1) und wird so ausgewiesen.',
-    stem: 'Arbeitsanweisung: „True or false? Tick the correct box." (ohne „(✓)".) Jede Aussage ist ein vollständiger Aussagesatz in der 3. Person, positiv formuliert und in der Regel paraphrasiert – nie eine Frage; der Wortlaut des Textes nur bei ausgewiesener Stufe 1.',
+    stem: 'Arbeitsanweisung: „True or false? Tick the correct box." (ohne „(✓)"; ein Beispiel markiert mit ☒, nie mit ✓ oder ☑.) Jede Aussage ist ein vollständiger Aussagesatz in der 3. Person, positiv formuliert und in der Regel paraphrasiert – nie eine Frage; der Wortlaut des Textes nur bei ausgewiesener Stufe 1.',
     scoring: 'ein Punkt je Item'
   },
   {
