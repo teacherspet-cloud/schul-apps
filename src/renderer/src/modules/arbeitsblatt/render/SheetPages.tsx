@@ -426,6 +426,7 @@ export function SheetPages({
                     )
                     return <div key={`frei-${b.id}`}>{box}</div>
                   })}
+                <SeitenVerdichtung massstab={page.massstab}>
                 {page.items.map((placed) => {
                   const block = byId.get(placed.id)
                   if (!block) return null
@@ -459,6 +460,7 @@ export function SheetPages({
                 })}
                 {/* Fußnoten dieser Seite (Blattoptionen „Fußnoten", 01.10.2026) – nur die Anmerkungen der Wörter auf ihr */}
                 {context.anmerkungsArt === 'fussnoten' && <SeitenFussnoten gruppen={fussnotenDerSeite(page, byId)} />}
+                </SeitenVerdichtung>
               </WsContext.Provider>
             </PageFrame>
           )
@@ -923,6 +925,23 @@ function textZeilen(block: TextBlock, unitEls: HTMLElement[], teilen: boolean, f
   return zeilenEinheiten(messungen, je.rest)
 }
 
+/**
+ * Verdichtete Seite (19.11.2026, paginate.ts `VERDICHTEN_MIN`): der Fluss gleichmäßig verkleinert, mittig. Die Hülle ist
+ * um den Kehrwert höher, damit Fußnoten unten (`bottom: 0`) nach dem Verkleinern wieder am Seitenende stehen.
+ */
+function SeitenVerdichtung({ massstab, children }: { massstab?: number; children: React.ReactNode }): React.JSX.Element {
+  if (!massstab || massstab >= 1) return <>{children}</>
+  return (
+    <div
+      className="ws-verdichtet"
+      data-massstab={massstab}
+      style={{ position: 'relative', height: `${100 / massstab}%`, transform: `scale(${massstab})`, transformOrigin: 'top center' }}
+    >
+      {children}
+    </div>
+  )
+}
+
 /** Die Stücke zeilenweise gemessener Materialtexte auf Absätze zurückrechnen (`aufAbsaetze`) */
 function aufTextAbsaetze(plaene: PagePlan[], karten: Map<string, ZeilenStelle[]>): PagePlan[] {
   if (!karten.size) return plaene
@@ -1216,6 +1235,8 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
             headHeight,
             footHeight,
             units,
+            // Materialtexte dürfen ihre Seite leicht verdichten, statt mit wenigen Zeilen umzubrechen (19.11.2026)
+            ...(zeilen ? { verdichtbar: true } : {}),
             ...(noteUnits ? { noteUnits, noteRule } : {}),
             ...(unitGlue.some(Boolean) ? { unitGlue } : {}),
             ...(unitRepeat.some((x) => x > 0) ? { unitRepeat } : {}),

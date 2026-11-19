@@ -1,6 +1,6 @@
 // Worterklärungen bleiben bei ihren Zeilen (19.11.2026, Befund „Welcome to my home!": Erklärungen allein auf Seite 2)
 import { describe, expect, it } from 'vitest'
-import { bindeWorterklaerungen, paginate } from '../src/renderer/src/shared/render/paginate'
+import { bindeWorterklaerungen, paginate, VERDICHTEN_MIN } from '../src/renderer/src/shared/render/paginate'
 
 // 15 Textzeilen à 22 px, Ziffern in Zeile 12 (Index 11), dann die Worterklärungen (50 px) samt Wortzahl (20 px Fuß)
 const zeilen = Array.from({ length: 15 }, () => 22)
@@ -30,5 +30,28 @@ describe('Worterklärungen binden', () => {
     const mit = paginate([{ ...item, unitGlue: bindeWorterklaerungen(units, hatZiffer, [], 1000) }], platz, 1000)
     expect(mit[0].items[0]).toMatchObject({ from: 0, to: 11 })
     expect(mit[1].items[0]).toMatchObject({ from: 11, to: 16 })
+  })
+})
+
+describe('Seite leicht verdichten statt Text zerreißen', () => {
+  const text = { id: 'm1', height: 30 + 15 * 22 + 50 + 20, headHeight: 30, footHeight: 20, units, unitLines: units.map((_, k) => (k < 15 ? 1 : 0)) }
+  const davor = { id: 'kasten', height: 300 }
+  it('fehlt wenig: ganzer Text auf Seite 1, Seite verkleinert, das Folgende auf Seite 2', () => {
+    const platz = 300 + 430 - 40 // 40 px zu wenig
+    const p = paginate([davor, { ...text, verdichtbar: true }, { id: 'a1', height: 100 }], platz, 1000)
+    expect(p[0].items.map((i) => i.id)).toEqual(['kasten', 'm1'])
+    expect(p[0].items[1]).toMatchObject({ from: 0, to: 16 })
+    expect(p[0].massstab).toBeGreaterThanOrEqual(VERDICHTEN_MIN)
+    expect(p[0].massstab).toBeLessThan(1)
+    expect(p[1].items.map((i) => i.id)).toEqual(['a1'])
+  })
+  it('fehlt viel: wird wie bisher geteilt, keine Verkleinerung', () => {
+    const p = paginate([davor, { ...text, verdichtbar: true, unitGlue: bindeWorterklaerungen(units, hatZiffer, [], 1000) }], 300 + 200, 1000)
+    expect(p[0].massstab).toBeUndefined()
+    expect(p[1].items[0]).toMatchObject({ id: 'm1', continued: true })
+  })
+  it('ohne verdichtbar (Aufgaben, Tabellen): nie verkleinert', () => {
+    const p = paginate([davor, text], 300 + 430 - 40, 1000)
+    expect(p[0].massstab).toBeUndefined()
   })
 })

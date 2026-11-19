@@ -57,6 +57,11 @@ export interface MeasuredItem {
    */
   keepTogether?: boolean
   /**
+   * Materialtext (19.11.2026): Fehlt nur wenig, bleibt er ganz auf der Seite – die Seite wird dafür leicht verkleinert
+   * (`PagePlan.massstab`, höchstens auf VERDICHTEN_MIN) statt die letzten Zeilen samt Worterklärungen umzubrechen.
+   */
+  verdichtbar?: boolean
+  /**
    * Beginnt auf einer NEUEN Seite, auch wenn auf der laufenden noch Platz waere.
    *
    * Wunsch der Lehrkraft (24.09.2026) fuer Uebungsklausuren: „fuege bei uebungsklausuren die
@@ -128,7 +133,17 @@ export interface PagePlan {
   overflow: boolean
   /** Seite im Querformat (06.10.2026) */
   quer?: boolean
+  /** Inhalt dieser Seite verkleinert (19.11.2026, `MeasuredItem.verdichtbar`), z. B. 0.94 */
+  massstab?: number
 }
+
+/*
+ * SEITE LEICHT VERDICHTEN STATT TEXT ZERREISSEN (19.11.2026, Befund „Welcome to my home!"): Auf Seite 1 fehlten dem
+ * Lesetext nur vier Zeilen samt Worterklärungen – sie standen allein auf Seite 2, der Text wirkte unvollständig.
+ * Passt der GANZE Materialtext auf die Seite, wenn ihr Inhalt auf höchstens 90 % verkleinert wird, bleibt er dort.
+ * Verkleinert wird gleichmäßig (Breite und Höhe), damit kein neuer Umbruch entsteht und die Messung stimmt.
+ */
+export const VERDICHTEN_MIN = 0.9
 
 const EPS = 0.5
 /** Höchstens so viel einer Seite bleibt leer, wenn Material zusammengehalten wird */
@@ -165,12 +180,15 @@ export function paginate(
   let querJetzt = istQuer(items[0])
   const pages: PagePlan[] = [{ items: [], overflow: false, ...(querJetzt ? { quer: true } : {}) }]
   let remaining = hoehe(0, querJetzt) - (abzug[0] ?? 0)
+  /** Platz der laufenden Seite insgesamt (für das Verdichten) */
+  let kapazitaet = remaining
   /** Steht auf der laufenden Seite schon eine Fußnote? Dann ist ihre Linie schon bezahlt */
   let notenAufSeite = false
   const page = (): PagePlan => pages[pages.length - 1]
   const newPage = (): void => {
     pages.push({ items: [], overflow: false, ...(querJetzt ? { quer: true } : {}) })
     remaining = hoehe(pages.length - 1, querJetzt) - (abzug[pages.length - 1] ?? 0)
+    kapazitaet = remaining
     notenAufSeite = false
   }
   // Höhe der weiteren Seiten im laufenden Format
@@ -207,6 +225,7 @@ export function paginate(
         if (querJetzt) page().quer = true
         else delete page().quer
         remaining = hoehe(pages.length - 1, querJetzt) - (abzug[pages.length - 1] ?? 0)
+        kapazitaet = remaining
       }
     }
     // Erzwungener Umbruch: Das Stueck beginnt oben auf einer neuen Seite
@@ -260,6 +279,21 @@ export function paginate(
       remaining -= h
       notenGesetzt(item, 0, item.noteUnits?.length ?? 0)
       return
+    }
+
+    // Materialtext, dem nur wenig fehlt: ganz auf diese Seite, die Seite leicht verkleinert
+    if (item.verdichtbar && item.units && page().items.length > 0 && !page().massstab && kapazitaet > 0) {
+      const genutzt = kapazitaet - remaining
+      const noetig = genutzt + gesamt(item)
+      const massstab = Math.floor((kapazitaet / noetig) * 1000) / 1000
+      if (massstab >= VERDICHTEN_MIN && massstab < 1) {
+        page().items.push({ id: item.id, from: 0, to: item.units.length, lineStart: 0, lineCount: sum(item.unitLines ?? []) })
+        page().massstab = massstab
+        notenGesetzt(item, 0, item.noteUnits?.length ?? 0)
+        // Die Seite ist voll: Was folgt, beginnt auf der nächsten
+        remaining = 0
+        return
+      }
     }
 
     if (item.units && item.units.length > 1) {

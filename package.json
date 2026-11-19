@@ -1,7 +1,7 @@
 {
   "name": "schul-apps",
   "productName": "Schul-Apps",
-  "version": "0.4.322",
+  "version": "0.4.323",
   "description": "Werkzeuge für Unterrichtsmaterial und Organisatorisches",
   "main": "./out/main/index.js",
   "author": "Torge Kornahrens",

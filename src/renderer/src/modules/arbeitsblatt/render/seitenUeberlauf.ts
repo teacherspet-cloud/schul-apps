@@ -23,7 +23,8 @@ const AUSNAHMEN = '.ws-free, .editor-block-toolbar, .editor-ai-revise-slot, .ws-
  * die Fußnoten hineinragt, zählt als Überlauf und wandert beim nächsten Umbruch weiter.
  */
 export function ueberlaufUnten(flaeche: HTMLElement): number {
-  const fussnoten = Array.from(flaeche.children).find((k) => k.hasAttribute('data-fussnoten-seite'))
+  // Auf einer verdichteten Seite (19.11.2026) stecken die Fußnoten eine Ebene tiefer, in der Hülle `.ws-verdichtet`
+  const fussnoten = flaeche.querySelector(':scope > [data-fussnoten-seite], :scope > .ws-verdichtet > [data-fussnoten-seite]')
   const unterkante = fussnoten ? fussnoten.getBoundingClientRect().top : flaeche.getBoundingClientRect().bottom
   let tiefste = unterkante
   const lauf = (el: Element, clipUnten: number): void => {

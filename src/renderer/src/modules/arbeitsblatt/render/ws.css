@@ -2446,10 +2446,21 @@ html[data-griff-zug] * {
   vertical-align: middle;
 }
 /* Kästchen im Satz hinter dem Ankreuz-Wort (02.11.2026): „tick ☒ the correct answer" – fließt mit dem Text */
+/*
+ * Mittig zur Schrift (19.11.2026, Befund der Lehrkraft: Kästchen saß zu tief, Unterkante unter der Grundlinie, rechts
+ * mehr Luft als links). inline-block mit overflow: hidden hat seine Grundlinie an der Unterkante – so lässt sich die
+ * Mitte genau setzen: 0,3 em der Schrift ringsum über der Grundlinie (zwischen x-Höhe und Großbuchstaben).
+ * Eigene Schrift 0,8 em → 0,375 em hier = 0,3 em draußen. Links ein Wortabstand dazu, weil rechts das Leerzeichen
+ * vor „the" steht.
+ */
 .ws-check-demo.ws-check-im-satz {
-  display: inline-flex;
-  margin: 0 1mm;
-  vertical-align: -0.6mm;
+  display: inline-block;
+  overflow: hidden;
+  box-sizing: border-box;
+  text-align: center;
+  line-height: calc(4.2mm - 0.5mm);
+  vertical-align: calc(0.375em - 2.1mm);
+  margin: 0 0.6mm 0 calc(0.6mm + 0.3em);
 }
 .ws-instruction-geteilt > .rt-inline,
 .ws-instruction-geteilt > .rt-editable-inline {
