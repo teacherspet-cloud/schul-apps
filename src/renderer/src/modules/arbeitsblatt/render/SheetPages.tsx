@@ -10,7 +10,7 @@ import type { Sheet, TextBlock, Worksheet, WorksheetMeta, WsBlock } from '../mod
 import { BlockView, SeitenFussnoten } from './BlockView'
 import { subjectById } from '../model/subjects'
 import { contentInsets, PageFrame, PageInfo } from './PageFrame'
-import { bindeKurzeTabellen, bindeWorterklaerungen, MeasuredItem, notenHoehe, PagePlan, paginate, PlacedItem, tabelleZusammenhalten } from './paginate'
+import { bindeKurzeTabellen, bindeTextzeilen, MeasuredItem, notenHoehe, PagePlan, paginateDicht, PlacedItem, tabelleZusammenhalten } from './paginate'
 import { WsContext, WsContextValue, WsMode, isEditMode, isKeyMode } from './WsContext'
 import { DEFAULT_CITATION_STYLE, formatCitation } from '../../../shared/citation'
 import type { CitationStyle } from '@shared/types'
@@ -926,6 +926,26 @@ function textZeilen(block: TextBlock, unitEls: HTMLElement[], teilen: boolean, f
 }
 
 /**
+ * Worterklärungen unter einem Text (19.11.2026): Höhe jeder Erklärung (Oberkante zu Oberkante, die letzte bis zu ihrer
+ * Unterkante) und der Rahmen der Liste – Abstand darüber, Linie, Innenabstand –, den jedes Stück mit Liste trägt.
+ * `gesamt`: die gemessene Höhe der Liste als Einheit (ohne den Abstand darüber, der steckt in der Zeile davor).
+ */
+function glossarHoehen(glossar: HTMLElement, gesamt: number): { je: Map<number, number>; rahmen: number; gesamt: number; abstand: number } | undefined {
+  const eintraege = Array.from(glossar.querySelectorAll<HTMLElement>(':scope > [data-fn-nr]'))
+  if (!eintraege.length) return undefined
+  const r = eintraege.map((e) => e.getBoundingClientRect())
+  const je = new Map<number, number>()
+  let summe = 0
+  eintraege.forEach((e, i) => {
+    const h = i < r.length - 1 ? r[i + 1].top - r[i].top : r[i].height
+    je.set(Number(e.dataset.fnNr), h)
+    summe += h
+  })
+  const abstand = parseFloat(getComputedStyle(glossar).marginTop) || 0
+  return { je, rahmen: Math.max(0, gesamt - summe) + abstand, gesamt, abstand }
+}
+
+/**
  * Verdichtete Seite (19.11.2026, paginate.ts `VERDICHTEN_MIN`): der Fluss gleichmäßig verkleinert, mittig. Die Hülle ist
  * um den Kehrwert höher, damit Fußnoten unten (`bottom: 0`) nach dem Verkleinern wieder am Seitenende stehen.
  */
@@ -1206,23 +1226,37 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
               else innere.push({ von: k, bis: k + 1 })
             })
           const bindung = innere.length ? bindeKurzeTabellen(units, gebunden, innere, otherHeight) : gebunden
-          // Worterklärungen unter dem Text bleiben bei den Zeilen mit ihren Ziffern (19.11.2026, paginate.ts)
-          const unitGlue =
-            zeilen && unitEls[unitEls.length - 1]?.classList.contains('ws-glossary')
-              ? bindeWorterklaerungen(
-                  units,
-                  zeilen.karte.map((z) => z.noten.length > 0),
-                  bindung,
-                  otherHeight
-                )
-              : bindung
+          /*
+           * WORTERKLÄRUNGEN JE STÜCK (19.11.2026, zweiter Befund „Welcome to my home!"): Wird ein Text geteilt, stehen
+           * unter jedem Stück die Erklärungen SEINER Zeilen (blockview.tsx, `placed.noten`). Gerechnet wird wie bei
+           * Fußnoten: Jede Zeile bringt die Höhe ihrer Erklärungen mit, der Rahmen der Liste (Linie, Abstände) gilt je
+           * Stück (`notenJeStueck`). Die Liste selbst ist nur noch eine leere Einheit am Ende, an der Wortzahl und Quelle
+           * hängen. Bis dahin waren alle Zeilen ab der ersten Ziffer an die Liste gekettet – stand die erste Ziffer in
+           * Zeile 1, blieb von M1 auf Seite 1 nur eine Zeile übrig, der Rest der Seite leer.
+           */
+          const glossar = zeilen ? unitEls[unitEls.length - 1] : undefined
+          const glossarJe = glossar?.classList.contains('ws-glossary') ? glossarHoehen(glossar, units[units.length - 1]) : undefined
+          if (glossarJe) units[units.length - 1] = 0
+          // Zeilen eines Texts: keine einzelne Zeile allein am Seitenende oder -anfang, die letzte geht mit der Liste
+          const unitGlue = zeilen
+            ? bindeTextzeilen(
+                units.length,
+                bindung,
+                Boolean(glossarJe),
+                // Nur vor einem längeren Absatz – in einem Dialog aus lauter Einzeilern entstünde sonst eine lange Kette
+                zeilen.karte.map((_, k, alle) => {
+                  const einzeilig = (j: number): boolean => Boolean(alle[j]?.erste && alle[j]?.letzte && zeilen.lines[j] === 1)
+                  return einzeilig(k) && !einzeilig(k + 1) && (zeilen.lines[k + 1] ?? 0) > 0
+                })
+              )
+            : bindung
           const unitRepeat = (zeilen ? [] : unitEls).map((u) => {
             if (block?.type === 'table' || u.tagName !== 'TR') return 0
             const kopf = u.closest('table')?.tHead
             return kopf ? kopf.getBoundingClientRect().height : 0
           })
-          // Bei Zeilen-Einheiten: Fußnoten bei der Zeile ihrer Ziffer
-          const notenH = block && notenJe.get(block.id)
+          // Bei Zeilen-Einheiten: Fußnoten bzw. Worterklärungen bei der Zeile ihrer Ziffer
+          const notenH = glossarJe?.je ?? (block && notenJe.get(block.id))
           const noteUnits = zeilen
             ? notenH && zeilen.karte.some((z) => z.noten.length)
               ? zeilen.karte.map((z) => z.noten.reduce((a, nr) => a + (notenH.get(nr) ?? 0), 0))
@@ -1231,13 +1265,14 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
           if (zeilen) zeilenKarten.set(id, zeilen.karte)
           items.push({
             id,
-            height,
+            // Die Liste zählt über `noteUnits` samt Rahmen (mit Abstand darüber) – nicht noch einmal im ganzen Baustein
+            height: glossarJe ? height - glossarJe.gesamt - glossarJe.abstand : height,
             headHeight,
             footHeight,
             units,
             // Materialtexte dürfen ihre Seite leicht verdichten, statt mit wenigen Zeilen umzubrechen (19.11.2026)
             ...(zeilen ? { verdichtbar: true } : {}),
-            ...(noteUnits ? { noteUnits, noteRule } : {}),
+            ...(noteUnits ? (glossarJe ? { noteUnits, noteRule: glossarJe.rahmen, notenJeStueck: true } : { noteUnits, noteRule }) : {}),
             ...(unitGlue.some(Boolean) ? { unitGlue } : {}),
             ...(unitRepeat.some((x) => x > 0) ? { unitRepeat } : {}),
             /*
@@ -1286,7 +1321,7 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       const k = layoutKey(sheet.id, key)
       const abzugHier = abzug.get(k) ?? []
       const plaene = linienAuffuellen(
-        paginate(items, firstHeight, otherHeight, abzugHier, querHoehen),
+        paginateDicht(items, firstHeight, otherHeight, abzugHier, querHoehen),
         items,
         sheet,
         (seite, quer) => (quer && querHoehen ? (seite === 0 ? querHoehen.erste : querHoehen.weitere) : seite === 0 ? firstHeight : otherHeight),

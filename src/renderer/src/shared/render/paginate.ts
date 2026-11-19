@@ -48,6 +48,11 @@ export interface MeasuredItem {
   noteUnits?: number[]
   /** Linie und Abstand über dem Fußnotenbereich – einmal je Seite, sobald dort eine Fußnote steht */
   noteRule?: number
+  /**
+   * Worterklärungen unter jedem Stück (19.11.2026, Blattoptionen „unter dem Text"): `noteUnits` sind dann die
+   * Erklärungen der Zeilen, `noteRule` der Rahmen der Liste – er gilt je Stück, nicht einmal je Seite.
+   */
+  notenJeStueck?: boolean
   /** Nicht allein am Seitenende stehen lassen (z. B. Abschnittsüberschrift) */
   keepWithNext?: boolean
   /**
@@ -144,6 +149,12 @@ export interface PagePlan {
  * Verkleinert wird gleichmäßig (Breite und Höhe), damit kein neuer Umbruch entsteht und die Messung stimmt.
  */
 export const VERDICHTEN_MIN = 0.9
+/**
+ * Stärker verdichten (bis 85 %) nur, wenn das Blatt dadurch eine Seite kürzer wird (19.11.2026, `paginateDicht`):
+ * Fehlte M1 knapp 90 % zum Bleiben, rutschte der Rest auf Seite 2 und nahm dort einer Aufgabe mit Tabelle den Platz
+ * – sie wanderte weiter, Seite 2 blieb zu einem Drittel leer, das Blatt hatte fünf statt vier Seiten.
+ */
+export const VERDICHTEN_SPAR = 0.85
 
 const EPS = 0.5
 /** Höchstens so viel einer Seite bleibt leer, wenn Material zusammengehalten wird */
@@ -171,7 +182,9 @@ export function paginate(
   otherPageHeight: number,
   abzug: readonly number[] = [],
   /** Höhen der Querseiten – ohne sie bleibt alles hoch */
-  querHoehen?: Seitenhoehen
+  querHoehen?: Seitenhoehen,
+  /** Kleinster Maßstab beim Verdichten eines Materialtexts */
+  verdichtenMin = VERDICHTEN_MIN
 ): PagePlan[] {
   const istQuer = (it: MeasuredItem | undefined): boolean => Boolean(querHoehen && it?.quer)
   /** Platz einer Seite (0-basiert) im jeweiligen Format */
@@ -196,7 +209,7 @@ export function paginate(
   /** Platz für die Fußnoten der Einheiten [von, bis) auf der laufenden Seite – samt Linie, wenn sie die ersten sind */
   const noten = (it: MeasuredItem, von: number, bis: number): number => {
     const h = notenHoehe(it, von, bis)
-    return h > 0 ? h + (notenAufSeite ? 0 : (it.noteRule ?? 0)) : 0
+    return h > 0 ? h + (notenAufSeite && !it.notenJeStueck ? 0 : (it.noteRule ?? 0)) : 0
   }
   /** Ganzer Baustein samt seinen Fußnoten */
   const gesamt = (it: MeasuredItem): number => it.height + noten(it, 0, it.noteUnits?.length ?? 0)
@@ -286,7 +299,7 @@ export function paginate(
       const genutzt = kapazitaet - remaining
       const noetig = genutzt + gesamt(item)
       const massstab = Math.floor((kapazitaet / noetig) * 1000) / 1000
-      if (massstab >= VERDICHTEN_MIN && massstab < 1) {
+      if (massstab >= verdichtenMin && massstab < 1) {
         page().items.push({ id: item.id, from: 0, to: item.units.length, lineStart: 0, lineCount: sum(item.unitLines ?? []) })
         page().massstab = massstab
         notenGesetzt(item, 0, item.noteUnits?.length ?? 0)
@@ -403,23 +416,35 @@ export function bindeKurzeTabellen(units: readonly number[], glue: readonly bool
 }
 
 /*
- * WORTERKLÄRUNGEN BLEIBEN BEI IHREN ZEILEN (19.11.2026, Befund „Welcome to my home!"): Alle Textzeilen standen auf
- * Seite 1, die Worterklärungen darunter passten nicht mehr und standen allein auf Seite 2 („M1 (Fortsetzung)") – die
- * Lernenden suchten „At night¹" vergeblich. Jetzt sind die Zeilen ab der ERSTEN mit einer Ziffer bis zu den
- * Erklärungen aneinander gebunden: Passt das nicht mehr, wandern sie gemeinsam. Damit ein langer Text mit einer
- * Ziffer in Zeile 2 nicht ganz wandert, umfasst die Bindung höchstens eine halbe Seite – die Erklärungen stehen nie
- * allein, mindestens die letzte Zeile geht mit.
- * `hatZiffer[k]`: Einheit k (Zeile) trägt eine Anmerkungsziffer; die LETZTE Einheit sind die Worterklärungen.
+ * ZEILEN EINES MATERIALTEXTS BINDEN (19.11.2026, zwei Befunde „Welcome to my home!"):
+ * - Keine einzelne Zeile allein: Die ersten beiden Zeilen gehen zusammen (kein Schusterjunge unten auf der Seite),
+ *   ebenso die letzten beiden (kein Hurenkind oben auf der nächsten) – nur bei Texten ab vier Zeilen.
+ * - Die LETZTE Zeile geht mit dem Ende des Texts (Worterklärungen, Wortzahl, Quelle): `mitListe` = die letzte
+ *   Einheit ist die Liste der Worterklärungen (Höhe 0, ihre Einträge zählen bei den Zeilen ihrer Ziffern).
+ * - Ein Absatz aus genau EINER Zeile (Sprecher „Mia", Zwischenüberschrift) bleibt bei der Zeile danach
+ *   (`einzeilig[k]`).
+ * Die Worterklärungen selbst stehen seitdem unter JEDEM Stück – je die seiner Zeilen (SheetPages `glossarHoehen`).
+ * Vorher waren alle Zeilen ab der ersten Ziffer an die Liste gekettet; stand die erste Ziffer in Zeile 1, blieb von
+ * M1 auf Seite 1 nur eine Zeile, der Rest der Seite leer.
  */
-export function bindeWorterklaerungen(units: readonly number[], hatZiffer: readonly boolean[], glue: readonly boolean[], seitenhoehe: number): boolean[] {
-  const n = units.length
+export function bindeTextzeilen(n: number, glue: readonly boolean[], mitListe: boolean, einzeilig: readonly boolean[] = []): boolean[] {
   const aus = Array.from({ length: n }, (_, k) => Boolean(glue[k]))
-  if (n < 2) return aus
-  let von = hatZiffer.slice(0, n - 1).findIndex(Boolean)
-  if (von < 0) von = n - 2
-  while (von < n - 2 && sum(units.slice(von, n) as number[]) > seitenhoehe / 2) von++
-  for (let k = von; k < n - 1; k++) aus[k] = true
+  const zeilen = mitListe ? n - 1 : n
+  for (let k = 0; k < zeilen - 1; k++) if (einzeilig[k]) aus[k] = true
+  if (mitListe && zeilen >= 1) aus[zeilen - 1] = true
+  if (zeilen >= 4) {
+    aus[0] = true
+    aus[zeilen - 2] = true
+  }
   return aus
+}
+
+/** Wie `paginate` – stärker verdichtet (VERDICHTEN_SPAR) nur, wenn das Blatt dadurch weniger Seiten braucht */
+export function paginateDicht(items: MeasuredItem[], firstPageHeight: number, otherPageHeight: number, abzug: readonly number[] = [], querHoehen?: Seitenhoehen): PagePlan[] {
+  const normal = paginate(items, firstPageHeight, otherPageHeight, abzug, querHoehen)
+  if (!items.some((i) => i.verdichtbar)) return normal
+  const dichter = paginate(items, firstPageHeight, otherPageHeight, abzug, querHoehen, VERDICHTEN_SPAR)
+  return dichter.length < normal.length ? dichter : normal
 }
 
 function sum(values: number[]): number {

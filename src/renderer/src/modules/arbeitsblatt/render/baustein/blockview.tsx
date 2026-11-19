@@ -799,7 +799,15 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
    * nach Zeilen, also auch mitten im Absatz.
    */
   const showHead = placed ? !placed.continued : from === 0
-  const showGlossary = !fussModus && anm.anmerkungen.length > 0 && to > paragraphs.length
+  /*
+   * WORTERKLÄRUNGEN JE STÜCK (19.11.2026): Zeilenweise geteilt weiß das Stück, welche Ziffern auf ihm stehen
+   * (`placed.noten`) – unter ihm stehen genau deren Erklärungen, auch unter dem ersten Stück. So bleibt die Seite
+   * voll, und jede Erklärung steht auf der Seite ihres Worts. Ohne diese Angabe (nach Absätzen geteilt) wie bisher
+   * alle unter dem letzten Stück.
+   */
+  const stueckNoten = placed?.noten
+  const glossarEintraege = stueckNoten ? anm.anmerkungen.filter((a) => stueckNoten.includes(a.nr)) : anm.anmerkungen
+  const showGlossary = !fussModus && glossarEintraege.length > 0 && (stueckNoten ? true : to > paragraphs.length)
   const lineStart = placed?.lineStart ?? 0
   const lineCount = placed?.lineCount ?? 0
   // Endet das Stück mitten im letzten Absatz, folgen Wortzahl und Quelle erst unter dem Rest (02.10.2026)
@@ -949,7 +957,7 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
         {showGlossary && (
           <div data-unit className="ws-glossary">
             {/* Fußnoten und Worthilfen in EINER Zählung, jede mit ihrer hochgestellten Ziffer (01.10.2026) */}
-            {anm.anmerkungen.map((a) => (
+            {glossarEintraege.map((a) => (
               <AnmerkungZeile key={`${a.art}-${a.index}`} block={block} a={a} />
             ))}
           </div>
