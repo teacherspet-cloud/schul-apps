@@ -94,6 +94,16 @@ try {
 
   // ---------- Lehrkraft: Startfenster mit Einstellung „Eigene Figur reagiert auf …"
   const p = await lk.newPage()
+  // Klangbild (19.11.2026): jedes Abspielen am Beamer mitschreiben
+  await p.addInitScript(() => {
+    window.__klang = []
+    const play = HTMLMediaElement.prototype.play
+    HTMLMediaElement.prototype.play = function () {
+      window.__klang.push(this.dataset.klang || String(this.currentSrc || this.src).split('/').pop())
+      return play.call(this)
+    }
+  })
+  const klang = () => p.evaluate(() => window.__klang.join(' '))
   await p.goto(A)
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
@@ -129,6 +139,8 @@ try {
   pruefe(boese.status === 400, `Unbekannte Figur abgewiesen (${boese.status})`)
   pruefe(await da(p.locator('[data-klassenspiel-figuren="3"]')), 'Beamer zeigt im Warteraum die drei gewählten Figuren')
   await p.screenshot({ path: join(out, '3-beamer-lobby.png') })
+  pruefe(await da(p.locator('[data-klassenspiel-klang="an"]')), 'Beamer: Klang-Schalter im Kopf')
+  pruefe(/musik-spannung/.test(await klang()), 'Warteraum: Spannungsmusik läuft')
 
   // ---------- Start: Arena
   await p.locator('[data-klassenspiel-start-knopf]').click()
@@ -194,6 +206,9 @@ try {
   const hpNachher = Number(await p.locator('[data-boss-arena]').getAttribute('data-beamer-boss'))
   pruefe(hpNachher <= hpVorher, `Boss-Leben ${hpVorher} → ${hpNachher}`)
   await p.screenshot({ path: join(out, '7-beamer-treffer.png') })
+  const k = await klang()
+  pruefe(/musik-kampf-\d/.test(k), 'Kampf: Kampfmusik läuft')
+  pruefe(/sfx-(treffer|krit)/.test(k) && /sfx-schlag/.test(k), `Kampf: Geräusche zu Treffern und Schlägen (${(k.match(/sfx-[a-z]+/g) ?? []).length} Geräusche)`)
 
   // Ende und nochmal: Mias Wahl bleibt
   await p.locator('[data-klassenspiel-beenden]').click()

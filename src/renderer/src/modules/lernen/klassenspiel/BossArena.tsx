@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { BBlockBoss, BossEreignis } from '@shared/klassenspiel/kern'
 import { bossBild, figurBild, type FigurPose } from './bossBilder'
+import { klangbild } from './klangbild'
 
 const RING_FARBEN = ['#f59e0b', '#38bdf8', '#f472b6', '#a3e635', '#c084fc', '#fb7185', '#2dd4bf', '#facc15']
 
@@ -298,6 +299,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       wer.slice(0, 8).forEach((i, k) => setTimeout(() => angriffVon(i), k * 50))
       for (const i of slots) blitz(figurBilder.current[i], 'ba-gold', 380)
       setTimeout(() => {
+        klangbild.ton(krit || anzahl > 3 ? 'krit' : 'treffer')
+        if (anzahl > 1) setTimeout(() => klangbild.ton('treffer', 0.8), 110)
         bossPose('getroffen', krit || anzahl > 3 ? 520 : 320)
         blitz(bossImg.current, 'ba-weiss')
         stoss(bossPlatz.current, 4, 220)
@@ -307,16 +310,19 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
         if (krit) wackeln()
       }, 160)
     } else if (e.art === 'abwehr') {
+      klangbild.ton('abwehr', 0.8)
       const p = e.slot !== undefined ? plaetze[e.slot] : null
       effekt('schild', p ? p.x + 4 : 40, p ? 100 - p.b - p.h / 2 : 60, p ? 12 : 20, 600)
       if (e.slot !== undefined && x.figuren[e.slot]?.rolle === 'tank') figurPose(e.slot, 'rolle1', 700)
     } else if (e.art === 'aufstieg') {
+      klangbild.ton('aufstieg', 0.7)
       if (e.slot !== undefined) {
         blitz(figurBilder.current[e.slot], 'ba-gold', 900)
         const p = plaetze[e.slot]
         if (p) zahl('⬆', p.x, 100 - p.b - p.h - 2, '#fde047', false)
       }
     } else if (e.art === 'fehler') {
+      klangbild.ton('fehler', 0.6)
       if (e.slot !== undefined) {
         figurPose(e.slot, 'getroffen', 450)
         blitz(figurBilder.current[e.slot], 'ba-rot', 220)
@@ -330,6 +336,7 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
         summe += w.wert ?? 0
         if (w.slot !== undefined) slots.push(w.slot)
       }
+      klangbild.ton(e.art, 0.85)
       const quelle = slots.length ? slots : slotsMit(e.art === 'schild' ? 'tank' : 'heiler').slice(0, 1)
       const viele = new Set(quelle).size > 1
       for (const i of [...new Set(quelle)].slice(0, 6)) {
@@ -352,10 +359,13 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       const grund = Boolean(e.grund)
       fliegendeKugeln(grund ? 1 : Math.max(1, Math.round(((e.wert ?? 0) + abgefangen) / 2)), abgefangen > 0 && !(e.wert ?? 0) ? 53 : undefined)
       setTimeout(() => {
+        klangbild.ton('schlag', grund ? 0.5 : 1)
+        if (!grund) klangbild.ducken(900, 0.55)
         // Schild der Tanks fängt ab – bricht er, gehen die Tanks kurz in die Knie
         if (abgefangen > 0) {
           const w = schildwand.current
           if (w) (w.classList.remove('blitz'), void w.offsetWidth, w.classList.add('blitz'))
+          klangbild.ton(e.bruch ? 'bruch' : 'abwehr', 0.8)
           zahl(`🛡️ ${abgefangen < 3 ? Math.round(abgefangen * 10) / 10 : Math.round(abgefangen)}`, 53, 34, '#7dd3fc', !grund)
           if (e.bruch) {
             effekt('schild', 53, 55, 16, 700)
@@ -381,6 +391,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       }, 520)
     } else if (e.art === 'phase') {
       if (bossImg.current) bossImg.current.src = bossBild(bossRuhe(x)) ?? ''
+      klangbild.ton('phase')
+      klangbild.ducken(2200, 0.35)
       zeigeBanner(e.wert === 2 ? x.texte?.ruestung ?? '' : x.texte?.raserei ?? '', 2200)
       wackeln()
     } else if (e.art === 'spezial') {
@@ -388,6 +400,8 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
       const angreifer = x.rollen ? slotsMit('angreifer') : Array.from({ length: n }, (_, i) => i)
       angreifer.forEach((i, k) => setTimeout(() => angriffVon(i, true), (k % 8) * 50))
       setTimeout(() => {
+        klangbild.ton('spezial')
+        klangbild.ducken(1600, 0.4)
         effekt('stern', BOSS_PLATZ.x - 2, 45, 30, 700)
         bossPose('getroffen', 520)
         blitz(bossImg.current, 'ba-weiss', 300)
@@ -415,7 +429,11 @@ export function BossArena({ b }: { b: BBlockBoss }): React.JSX.Element {
   // Vorwarnung als Banner (einmal je Warnung)
   const warnungVorher = useRef(false)
   useEffect(() => {
-    if (b.warnung && !warnungVorher.current) zeigeBanner(b.texte?.holtAus ?? '', 1600)
+    if (b.warnung && !warnungVorher.current) {
+      zeigeBanner(b.texte?.holtAus ?? '', 1600)
+      klangbild.ton('bruellen')
+      klangbild.ducken(1300, 0.5)
+    }
     warnungVorher.current = b.warnung
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b.warnung])

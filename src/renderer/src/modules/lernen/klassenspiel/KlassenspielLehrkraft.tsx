@@ -16,6 +16,7 @@ import {
   Loader,
   Modal,
   Paper,
+  Popover,
   ScrollArea,
   SegmentedControl,
   SimpleGrid,
@@ -30,9 +31,9 @@ import {
   Tooltip,
   UnstyledButton
 } from '@mantine/core'
-import { IconDeviceGamepad2, IconMaximize, IconMinimize, IconPlayerPause, IconPlayerPlay, IconPlayerStop, IconRefresh, IconReportAnalytics, IconUsersGroup, IconX } from '@tabler/icons-react'
+import { IconDeviceGamepad2, IconMaximize, IconMinimize, IconPlayerPause, IconPlayerPlay, IconPlayerStop, IconRefresh, IconReportAnalytics, IconUsersGroup, IconVolume, IconVolumeOff, IconX } from '@tabler/icons-react'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { BBlock } from '@shared/klassenspiel/kern'
+import type { BBlock, BBlockBoss } from '@shared/klassenspiel/kern'
 import { STANDARD_EINSTELLUNGEN, type KlassenEinstellungen, type KlassenspielInfo, type KlassenspielId } from '@shared/klassenspiel/typen'
 import { useProgrammFarbe } from '../../../shared/components/AppKopf'
 import { BandGruppe } from '../../../shared/components/BandCover'
@@ -48,6 +49,7 @@ import { auswahlZahlen, bandSchluessel, testAuswahlGliedern, unitSchluessel, typ
 import { BeamerBloecke, Podest, TeamKarten } from './BeamerBloecke'
 import { kt } from '@shared/klassenspiel/texte'
 import { figurBild } from './bossBilder'
+import { klangbild, klangLaden, type KlangEinstellung, type MusikZustand } from './klangbild'
 
 interface Angebot {
   titel: string
@@ -551,6 +553,24 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
   const teamSpiel = Boolean(s && (s.art === 'team' || s.teams.length || ['puzzle', 'turnier'].includes(s.spiel)))
   const online = s?.personen.filter((p) => p.online).length ?? 0
 
+  // Klangbild (19.11.2026): bisher nur der Boss-Kampf; spielt nur hier am Beamer
+  const [klang, setKlang] = useState<KlangEinstellung>(() => klangLaden())
+  const mitKlang = s?.spiel === 'boss'
+  const bossBlock = s?.bloecke.find((x): x is BBlockBoss => x.typ === 'boss')
+  const ausgang = bossBlock?.ausgang ?? (s?.phase === 'ende' && s.ergebnis ? (s.ergebnis.sieg === true ? 'sieg' : s.ergebnis.sieg === false ? 'niederlage' : null) : null)
+  const musikZiel: MusikZustand =
+    !s || !mitKlang ? 'aus' : ausgang === 'sieg' ? 'sieg' : ausgang ? 'niederlage' : s.phase === 'lobby' || s.phase === 'teams' ? 'spannung' : s.phase === 'spiel' ? 'kampf' : 'aus'
+  const pause = Boolean(s?.pause)
+  const hintergrund = musikZiel === 'kampf' ? bossBlock?.hintergrund ?? null : null
+  useEffect(() => klangbild.musik(musikZiel, pause), [musikZiel, pause])
+  useEffect(() => klangbild.atmosphaere(hintergrund), [hintergrund])
+  useEffect(() => () => klangbild.stopp(), [])
+  const klangSetzen = (x: Partial<KlangEinstellung>): void => {
+    const neu = { ...klang, ...x }
+    setKlang(neu)
+    klangbild.einstellen(neu)
+  }
+
   return (
     <Modal opened onClose={() => undefined} withCloseButton={false} fullScreen padding={0}>
       <div ref={rahmen} style={{ minHeight: '100vh', background: 'var(--mantine-color-body)', display: 'flex', flexDirection: 'column' }} data-klassenspiel-beamer={s?.phase ?? 'laden'}>
@@ -617,6 +637,36 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
                   Nochmal
                 </Button>
               </>
+            )}
+            {mitKlang && (
+              // Ohne Portal: im Vollbild läge ein Portal außerhalb des sichtbaren Bereichs
+              <Popover position="bottom-end" withArrow shadow="md" withinPortal={false}>
+                <Popover.Target>
+                  <ActionIcon variant="default" size="lg" aria-label="Klang am Beamer" title="Klang am Beamer" data-klassenspiel-klang={klang.an ? 'an' : 'aus'}>
+                    {klang.an ? <IconVolume size={18} /> : <IconVolumeOff size={18} />}
+                  </ActionIcon>
+                </Popover.Target>
+                <Popover.Dropdown>
+                  <Stack gap="sm" w={250}>
+                    <Switch label="Musik und Geräusche" checked={klang.an} onChange={(x) => klangSetzen({ an: x.currentTarget.checked })} data-klassenspiel-klang-an />
+                    <div>
+                      <Text size="sm" mb={4}>
+                        Musik
+                      </Text>
+                      <Slider min={0} max={1} step={0.05} value={klang.musik} disabled={!klang.an} label={(v) => `${Math.round(v * 100)} %`} onChange={(v) => klangSetzen({ musik: v })} />
+                    </div>
+                    <div>
+                      <Text size="sm" mb={4}>
+                        Geräusche
+                      </Text>
+                      <Slider min={0} max={1} step={0.05} value={klang.geraeusche} disabled={!klang.an} label={(v) => `${Math.round(v * 100)} %`} onChange={(v) => klangSetzen({ geraeusche: v })} />
+                    </div>
+                    <Text size="xs" c="dimmed">
+                      Nur an diesem Gerät, nie auf den Geräten der Kinder.
+                    </Text>
+                  </Stack>
+                </Popover.Dropdown>
+              </Popover>
             )}
             <Tooltip label={vollbild ? 'Vollbild verlassen' : 'Vollbild (Beamer)'}>
               <ActionIcon variant="default" size="lg" onClick={vollbildUmschalten} aria-label="Vollbild">
