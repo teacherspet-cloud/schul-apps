@@ -8,8 +8,11 @@
 FROM node:24-bookworm-slim
 
 # Chromium für PDF, Schriften für Druckgleichheit (Umlaute, Emoji, Lautschrift)
+# Maßgleiche Ersatzschriften (19.11.2026): Die Seiten teilt der Browser der Lehrkraft mit Calibri/Cambria auf – ohne
+# Carlito/Caladea setzte das PDF hier breiter, der Text lief über den Fuß. Comic Neue für „Comic Sans (Grundschule)".
 RUN apt-get update \
  && apt-get install -y --no-install-recommends chromium ca-certificates fonts-dejavu-core fonts-liberation fonts-noto-core fonts-noto-color-emoji fonts-noto-extra \
+    fonts-crosextra-carlito fonts-crosextra-caladea fonts-comic-neue \
  && rm -rf /var/lib/apt/lists/*
 
 # Die offiziellen KI-Programme für den Abo-Zugang (jede Lehrkraft meldet IHR eigenes Konto an)

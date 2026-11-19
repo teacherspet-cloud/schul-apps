@@ -11,6 +11,7 @@ import { digitalisieren, zusatzLinien } from '../shared/blattDigital'
 import { BILD_SEITE, blattBilder } from '../shared/blattBilder'
 import { objekteSvg, type BlattObjekt } from '../shared/blattObjekte'
 import { materialMitZeilen } from '../renderer/src/modules/onlinetest/materialZeilen'
+import { seitenEinpassen } from '../shared/seitenEinpassen'
 import type { Browser } from 'playwright-core'
 import type { Druckmaschine } from '../main/kanaele'
 
@@ -70,15 +71,43 @@ async function mitSeite<T>(html: string, fn: (seite: import('playwright-core').P
 const PDF = { format: 'A4' as const, printBackground: true, preferCSSPageSize: true }
 
 /**
+ * Vor jedem PDF: Seiten, deren Inhalt hier in den Fuß ragt, einpassen (shared/seitenEinpassen.ts, 19.11.2026).
+ * Gemessen im Druckmodus – so, wie das PDF setzt; danach wieder Bildschirm, damit ein Messskript wie bisher misst.
+ */
+async function eingepasst(s: import('playwright-core').Page): Promise<void> {
+  try {
+    await s.emulateMedia({ media: 'print' })
+    await s.evaluate(`(${seitenEinpassen.toString()})(document)`)
+  } catch {
+    // Ohne Einpassen drucken ist besser als gar nicht
+  } finally {
+    await s.emulateMedia({ media: null }).catch(() => undefined)
+  }
+}
+
+/**
  * PDF aus HTML, das von den Lernenden kommt (ausgefülltes Arbeitsblatt speichern/drucken,
  * 03.10.2026): ohne Skripte und ohne Netz – nur Darstellung.
  */
-export const pdfOhneSkripte = (html: string): Promise<Uint8Array> => mitSeite(html, async (s) => new Uint8Array(await s.pdf(PDF)), false)
+export const pdfOhneSkripte = (html: string): Promise<Uint8Array> =>
+  mitSeite(
+    html,
+    async (s) => {
+      await eingepasst(s)
+      return new Uint8Array(await s.pdf(PDF))
+    },
+    false
+  )
 
 export const serverDruck: Druckmaschine = {
-  pdf: (html) => mitSeite(html, async (s) => new Uint8Array(await s.pdf(PDF))),
+  pdf: (html) =>
+    mitSeite(html, async (s) => {
+      await eingepasst(s)
+      return new Uint8Array(await s.pdf(PDF))
+    }),
   messenUndPdf: (html, skript) =>
     mitSeite(html, async (s) => {
+      await eingepasst(s)
       // Das Messskript ist ein Ausdruck (wie executeJavaScript am PC)
       const messung = await s.evaluate((code) => (0, eval)(code), skript)
       return { pdf: new Uint8Array(await s.pdf(PDF)), messung }
