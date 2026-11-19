@@ -10,7 +10,7 @@ import type { Sheet, TextBlock, Worksheet, WorksheetMeta, WsBlock } from '../mod
 import { BlockView, SeitenFussnoten } from './BlockView'
 import { subjectById } from '../model/subjects'
 import { contentInsets, PageFrame, PageInfo } from './PageFrame'
-import { bindeKurzeTabellen, MeasuredItem, notenHoehe, PagePlan, paginate, PlacedItem, tabelleZusammenhalten } from './paginate'
+import { bindeKurzeTabellen, bindeWorterklaerungen, MeasuredItem, notenHoehe, PagePlan, paginate, PlacedItem, tabelleZusammenhalten } from './paginate'
 import { WsContext, WsContextValue, WsMode, isEditMode, isKeyMode } from './WsContext'
 import { DEFAULT_CITATION_STYLE, formatCitation } from '../../../shared/citation'
 import type { CitationStyle } from '@shared/types'
@@ -1186,7 +1186,17 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
               if (letzte && letzte.bis === k && unitEls[k - 1]?.closest('table') === t) letzte.bis = k + 1
               else innere.push({ von: k, bis: k + 1 })
             })
-          const unitGlue = innere.length ? bindeKurzeTabellen(units, gebunden, innere, otherHeight) : gebunden
+          const bindung = innere.length ? bindeKurzeTabellen(units, gebunden, innere, otherHeight) : gebunden
+          // Worterklärungen unter dem Text bleiben bei den Zeilen mit ihren Ziffern (19.11.2026, paginate.ts)
+          const unitGlue =
+            zeilen && unitEls[unitEls.length - 1]?.classList.contains('ws-glossary')
+              ? bindeWorterklaerungen(
+                  units,
+                  zeilen.karte.map((z) => z.noten.length > 0),
+                  bindung,
+                  otherHeight
+                )
+              : bindung
           const unitRepeat = (zeilen ? [] : unitEls).map((u) => {
             if (block?.type === 'table' || u.tagName !== 'TR') return 0
             const kopf = u.closest('table')?.tHead

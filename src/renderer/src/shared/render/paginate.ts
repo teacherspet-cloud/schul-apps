@@ -368,6 +368,26 @@ export function bindeKurzeTabellen(units: readonly number[], glue: readonly bool
   return aus
 }
 
+/*
+ * WORTERKLÄRUNGEN BLEIBEN BEI IHREN ZEILEN (19.11.2026, Befund „Welcome to my home!"): Alle Textzeilen standen auf
+ * Seite 1, die Worterklärungen darunter passten nicht mehr und standen allein auf Seite 2 („M1 (Fortsetzung)") – die
+ * Lernenden suchten „At night¹" vergeblich. Jetzt sind die Zeilen ab der ERSTEN mit einer Ziffer bis zu den
+ * Erklärungen aneinander gebunden: Passt das nicht mehr, wandern sie gemeinsam. Damit ein langer Text mit einer
+ * Ziffer in Zeile 2 nicht ganz wandert, umfasst die Bindung höchstens eine halbe Seite – die Erklärungen stehen nie
+ * allein, mindestens die letzte Zeile geht mit.
+ * `hatZiffer[k]`: Einheit k (Zeile) trägt eine Anmerkungsziffer; die LETZTE Einheit sind die Worterklärungen.
+ */
+export function bindeWorterklaerungen(units: readonly number[], hatZiffer: readonly boolean[], glue: readonly boolean[], seitenhoehe: number): boolean[] {
+  const n = units.length
+  const aus = Array.from({ length: n }, (_, k) => Boolean(glue[k]))
+  if (n < 2) return aus
+  let von = hatZiffer.slice(0, n - 1).findIndex(Boolean)
+  if (von < 0) von = n - 2
+  while (von < n - 2 && sum(units.slice(von, n) as number[]) > seitenhoehe / 2) von++
+  for (let k = von; k < n - 1; k++) aus[k] = true
+  return aus
+}
+
 function sum(values: number[]): number {
   return values.reduce((a, b) => a + b, 0)
 }

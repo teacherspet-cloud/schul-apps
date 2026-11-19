@@ -789,7 +789,9 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
    * des Seitenflusses und behalten ihre Liste am Ende.
    */
   const fussModus = ctx.anmerkungsArt === 'fussnoten' && !block.free
-  const to = placed?.to ?? paragraphs.length + (anm.anmerkungen.length && !fussModus ? 1 : 0)
+  // Einheiten des ganzen Materials: Absätze, dazu die Worterklärungen darunter
+  const einheiten = paragraphs.length + (anm.anmerkungen.length && !fussModus ? 1 : 0)
+  const to = placed?.to ?? einheiten
   /*
    * Kopf (Titel, Quellenangabe, Einleitung) nur auf dem ersten Stück. Nicht an `from` ablesbar: Teilt
    * der Umbruch schon den ERSTEN Absatz, beginnt auch das Folgestück bei Absatz 0 – der Kopf stand dann
@@ -962,12 +964,13 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
             Gezaehlt wird der ganze Text, nicht nur das Stueck auf dieser Seite – und die
             Auslassungszeichen zaehlen nicht mit.
           */}
-      {to >= paragraphs.length && !endetImAbsatz && materialWoerter > 0 && (
+      {/* Nur unter dem LETZTEN Stück – samt Worterklärungen (19.11.2026: stand sonst auf beiden Seiten) */}
+      {to >= einheiten && !endetImAbsatz && materialWoerter > 0 && (
         <div className="ws-wortzahl" data-foot>
           ({wortzahlText(materialWoerter, ctx.labelLanguage)})
         </div>
       )}
-      {block.source && to >= paragraphs.length && !endetImAbsatz && (
+      {block.source && to >= einheiten && !endetImAbsatz && (
         <div className="ws-source" data-foot>
           Quelle: <Feld value={block.source} editable={schreiben} onChange={set((d, v) => ((d as typeof block).source = v))} />
         </div>
