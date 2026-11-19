@@ -102,13 +102,34 @@ export function gruppenAus(claims: Record<string, unknown>): { id: string; name:
 }
 
 /** Rolle aus den Angaben von IServ – null = kein Zugang */
+/*
+ * Rolle aus IServ (19.11.2026, Befund: eine Lehrkraft mit richtig gesetzter Rolle wurde abgelehnt). Bis dahin galt
+ * Lehrkraft nur mit Rolle UND Benutzernamen im Format „m.mustermann" (LEHRKRAFT_MUSTER) – ein anderer Benutzername
+ * (ausgeschriebener oder doppelter Vorname, mehrere Ziffern …) sperrte aus. Maßgeblich ist jetzt die Rolle, die die
+ * Schule in IServ pflegt; ein abweichender Benutzername wird nur protokolliert (`rollenBefund`).
+ * Referendarinnen und Referendare zählen als Lehrkräfte.
+ */
+const LEHRER_ROLLE = /lehr|teacher|referendar|ROLE_TEACHER/i
+const SCHUELER_ROLLE = /sch(ü|ue)ler|student|pupil|ROLE_STUDENT/i
+const rollenTexte = (claims: Record<string, unknown>): string[] => [...claimTexte(claims['iserv:roles']), ...claimTexte(claims.roles)]
+
 export function rolleAus(benutzer: string, claims: Record<string, unknown>): Rolle | null {
-  const rollen = [...claimTexte(claims['iserv:roles']), ...claimTexte(claims.roles)].join(' ')
-  const lehrer = /lehr|teacher|ROLE_TEACHER/i.test(rollen)
-  const schueler = /sch(ü|ue)ler|student|pupil|ROLE_STUDENT/i.test(rollen)
-  if (lehrer && LEHRKRAFT_MUSTER.test(benutzer)) return benutzer === ADMIN_BENUTZER ? 'admin' : 'lehrkraft'
-  if (schueler && !lehrer) return 'schueler'
+  const rollen = rollenTexte(claims).join(' ')
+  const lehrer = LEHRER_ROLLE.test(rollen)
+  const schueler = SCHUELER_ROLLE.test(rollen)
+  if (lehrer) return benutzer === ADMIN_BENUTZER ? 'admin' : 'lehrkraft'
+  if (schueler) return 'schueler'
   return null
+}
+
+/**
+ * Für das Protokoll, ohne Personendaten: die Rollennamen (keine Namen von Menschen) und die FORM des Benutzernamens
+ * (Buchstaben → a, Ziffern → 9; „m.mustermann" → „a.aaaaaaaaaa").
+ */
+export function rollenBefund(benutzer: string, claims: Record<string, unknown>): string {
+  const form = benutzer.replace(/\p{L}/gu, 'a').replace(/[0-9]/g, '9').slice(0, 40)
+  const rollen = [...new Set(rollenTexte(claims))].map((r) => r.slice(0, 40)).slice(0, 12)
+  return `Rollen ${rollen.length ? `„${rollen.join('", „')}"` : '(keine geliefert)'}, Benutzername-Form ${form}${LEHRKRAFT_MUSTER.test(benutzer) ? '' : ' (nicht im Format v.nachname)'}`
 }
 
 /** UUID des IServ-Kontos aus den Angaben (iserv:uuid bzw. uuid, sonst sub) – leer, wenn keine geliefert wurde */
@@ -325,7 +346,7 @@ export function iservAngabenUebernehmen(claims: Record<string, unknown>): Nutzer
   if (!benutzer) throw new AnmeldeFehler('IServ hat keinen Benutzernamen geliefert.')
   const rolle = rolleAus(benutzer, claims)
   if (!rolle) {
-    protokolliereServer('anmeldung', 'Anmeldung über IServ abgelehnt (keine passende Rolle)')
+    protokolliereServer('anmeldung', `Anmeldung über IServ abgelehnt (keine passende Rolle) – ${rollenBefund(benutzer, claims)}`)
     throw new AnmeldeFehler('Mit diesem Konto ist keine Anmeldung möglich. Zugang haben Lehrkräfte und – für Onlinetests – Schülerinnen und Schüler.')
   }
   const name = String(claims.name ?? [claims.given_name, claims.family_name].filter(Boolean).join(' ') ?? benutzer).trim() || benutzer

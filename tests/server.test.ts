@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { entschluessle, passwortHash, passwortPruefen, setzeSchluesselFuerTests, verschluessle, zufallsPasswort } from '../src/server/geheim'
-import { claimTexte, gruppenAus, LEHRKRAFT_MUSTER, rolleAus } from '../src/server/anmeldung'
+import { claimTexte, gruppenAus, LEHRKRAFT_MUSTER, rolleAus, rollenBefund } from '../src/server/anmeldung'
 import {
   datenbankFuerTests,
   nutzerAendern,
@@ -51,9 +51,14 @@ describe('Verschlüsselung', () => {
 
 describe('Rollen aus IServ', () => {
   const lehrer = { roles: [{ id: 'ROLE_TEACHER', displayName: 'Lehrer' }] }
-  it('Lehrkraft nur mit Rolle UND Benutzernamen im Format m.mustermann', () => {
+  it('Lehrkraft nach der IServ-Rolle – auch mit anderem Benutzernamen (19.11.2026)', () => {
     expect(rolleAus('m.mustermann', lehrer)).toBe('lehrkraft')
-    expect(rolleAus('max.mustermann', lehrer)).toBeNull()
+    expect(rolleAus('max.mustermann', lehrer)).toBe('lehrkraft')
+    // Befund 19.11.2026: Nachname aus mehreren Teilen
+    expect(rolleAus('n.de.wall', lehrer)).toBe('lehrkraft')
+    expect(rolleAus('anna-lena.mueller12', { 'iserv:roles': ['Referendarin'] })).toBe('lehrkraft')
+    expect(rolleAus('m.mustermann', { roles: ['Eltern'] })).toBeNull()
+    expect(rollenBefund('max.mustermann', lehrer)).toBe('Rollen „ROLE_TEACHER", „Lehrer", Benutzername-Form aaa.aaaaaaaaaa (nicht im Format v.nachname)')
     expect(rolleAus('m.mustermann', { roles: ['Schüler'] })).toBe('schueler')
     expect(rolleAus('m.mustermann', {})).toBeNull()
     expect(LEHRKRAFT_MUSTER.test('a.meier-schulz')).toBe(true)
