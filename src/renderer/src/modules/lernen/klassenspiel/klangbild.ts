@@ -1,7 +1,8 @@
 /**
  * Klangbild der Klassenspiele am Beamer (19.11.2026, mit der Lehrkraft abgestimmt und in der Hörprobe ausgewählt):
  * Abenteuer-Orchester, nur am Beamer (nie auf den Geräten der Kinder), Musik leise durchgehend und bei großen Momenten
- * kurz leiser (Ducking). Alle Dateien CC0 – Herkunft in assets/klassenspiele/klang/QUELLEN.md.
+ * kurz leiser (Ducking). Alle Dateien CC0 – Herkunft in assets/klassenspiele/klang/QUELLEN.md. Seit 20.11.2026 für alle
+ * Klassenspiele (Runde 2 der Hörprobe): Musik je Spiel (Abenteuer, Wettlauf, Knobeln), Sieg/Niederlage wie beim Boss.
  *
  * Bewusst nur HTMLAudioElement statt Web Audio: läuft so auch unter file:// in der Exe (kein fetch/CORS); Lautstärke,
  * Überblenden und Ducking rechnet ein kleiner Takt (50 ms) selbst. Geräusche variieren leicht in der Tonhöhe.
@@ -37,15 +38,54 @@ export function klangSpeichern(e: KlangEinstellung): void {
   }
 }
 
-export type MusikZustand = 'aus' | 'spannung' | 'kampf' | 'sieg' | 'niederlage'
-export type KlangArt = 'treffer' | 'krit' | 'abwehr' | 'fehler' | 'schlag' | 'schild' | 'bruch' | 'heilung' | 'aufstieg' | 'spezial' | 'phase' | 'bruellen'
+/** warten = Warteraum/Teams, spiel = laufendes Spiel */
+export type MusikZustand = 'aus' | 'warten' | 'spiel' | 'sieg' | 'niederlage'
+export type KlangArt =
+  | 'treffer'
+  | 'krit'
+  | 'abwehr'
+  | 'fehler'
+  | 'schlag'
+  | 'schild'
+  | 'bruch'
+  | 'heilung'
+  | 'aufstieg'
+  | 'spezial'
+  | 'phase'
+  | 'bruellen'
+  | 'schritt'
+  | 'etappe'
+  | 'fuehrung'
+  | 'erobert'
+  | 'gestohlen'
+  | 'rekord'
+  | 'seil'
+  | 'runde'
+  | 'gebremst'
 
 const KAMPF = ['musik-kampf-1', 'musik-kampf-2', 'musik-kampf-3', 'musik-kampf-4', 'musik-kampf-5']
+/** Favorit zuerst, danach die mit „geht auch“ markierten Stücke im Wechsel */
+const ABENTEUER = ['musik-abenteuer-1', 'musik-abenteuer-2', 'musik-abenteuer-3', 'musik-abenteuer-4', 'musik-abenteuer-5']
+const WETTLAUF = ['musik-wettlauf']
+const KNOBELN = ['musik-knobeln']
+/** Musik je Spiel im Warteraum und im Spiel (gleiche Liste = läuft beim Start einfach weiter); Boss: Kampfliste zufällig */
+const MUSIK_JE_SPIEL: Record<string, { warten: string[]; spiel: string[]; zufall?: boolean }> = {
+  boss: { warten: ['musik-spannung'], spiel: KAMPF, zufall: true },
+  expedition: { warten: ABENTEUER, spiel: ABENTEUER },
+  rennen: { warten: WETTLAUF, spiel: WETTLAUF },
+  rekord: { warten: WETTLAUF, spiel: WETTLAUF },
+  puzzle: { warten: WETTLAUF, spiel: WETTLAUF },
+  gebiet: { warten: KNOBELN, spiel: KNOBELN },
+  turnier: { warten: KNOBELN, spiel: KNOBELN },
+  wette: { warten: KNOBELN, spiel: KNOBELN }
+}
+/** Ersatz, solange ein Klang noch nicht ausgewählt ist */
+const ERSATZ: Record<string, string> = { 'sfx-seil': 'sfx-schritt' }
 const BRUELLEN = ['sfx-bruellen-1', 'sfx-bruellen-2', 'sfx-bruellen-3', 'sfx-bruellen-4']
 /** Mindestabstand je Geräusch (ms) – viele Fehler zugleich sollen nicht prasseln */
-const ABSTAND: Partial<Record<KlangArt, number>> = { fehler: 280, aufstieg: 150, treffer: 70, abwehr: 120 }
+const ABSTAND: Partial<Record<KlangArt, number>> = { fehler: 280, aufstieg: 150, treffer: 70, abwehr: 120, schritt: 140, seil: 160, erobert: 120 }
 /** Atmosphäre je Arena: nur wo die Lehrkraft einen Klang gewählt hat (Weltraum: tiefes Brummen) */
-const ATMOSPHAERE: Record<string, string> = { raumstation: 'amb-weltraum', cyberdach: 'amb-weltraum', asteroiden: 'amb-weltraum', mondkrater: 'amb-weltraum' }
+const ATMOSPHAERE: Record<string, string> = { raumstation: 'amb-weltraum', cyberdach: 'amb-weltraum', asteroiden: 'amb-weltraum', mondkrater: 'amb-weltraum', expedition: 'amb-bergwind' }
 /** Grundpegel: Musik deutlich unter den Geräuschen („leise durchgehend“) */
 const PEGEL = { musik: 0.55, amb: 0.7, jingle: 0.95 }
 const UEBERBLENDEN = 3
@@ -77,6 +117,7 @@ let takt: ReturnType<typeof setInterval> | null = null
 let gesperrt = false
 let reihe: string[] = []
 let letztesStueck = ''
+let liste: string[] = []
 const zuletzt = new Map<string, number>()
 let laufendeGeraeusche = 0
 let vorgeladen: HTMLAudioElement[] = []
@@ -164,10 +205,10 @@ function ausblenden(s: Stimme | null, sek: number): void {
   s.weiter = undefined
 }
 
-function naechstesKampfstueck(): string {
+function naechstesStueck(): string {
   if (!reihe.length) {
     // Zufällige Reihenfolge, nie dasselbe Stück zweimal hintereinander
-    reihe = [...KAMPF].sort(() => Math.random() - 0.5)
+    reihe = [...liste].sort(() => Math.random() - 0.5)
     if (reihe[0] === letztesStueck && reihe.length > 1) reihe.push(reihe.shift()!)
   }
   letztesStueck = reihe.shift()!
@@ -215,20 +256,34 @@ export const klangbild = {
     for (const s of stimmen) s.el.volume = pegel(s)
   },
 
-  /** Musikzustand setzen – mehrfach mit demselben Wert ist harmlos */
-  musik(neu: MusikZustand, pause = false): void {
+  /** Musikzustand für ein Spiel setzen – mehrfach mit denselben Werten ist harmlos */
+  musik(neu: MusikZustand, spiel: string, pause = false): void {
     pausiert = pause
-    if (neu === zustand) return
+    const plan = MUSIK_JE_SPIEL[spiel]
+    const neueListe = (neu === 'warten' || neu === 'spiel') && plan ? plan[neu] : []
+    // Gleiche Liste (z. B. Expedition: Warteraum → Spiel): einfach weiterlaufen lassen
+    if (neueListe.length && neueListe.join() === liste.join() && musikStimme) {
+      zustand = neu
+      return
+    }
+    if (neu === zustand && !neueListe.length) return
     zustand = neu
     vorladen()
     const alt = musikStimme
     musikStimme = null
-    if (neu === 'spannung') {
+    liste = neueListe
+    reihe = []
+    if (neueListe.length) {
       ausblenden(alt, 1.5)
-      musikStarten('musik-spannung', () => 'musik-spannung', 2)
-    } else if (neu === 'kampf') {
-      ausblenden(alt, 2)
-      musikStarten(naechstesKampfstueck(), naechstesKampfstueck, 2)
+      let erstes: string
+      if (plan?.zufall) erstes = naechstesStueck()
+      else {
+        // Favorit (erstes Stück) beginnt, danach die übrigen zufällig
+        erstes = neueListe[0]
+        letztesStueck = erstes
+        reihe = neueListe.slice(1).sort(() => Math.random() - 0.5)
+      }
+      musikStarten(erstes, naechstesStueck, 2)
     } else if (neu === 'sieg' || neu === 'niederlage') {
       ausblenden(alt, 0.8)
       ausblenden(atmoStimme, 2.5)
@@ -238,13 +293,13 @@ export const klangbild = {
       setTimeout(() => zustand === neu && neueStimme(neu === 'sieg' ? 'jingle-sieg' : 'jingle-niederlage', 'jingle', 0), 350)
     } else {
       ausblenden(alt, 1.5)
-      for (const s of stimmen) if (s.kanal === 'jingle') ausblenden(s, 1.5)
+      for (const st of stimmen) if (st.kanal === 'jingle') ausblenden(st, 1.5)
     }
   },
 
-  /** Atmosphäre zur Arena (Hintergrund-Kennung wie „raumstation-56“); null = keine */
-  atmosphaere(hintergrund: string | null): void {
-    const name = hintergrund ? ATMOSPHAERE[hintergrund.replace(/-\d+$/, '')] ?? null : null
+  /** Atmosphäre zur Arena (Hintergrund-Kennung wie „raumstation-56“) oder zum Spiel („expedition“); null = keine */
+  atmosphaere(schluessel: string | null): void {
+    const name = schluessel ? ATMOSPHAERE[schluessel.replace(/-\d+$/, '')] ?? null : null
     if (name === atmo) return
     atmo = name
     ausblenden(atmoStimme, 2)
@@ -260,7 +315,8 @@ export const klangbild = {
     if (jetzt - (zuletzt.get(art) ?? -1e9) < (ABSTAND[art] ?? 50)) return
     if (laufendeGeraeusche >= 8) return
     zuletzt.set(art, jetzt)
-    const name = art === 'bruellen' ? BRUELLEN[Math.floor(Math.random() * BRUELLEN.length)] : `sfx-${art}`
+    const roh = art === 'bruellen' ? BRUELLEN[Math.floor(Math.random() * BRUELLEN.length)] : `sfx-${art}`
+    const name = datei(roh) ? roh : ERSATZ[roh] ?? roh
     const src = datei(name)
     if (!src) return
     const el = new Audio(src)

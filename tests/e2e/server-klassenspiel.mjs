@@ -131,6 +131,16 @@ try {
 
   // ---------- Lehrkraft: Meine Klassen › Klasse › Englisch › Klassenspiel
   const p = await lk.newPage()
+  // Klangbild (20.11.2026): jedes Abspielen am Beamer mitschreiben
+  await p.addInitScript(() => {
+    window.__klang = []
+    const play = HTMLMediaElement.prototype.play
+    HTMLMediaElement.prototype.play = function () {
+      window.__klang.push(this.dataset.klang || String(this.currentSrc || this.src).split('/').pop())
+      return play.call(this)
+    }
+  })
+  const klang = () => p.evaluate(() => window.__klang.join(' '))
   await p.goto(A)
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
@@ -179,6 +189,7 @@ try {
   pruefe(tom.status === 403, `Fremde Klasse wird abgewiesen (${tom.status})`)
   pruefe(await da(p.locator('[data-klassenspiel-dabei="4"]')), 'Beamer: 4 dabei')
   await p.screenshot({ path: join(out, '4-beamer-lobby.png') })
+  pruefe(/musik-wettlauf/.test(await klang()), 'Klang: Wettlauf-Musik im Warteraum')
 
   // ---------- Teams losen und starten
   await p.locator('[data-klassenspiel-losen]').click()
@@ -214,6 +225,7 @@ try {
   await p.waitForTimeout(1500)
   await mp.screenshot({ path: join(out, '6-mia-frage.png') })
   await p.screenshot({ path: join(out, '7-beamer-spiel.png') })
+  pruefe(/sfx-(schritt|seil)/.test(await klang()), `Klang: Schritt/Seil bei richtigen Antworten (${(await klang()).match(/sfx-[a-z]+/g)?.length ?? 0} Geräusche)`)
 
   // Pause
   await p.locator('[data-klassenspiel-pause]').click()
@@ -228,6 +240,8 @@ try {
   pruefe(await da(mp.locator('[data-klasse-eigen]')), 'Mia sieht ihre eigene Leistung (privat)')
   await mp.screenshot({ path: join(out, '8-mia-ende.png') })
   await p.screenshot({ path: join(out, '9-beamer-ende.png') })
+  await p.waitForTimeout(600)
+  pruefe(/jingle-sieg/.test(await klang()), 'Klang: Sieg-Jingle am Ende')
   await p.locator('[data-klassenspiel-auswertung-knopf]').click()
   pruefe(await da(p.locator('[data-auswertung-person]').first()), 'Auswertung je Person (nur Lehrkraft)')
   const personen = await p.locator('[data-auswertung-person]').count()

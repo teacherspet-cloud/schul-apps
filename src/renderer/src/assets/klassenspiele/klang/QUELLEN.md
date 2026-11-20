@@ -29,3 +29,19 @@ Ausgewählt von der Lehrkraft in der Hörprobe; Lautheit angeglichen (Musik −2
 | sfx-bruellen-2.mp3 | Troll | https://opengameart.org/content/big-scary-troll-sounds |
 | sfx-bruellen-3.mp3 | Troll | https://opengameart.org/content/big-scary-troll-sounds |
 | sfx-bruellen-4.mp3 | Troll | https://opengameart.org/content/big-scary-troll-sounds |
+| musik-abenteuer-1.mp3 | Chest of Adventure – Eldritch Grim | https://opengameart.org/content/chest-of-adventure |
+| musik-abenteuer-2.mp3 | Medieval: Exploration – RandomMind | https://opengameart.org/content/medieval-exploration |
+| musik-abenteuer-3.mp3 | Forest Exploration – Tsorthan Grove | https://opengameart.org/content/forest-exploration |
+| musik-abenteuer-4.mp3 | Overlook Montage – Grapestar | https://opengameart.org/content/overlook-montage |
+| musik-abenteuer-5.mp3 | Once Upon a Time – TAD | https://opengameart.org/content/once-upon-a-time-loop |
+| musik-wettlauf.mp3 | Winning the Race – section31 | https://opengameart.org/content/winning-the-race |
+| musik-knobeln.mp3 | Adventure Time – Scribe | https://opengameart.org/content/adventure-time |
+| sfx-schritt.mp3 | Schritt (Gras) – Kenney | https://kenney.nl/assets/impact-sounds |
+| sfx-etappe.mp3 | Glocke | https://opengameart.org/content/100-cc0-sfx |
+| sfx-fuehrung.mp3 | Hit-Jingle – Kenney | https://kenney.nl/assets/music-jingles |
+| sfx-erobert.mp3 | Ablegen – Kenney | https://kenney.nl/assets/interface-sounds |
+| sfx-gestohlen.mp3 | Zisch – Kenney | https://kenney.nl/assets/digital-audio |
+| sfx-rekord.mp3 | 8-Bit-Jingle – Kenney | https://kenney.nl/assets/music-jingles |
+| sfx-runde.mp3 | Glocke 2 | https://opengameart.org/content/100-cc0-sfx |
+| sfx-gebremst.mp3 | Windstoß | https://opengameart.org/content/wind-whoosh-loop |
+| amb-bergwind.mp3 | Bergwind | https://opengameart.org/content/wind-whoosh-loop |

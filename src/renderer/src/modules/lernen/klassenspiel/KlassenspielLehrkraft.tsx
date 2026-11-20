@@ -50,6 +50,7 @@ import { BeamerBloecke, Podest, TeamKarten } from './BeamerBloecke'
 import { kt } from '@shared/klassenspiel/texte'
 import { figurBild } from './bossBilder'
 import { klangbild, klangLaden, type KlangEinstellung, type MusikZustand } from './klangbild'
+import { klangAusBloecken } from './klangEreignisse'
 
 interface Angebot {
   titel: string
@@ -553,18 +554,47 @@ export function Beamer({ code, adresse, schliessen }: { code: string; adresse: s
   const teamSpiel = Boolean(s && (s.art === 'team' || s.teams.length || ['puzzle', 'turnier'].includes(s.spiel)))
   const online = s?.personen.filter((p) => p.online).length ?? 0
 
-  // Klangbild (19.11.2026): bisher nur der Boss-Kampf; spielt nur hier am Beamer
+  // Klangbild (19.11.2026 Boss, 20.11.2026 alle Klassenspiele): spielt nur hier am Beamer
   const [klang, setKlang] = useState<KlangEinstellung>(() => klangLaden())
-  const mitKlang = s?.spiel === 'boss'
+  const mitKlang = Boolean(s)
   const bossBlock = s?.bloecke.find((x): x is BBlockBoss => x.typ === 'boss')
-  const ausgang = bossBlock?.ausgang ?? (s?.phase === 'ende' && s.ergebnis ? (s.ergebnis.sieg === true ? 'sieg' : s.ergebnis.sieg === false ? 'niederlage' : null) : null)
-  const musikZiel: MusikZustand =
-    !s || !mitKlang ? 'aus' : ausgang === 'sieg' ? 'sieg' : ausgang ? 'niederlage' : s.phase === 'lobby' || s.phase === 'teams' ? 'spannung' : s.phase === 'spiel' ? 'kampf' : 'aus'
+  const sieg = s?.phase === 'ende' && s.ergebnis ? s.ergebnis.sieg : undefined
+  // Boss: Ausgang aus der Arena; übrige Spiele: am Ende immer ein Jingle (Teamwettbewerb ohne „sieg“ = Gewinnerteam feiern)
+  const ausgang = bossBlock?.ausgang ?? (sieg === true ? 'sieg' : sieg === false ? 'niederlage' : s?.phase === 'ende' && s.spiel !== 'boss' ? 'sieg' : null)
+  const musikZiel: MusikZustand = !s
+    ? 'aus'
+    : ausgang === 'sieg'
+    ? 'sieg'
+    : ausgang
+    ? 'niederlage'
+    : s.phase === 'lobby' || s.phase === 'teams'
+    ? 'warten'
+    : s.phase === 'spiel'
+    ? 'spiel'
+    : 'aus'
+  const spielId = s?.spiel ?? ''
   const pause = Boolean(s?.pause)
-  const hintergrund = musikZiel === 'kampf' ? bossBlock?.hintergrund ?? null : null
-  useEffect(() => klangbild.musik(musikZiel, pause), [musikZiel, pause])
-  useEffect(() => klangbild.atmosphaere(hintergrund), [hintergrund])
+  const atmoSchluessel = musikZiel === 'spiel' ? (spielId === 'boss' ? bossBlock?.hintergrund ?? null : spielId) : null
+  useEffect(() => klangbild.musik(musikZiel, spielId, pause), [musikZiel, spielId, pause])
+  useEffect(() => klangbild.atmosphaere(atmoSchluessel), [atmoSchluessel])
   useEffect(() => () => klangbild.stopp(), [])
+  // Übrige Spiele: Klänge aus dem Vergleich mit dem vorigen Stand (der Boss spielt seine Ereignisse selbst)
+  const vorigeBloecke = useRef<BBlock[] | null>(null)
+  const bloecke = s?.bloecke
+  useEffect(() => {
+    const vorher = vorigeBloecke.current
+    vorigeBloecke.current = bloecke ?? null
+    if (!bloecke || !vorher || s?.phase !== 'spiel' || s.pause || spielId === 'boss') return
+    klangAusBloecken(vorher, bloecke)
+      .slice(0, 3)
+      .forEach((k, i) =>
+        setTimeout(() => {
+          klangbild.ton(k.art, k.staerke)
+          if (k.ducken) klangbild.ducken(1400, 0.45)
+        }, i * 180)
+      )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloecke])
   const klangSetzen = (x: Partial<KlangEinstellung>): void => {
     const neu = { ...klang, ...x }
     setKlang(neu)
