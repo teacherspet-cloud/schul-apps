@@ -265,7 +265,7 @@ export async function erzeugeBankAufgaben(
   if (ws) {
     const vorher = ohne.aufgaben.length
     ohne.aufgaben = ohne.aufgaben.filter((x) => {
-      const u = unbekannteWoerter(x, ws.bekannt, formWoerter(a.schluessel), ws.lexikon)
+      const u = unbekannteWoerter(x, ws.bekannt, formWoerter(a.schluessel), ws.lexikon, a.sprache)
       if (!u.length) return true
       const g = `Wortschatz (${stelleText(ws)}): ${u.slice(0, 4).join(', ')}`
       if (bericht.gruende.length < 20 && !bericht.gruende.includes(g)) bericht.gruende.push(g)

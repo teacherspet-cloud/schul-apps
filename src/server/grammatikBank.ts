@@ -11,7 +11,7 @@
  *   POST /server/grammatik-bank/lesen   {schluessel[]} → { eintraege }
  *   POST /server/grammatik-bank/speichern {sprache, schluessel, regel, aufgaben} → { zahlen, kurse }
  */
-import { bekannterWortschatz, formWoerter, fruehesteEinfuehrung, unbekannteWoerter, type Einfuehrung, type GrammatikBand, type WortschatzBand, lexikonAus, type Lexikon, bekannteKennungen, mitUnregelmaessigenFormen } from '../shared/lehrwerkWortschatz'
+import { bekannterWortschatz, formWoerter, fruehesteEinfuehrung, unbekannteWoerter, type Einfuehrung, type GrammatikBand, type WortschatzBand, lexikonAus, type Lexikon, bekannteKennungen, mitUnregelmaessigenFormen, VORWISSEN_BAENDE } from '../shared/lehrwerkWortschatz'
 import { standardListe } from '../renderer/src/shared/verben/standard'
 import { mitGrundwortschatz } from '../shared/grundwortschatz'
 import { LEHRWERK_GRAMMATIK, reiheDesBands } from '../renderer/src/shared/lehrwerkGrammatik'
@@ -435,6 +435,15 @@ function wortschatzStandNeu(schluessel: string, sprache: string): WortschatzStan
     const grade = r.find((b) => b.name === stelle.buch)?.grade ?? 99
     if (!best || grade < best.grade) best = { stelle, baende: r, grade }
   }
+  // Vorwissen aus anderen Bänden (20.11.2026): vor die Bände der Reihe stellen – gilt dann ganz als bekannt
+  if (best) {
+    const vor = (VORWISSEN_BAENDE[best.baende[0]?.name ?? ''] ?? [])
+      .map((id) => join(ordner, `${id}.json`))
+      .filter((f) => existsSync(f))
+      .map((f) => json_(readFileSync(f, 'utf8'), null as unknown as (WortschatzBand & { language?: string; reihe?: string }) | null))
+      .filter((b): b is WortschatzBand & { language?: string; reihe?: string } => Boolean(b?.units?.length))
+    if (vor.length) best = { ...best, baende: [...vor, ...best.baende] }
+  }
   // Klasse des Bands der Einführung (29.10.2026: Handbetrieb gab jeder Form „Klasse 5" – Past Progressive ist Green Line 2)
   return best
     ? {
@@ -444,7 +453,7 @@ function wortschatzStandNeu(schluessel: string, sprache: string): WortschatzStan
           mitGrundwortschatz(bekannterWortschatz(best.baende, best.stelle), sprache),
           sprache === 'en' ? standardListe('en') : [],
           bekannteKennungen(
-            best.baende.map((b) => ({ name: b.name, grammatik: LEHRWERK_GRAMMATIK[b.name] as unknown as GrammatikBand })),
+            best.baende.filter((b) => LEHRWERK_GRAMMATIK[b.name]).map((b) => ({ name: b.name, grammatik: LEHRWERK_GRAMMATIK[b.name] as unknown as GrammatikBand })),
             best.stelle
           )
         ),
@@ -487,7 +496,7 @@ function wortschatzEinmal(d: ReturnType<typeof datenbank>): void {
         if (!ws || !WORTSCHATZ_STELLEN.some(([b, u]) => ws.stelle.buch === b && ws.stelle.unit === u)) continue
         const b = bankAufgabeBereinigt({ ...json_(z.bank_aufgabe, {} as Record<string, unknown>), uebung: z.uebung, niveau: z.niveau }, z.id, z.schluessel)
         if (!b) continue
-        const u = unbekannteWoerter(b.a, ws.bekannt, formWoerter(z.schluessel), ws.lexikon)
+        const u = unbekannteWoerter(b.a, ws.bekannt, formWoerter(z.schluessel), ws.lexikon, z.sprache)
         // Mangel nach den Regeln geht vor (die Mängel-Wartung stellt ihn zurück)
         const neu = b.pruefen || (u.length ? `${WORTSCHATZ_PRUEFEN}${ws.stelle.buch}, ${ws.stelle.unit}, ${ws.stelle.abschnitt}): ${u.slice(0, 6).join(', ')}` : '')
         if (neu === z.pruefen) continue
@@ -679,7 +688,7 @@ function einspielen(d: ReturnType<typeof datenbank>, wartungsName: string, datei
         if (schonDa(e.schluessel, b.a as unknown as Record<string, unknown>)) continue
         // Wortschatz nach Lehrwerksstand als Sicherung (29.10.2026)
         const ws = wortschatzStandServer(e.schluessel, e.schluessel.replace(/^mix:/, '').split('.')[0])
-        const unbekannt = ws ? unbekannteWoerter(b.a, ws.bekannt, formWoerter(e.schluessel), ws.lexikon) : []
+        const unbekannt = ws ? unbekannteWoerter(b.a, ws.bekannt, formWoerter(e.schluessel), ws.lexikon, e.schluessel.replace(/^mix:/, '').split('.')[0]) : []
         if (!b.pruefen && unbekannt.length) b.pruefen = `${WORTSCHATZ_PRUEFEN}${ws!.stelle.buch}, ${ws!.stelle.unit}, ${ws!.stelle.abschnitt}): ${unbekannt.slice(0, 6).join(', ')}`
         const pos = ((d.prepare('SELECT MAX(pos) AS p FROM gram_bank WHERE schluessel = ?').get(e.schluessel) as { p: number | null }).p ?? 0) + 1
         const { id: _i, regelId: _r, stufe: _s, uebung, niveau, pruefen: _p, ...rest } = b.a as BankAufgabe & { regelId?: string; stufe?: unknown }

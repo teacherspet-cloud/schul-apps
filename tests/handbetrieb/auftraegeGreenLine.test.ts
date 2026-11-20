@@ -26,6 +26,9 @@ const kurzId = (k: string): string => {
 const PUFFER = 2
 const ARTEN_JE_ANFRAGE = 3
 
+/** Sprache (20.11.2026: Spanisch, ¡Apúntate! 2 Ausgabe 2016) – HANDBETRIEB_SPRACHE, Vorgabe Englisch */
+const SPRACHE = process.env.HANDBETRIEB_SPRACHE ?? 'en'
+const FACH: Record<string, string> = { en: 'Englisch', es: 'Spanisch', fr: 'Französisch' }
 const BAND = process.env.HANDBETRIEB_BAND ?? 'Green Line 1'
 const UNIT = process.env.HANDBETRIEB_UNIT ?? 'Unit 1'
 
@@ -52,7 +55,7 @@ describe.skipIf(!ORDNER)('Aufträge Green Line (Band/Unit)', () => {
     for (const r of reiter) {
       // Klasse und Lehrwerksstelle aus der FRÜHESTEN Einführung der Form (29.10.2026, Befund der Lehrkraft: Zusatzformen wie
       // Past Progressive liefen mit „Klasse 5, Green Line 1 Unit 1" – sie stehen dort nicht)
-      const ws = wortschatzStandServer(r.schluessel, 'en')
+      const ws = wortschatzStandServer(r.schluessel, SPRACHE)
       const jahrgang = ws?.jahrgang ?? 5
       const lehrwerk = ws ? { buch: ws.stelle.buch, unit: ws.stelle.unit } : { buch: BAND, unit: UNIT }
       for (const st of ['g', 'm', 'a'] as Stufe[]) {
@@ -66,8 +69,8 @@ describe.skipIf(!ORDNER)('Aufträge Green Line (Band/Unit)', () => {
               niveau: st,
               schluessel: r.schluessel,
               titel: r.titel,
-              fach: 'Englisch',
-              sprache: 'en',
+              fach: FACH[SPRACHE] ?? 'Englisch',
+              sprache: SPRACHE,
               jahrgang,
               land: 'NI',
               schulform: 'gymnasium',

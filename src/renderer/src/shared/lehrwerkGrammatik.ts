@@ -52,84 +52,103 @@ export const QUELLE_NDS = 'Grammatikthemen Green Line Niedersachsen (Liste der L
 
 /**
  * ¡Apúntate! 2, Ausgabe 2016 (Cornelsen, Niedersachsen Jg. 7) – Liste der Lehrkraft „Spanisch_Grammatik_nach_Abschnitten"
- * (20.11.2026, nach dem Inhaltsverzeichnis), den spanischen Katalogthemen zugeordnet. Reiner Themenwortschatz und
+ * (20.11.2026, nach dem Inhaltsverzeichnis), den spanischen Katalog-Teilformen zugeordnet (nur was die Liste nennt). Reiner Themenwortschatz und
  * Redemittel (Uhrzeit, Wegbeschreibung, Ratschläge, Zahlen) haben kein Katalogthema und werden nur genannt.
  * Módulos ohne Stationen ('' = ganzes Kapitel).
  */
 const APUNTATE_2016_2: Band = {
   'Unidad 1': {
-    '¡Acércate!': [P('das Verb gustar', ['es.pron.oi'], true), P('die indirekten Objektpronomen nos, os, les', ['es.pron.oi'])],
-    'Texto A': [P('estar + gerundio', ['es.verb.gerundio']), P('das Verb dar', ['es.verb.presente_irr'])],
+    '¡Acércate!': [P('das Verb gustar', ['es.pron.oi/mit-gustar'], true), P('die indirekten Objektpronomen nos, os, les', ['es.pron.oi/formen', 'es.pron.oi/mit-gustar'])],
+    'Texto A': [P('estar + gerundio', ['es.verb.gerundio/bildung', 'es.verb.gerundio/estar-gerundio']), P('das Verb dar', ['es.verb.presente_irr/saber-dar-ver'])],
     'Texto B': [
-      P('die Verben salir, tener und hacer', ['es.verb.presente_irr'], true),
-      P('das Verb poner', ['es.verb.presente_irr']),
-      P('der Begleiter todo/-a', ['es.pron.indefinit'])
+      P('die Verben salir, tener und hacer', ['es.verb.presente_irr/go'], true),
+      P('das Verb poner', ['es.verb.presente_irr/go']),
+      P('der Begleiter todo/-a', ['es.pron.indefinit/todo'])
     ]
   },
-  'Módulo 1': { '': [P('das Verb doler', ['es.pron.oi', 'es.verb.presente_irr'])] },
+  'Módulo 1': { '': [P('das Verb doler', ['es.pron.oi/dativ-besitz', 'es.verb.presente_irr/o-ue'])] },
   'Unidad 2': {
-    '¡Acércate!': [P('die Schulfächer', [], true), P('bueno/-a, malo/-a; Verkürzung buen/mal', ['es.adj.angleichung'])],
-    'Texto A': [P('die Angabe der Uhrzeit', [], true), P('reflexive Verben (Singular)', ['es.verb.reflexiv', 'es.pron.reflexiv']), P('der Begleiter otro/-a', ['es.pron.indefinit'])],
+    '¡Acércate!': [P('die Schulfächer', [], true), P('bueno/-a, malo/-a; Verkürzung buen/mal', ['es.adj.angleichung/apokope'])],
+    'Texto A': [
+      P('die Angabe der Uhrzeit', [], true),
+      P('reflexive Verben (Singular)', ['es.verb.reflexiv/praesens', 'es.pron.reflexiv/formen']),
+      P('der Begleiter otro/-a', ['es.pron.indefinit/otro'])
+    ],
     'Texto B': [
-      P('die Diphthongverben o → ue', ['es.verb.presente_irr'], true),
-      P('das Verb jugar', ['es.verb.presente_irr']),
-      P('reflexive Verben (Plural)', ['es.verb.reflexiv', 'es.pron.reflexiv'])
+      P('die Diphthongverben o → ue', ['es.verb.presente_irr/o-ue'], true),
+      P('das Verb jugar', ['es.verb.presente_irr/o-ue']),
+      P('reflexive Verben (Plural)', ['es.verb.reflexiv/praesens', 'es.pron.reflexiv/formen'])
     ]
   },
   'Módulo 2': { '': [P('Personenbeschreibung', [], true), P('Kleidung und Farben (Themenwortschatz)', [])] },
   'Unidad 3': {
-    '¡Acércate!': [P('die Adjektive', ['es.adj.angleichung'], true), P('die Zahlen bis 1000', []), P('der Superlativ', ['es.adj.komparation'])],
+    '¡Acércate!': [
+      P('die Adjektive', ['es.adj.angleichung/o-a', 'es.adj.angleichung/e-konsonant'], true),
+      P('die Zahlen bis 1000', []),
+      P('der Superlativ', ['es.adj.komparation/superlativ-rel'])
+    ],
     'Texto A': [
-      P('die direkten Objektpronomen', ['es.pron.od']),
-      P('der reale Bedingungssatz mit si', ['es.satz.bedingung_real']),
-      P('das Verb conocer', ['es.verb.presente_irr'])
+      P('die direkten Objektpronomen', ['es.pron.od/formen', 'es.pron.od/angleichung']),
+      P('der reale Bedingungssatz mit si', ['es.satz.bedingung_real/praesens-praesens', 'es.satz.bedingung_real/praesens-futur', 'es.satz.bedingung_real/praesens-imperativ']),
+      P('das Verb conocer', ['es.verb.presente_irr/zco'])
     ],
     'Texto B': [
       P('Wegbeschreibung', [], true),
-      P('der Komparativ', ['es.adj.komparation']),
-      P('die Verben decir und saber', ['es.verb.presente_irr']),
-      P('die Höflichkeitsformen usted/ustedes', ['es.pron.subjekt'])
+      P('der Komparativ', ['es.adj.komparation/mas-menos', 'es.adj.komparation/tan-como', 'es.adj.komparation/unregelmaessig']),
+      P('die Verben decir und saber', ['es.verb.presente_irr/go', 'es.verb.presente_irr/saber-dar-ver']),
+      P('die Höflichkeitsformen usted/ustedes', ['es.pron.subjekt/usted'])
     ]
   },
   'Módulo 3': { '': [P('Lebensmittel und Mengenangaben (Themenwortschatz)', [])] },
   'Unidad 4': {
-    '¡Acércate!': [P('mucho/-a, poco/-a, otro/-a', ['es.pron.indefinit'], true), P('Essen (Themenwortschatz)', [])],
+    '¡Acércate!': [P('mucho/-a, poco/-a, otro/-a', ['es.pron.indefinit/mucho-poco'], true), P('Essen (Themenwortschatz)', [])],
     'Texto A': [
-      P('ser/estar', ['es.verb.ser_estar_hay'], true),
-      P('das pretérito indefinido der Verben auf -ar', ['es.verb.indefinido_reg']),
-      P('das pretérito indefinido der Verben ir und ser', ['es.verb.indefinido_irr'])
+      P('ser/estar', ['es.verb.ser_estar_hay/ser-eigenschaft', 'es.verb.ser_estar_hay/estar-befinden'], true),
+      P('das pretérito indefinido der Verben auf -ar', ['es.verb.indefinido_reg/ar', 'es.verb.indefinido_reg/signalwoerter']),
+      P('das pretérito indefinido der Verben ir und ser', ['es.verb.indefinido_irr/ser-ir'])
     ],
     'Texto B': [
       P('Ratschläge geben', [], true),
-      P('das pretérito indefinido der Verben auf -er und -ir', ['es.verb.indefinido_reg']),
-      P('antes de / después de + infinitivo', ['es.satz.infinitivkonstr'])
+      P('das pretérito indefinido der Verben auf -er und -ir', ['es.verb.indefinido_reg/er-ir']),
+      P('antes de / después de + infinitivo', ['es.satz.infinitivkonstr/antes-despues'])
     ]
   },
   'Unidad 5': {
     '¡Acércate!': [
-      P('der Imperativ', ['es.verb.imperativo_afirm'], true),
+      P('der Imperativ', ['es.verb.imperativo_afirm/tu-regelmaessig', 'es.verb.imperativo_afirm/tu-unregelmaessig', 'es.verb.imperativo_afirm/vosotros'], true),
       P('die Zahlen über 1000', []),
-      P('der Imperativ der reflexiven Verben', ['es.verb.imperativo_afirm', 'es.pron.stellung'])
+      P('der Imperativ der reflexiven Verben', ['es.verb.imperativo_afirm/pronomen', 'es.verb.imperativo_afirm/vosotros-reflexiv'])
     ],
-    'Texto A': [P('unregelmäßige Formen des pretérito indefinido (estar, hacer, venir)', ['es.verb.indefinido_irr']), P('nada, nadie, nunca', ['es.satz.negation'])],
+    'Texto A': [
+      P('unregelmäßige Formen des pretérito indefinido (estar, hacer, venir)', ['es.verb.indefinido_irr/u-stamm', 'es.verb.indefinido_irr/i-stamm']),
+      P('nada, nadie, nunca', ['es.pron.indefinit/algo-alguien', 'es.satz.negation/vorangestellt'])
+    ],
     'Texto B': [
-      P('die unregelmäßigen Verben im Präsens', ['es.verb.presente_irr'], true),
-      P('unregelmäßige Formen des pretérito indefinido (dar, poder, poner, tener)', ['es.verb.indefinido_irr']),
-      P('der absolute Superlativ (-ísimo/-a)', ['es.adj.superl_abs']),
-      P('no … nada/nadie/nunca', ['es.satz.negation'])
+      P('die unregelmäßigen Verben im Präsens', ['es.verb.presente_irr/e-ie', 'es.verb.presente_irr/go'], true),
+      P('unregelmäßige Formen des pretérito indefinido (dar, poder, poner, tener)', ['es.verb.indefinido_irr/dar-ver', 'es.verb.indefinido_irr/u-stamm']),
+      P('der absolute Superlativ (-ísimo/-a)', ['es.adj.superl_abs/isimo', 'es.adj.superl_abs/orthographie']),
+      P('no … nada/nadie/nunca', ['es.satz.negation/doppelt'])
     ]
   },
   'Unidad 6': {
-    '¡Acércate!': [P('¿para qué?, ¿en qué?, ¿de qué?, ¿a quién?', ['es.pron.interrogativ'])],
-    'Texto A': [P('die Fragewörter', ['es.pron.interrogativ'], true), P('die indirekte Rede/Frage im Präsens', ['es.satz.indirekte_rede'])],
+    '¡Acércate!': [P('¿para qué?, ¿en qué?, ¿de qué?, ¿a quién?', ['es.pron.interrogativ/praeposition'])],
+    'Texto A': [
+      P('die Fragewörter', ['es.pron.interrogativ/grundformen'], true),
+      P('die indirekte Rede/Frage im Präsens', ['es.satz.indirekte_rede/praesens', 'es.satz.indirekte_rede/fragen', 'es.satz.indirekte_rede/deixis'])
+    ],
     'Texto B': [
-      P('Stellung der Objektpronomen beim Imperativ', ['es.pron.stellung']),
-      P('die Ordinalzahlen', []),
-      P('hay que + infinitivo', ['es.verb.perifrasis']),
-      P('die Verben encantar, interesar und parecer', ['es.pron.oi'])
+      P('Stellung der Objektpronomen beim Imperativ', ['es.pron.stellung/imperativ']),
+      P('die Ordinalzahlen', ['es.adj.angleichung/ordinal']),
+      P('hay que + infinitivo', []),
+      P('die Verben encantar, interesar und parecer', ['es.pron.oi/mit-gustar'])
     ]
   },
-  'Módulo 4': { '': [P('das pretérito perfecto', ['es.verb.perfecto']), P('Verwendung von pretérito indefinido und pretérito perfecto', ['es.verb.perf_vs_indef'])] }
+  'Módulo 4': {
+    '': [
+      P('das pretérito perfecto', ['es.verb.perfecto/bildung', 'es.verb.perfecto/unregelmaessig', 'es.verb.perfecto/signalwoerter', 'es.verb.perfecto/erfahrung']),
+      P('Verwendung von pretérito indefinido und pretérito perfecto', ['es.verb.perf_vs_indef/zeitraum', 'es.verb.perf_vs_indef/erfahrung-ereignis', 'es.verb.perf_vs_indef/signalwoerter'])
+    ]
+  }
 }
 
 /**

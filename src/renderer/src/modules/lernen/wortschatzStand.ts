@@ -10,6 +10,7 @@ import {
   fruehesteEinfuehrung,
   lexikonAus,
   mitUnregelmaessigenFormen,
+  VORWISSEN_BAENDE,
   type Einfuehrung,
   type GrammatikBand,
   type Lexikon
@@ -58,8 +59,11 @@ async function laden(schluessel: string, sprache: string): Promise<WortschatzSta
   }
   if (!best) return null
   const bis = best.baende.findIndex((b) => b.name === best!.stelle.buch)
-  const alle = await Promise.all(best.baende.map((b) => api.get(b.id)))
-  const voll = alle.slice(0, bis + 1)
+  // Vorwissen aus anderen Bänden (20.11.2026, VORWISSEN_BAENDE) steht vor der Reihe und gilt ganz als bekannt
+  const vor = await Promise.all((VORWISSEN_BAENDE[best.baende[0]?.name ?? ''] ?? []).map((id) => api.get(id).catch(() => null)))
+  const vorBaende = vor.filter((b): b is Textbook => Boolean(b?.units?.length))
+  const alle = [...vorBaende, ...(await Promise.all(best.baende.map((b) => api.get(b.id))))]
+  const voll = alle.slice(0, vorBaende.length + bis + 1)
   const g = best.baende.slice(0, bis + 1).map((b) => ({ name: b.name, grammatik: LEHRWERK_GRAMMATIK[b.name] as unknown as GrammatikBand }))
   return {
     stelle: best.stelle,

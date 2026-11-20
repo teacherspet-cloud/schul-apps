@@ -8,7 +8,14 @@
  * dem der Form. Geprüft werden die englischen Teile einer Aufgabe; Namen (groß mitten im Satz), Zahlen und
  * Grundformen hinter Plural-s, Kurzformen ('m, 're, 's, n't) zählen nicht als unbekannt.
  */
+import { spanischBekannt } from './spanischFormen'
 import type { GrammatikAufgabe } from './grammatiktrainer'
+
+/**
+ * Vorwissen aus einem anderen Band (20.11.2026, Auftrag der Lehrkraft): Vom Band 1 der Ausgabe 2016 fehlt der Wortschatz –
+ * für ¡Apúntate! 2 (Ausgabe 2016) gilt der Wortschatz von ¡Apúntate! 1 (Ausgabe 2024) als bekannt. Band → Lehrwerk-Kennungen.
+ */
+export const VORWISSEN_BAENDE: Record<string, readonly string[]> = { '¡Apúntate! 2 (Ausgabe 2016)': ['apuntate-2024-1'] }
 
 export interface WortschatzBand {
   name: string
@@ -32,7 +39,9 @@ export function lexikonAus(baende: readonly WortschatzBand[]): Lexikon {
     for (const u of b.units)
       for (const s of u.sections)
         for (const e of s.entries) {
+          // Buchstaben mit Akzent (Spanisch, 20.11.2026) – „cómo“ ist ein Wort, nicht „c“ und „mo“; Lautschrift (ɪ, ə) nicht
           for (const t of `${e.term} ${e.example ?? ''}`.toLowerCase().match(/[a-z]+/g) ?? []) englisch.add(t)
+          for (const t of `${e.term} ${e.example ?? ''}`.toLowerCase().match(MIT_AKZENT) ?? []) englisch.add(t)
           for (const t of `${e.translation ?? ''} ${e.exampleTranslation ?? ''}`.toLowerCase().match(/[a-zäöüß]+/g) ?? []) deutsch.add(t)
         }
   return { deutsch, englisch }
@@ -47,12 +56,16 @@ export interface Einfuehrung {
   abschnitt: string
 }
 
+/** Wörter mit mindestens einem Buchstaben mit Akzent (cómo, años, pingüino) – Lautschrift (ɪ, ə) nicht */
+const MIT_AKZENT = /[a-zà-öø-ÿ]*[à-öø-ÿ][a-zà-öø-ÿ]*/g
+
 const klein = (s: string): string => s.toLocaleLowerCase('en').replace(/[’‘`´]/g, "'")
 
 /** Wörter eines englischen Textes (klein, Kurzformen aufgelöst) */
 export function wortformen(text: string): string[] {
   const aus: string[] = []
-  for (const roh of klein(text).match(/[a-z]+(?:'[a-z]+)?/g) ?? []) {
+  // Wörter mit Akzent (Spanisch) zusätzlich als Ganzes – die Teile ohne Akzent bleiben wie bisher (englische Bank unverändert)
+  for (const roh of [...(klein(text).match(/[a-z]+(?:'[a-z]+)?/g) ?? []), ...(klein(text).match(MIT_AKZENT) ?? [])]) {
     const [w, k] = roh.split("'")
     if (k === undefined) aus.push(...(w === 'cannot' ? ['can', 'not'] : [w]))
     else if (k === 't' && w.endsWith('n')) aus.push(w === 'can' ? 'can' : w === 'won' ? 'will' : w.slice(0, -1), 'not')
@@ -323,16 +336,19 @@ export function englischeTexte(a: GrammatikAufgabe): string[] {
  * Unbekannte Wörter einer Aufgabe. Namen: groß geschriebene Wörter, die nicht am Satzanfang stehen bzw. als Name in einer
  * Liste stehen (Wörter, die mit Großbuchstaben bekannt sind, bleiben Wörter). `extra`: zusätzlich erlaubte Wörter.
  */
-export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<string>, extra: readonly string[] = [], lexikon?: Lexikon): string[] {
+export function unbekannteWoerter(a: GrammatikAufgabe, bekannt: ReadonlySet<string>, extra: readonly string[] = [], lexikon?: Lexikon, sprache = 'en'): string[] {
   const erlaubt = new Set([...bekannt, ...extra.map(klein)])
   const aus = new Set<string>()
   for (const text of englischeTexte(a)) {
-    const roh = text.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) ?? []
+    const roh = (sprache === 'en' ? text.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) : text.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+/g)) ?? []
     roh.forEach((r) => {
       // Name: groß und kein bekanntes Wort (am Satzanfang nur, wenn es klein auch unbekannt ist)
-      const gross = /^[A-Z]/.test(r)
-      for (const w of wortformen(r)) {
+      const gross = /^[A-ZÀ-ÖØ-Þ]/.test(r)
+      // Andere Sprachen: das ganze Wort (wortformen zerlegt englische Kurzformen und liefert Teile ohne Akzent)
+      for (const w of sprache === 'en' ? wortformen(r) : [klein(r)]) {
         if (istBekanntesWort(w, erlaubt)) continue
+        // Spanisch (20.11.2026): gebeugte Formen aus Infinitiv und Grundform ableiten (spanischFormen.ts)
+        if (sprache === 'es' && spanischBekannt(w, erlaubt)) continue
         // Einzelne Buchstaben (Sprecher „A:"/„B:", Aufzählungen) und deutsche Wörter neben dem Englischen
         // Kurzformen-Endungen („'ll", „'re", „'ve" – 29.10.2026) und absichtliche Fehlformen zählen nicht
         if (w.length < 2 || KURZ_ENDUNGEN.has(w) || FEHLFORMEN.has(w) || DEUTSCHE_WOERTER.has(w) || (lexikon && istDeutschesWort(w, lexikon))) continue
