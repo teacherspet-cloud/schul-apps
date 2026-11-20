@@ -131,6 +131,7 @@ export const BROWSER_SPEICHER: LokalerSpeicher[] = [
     schutz: 'Rückmeldung/Elternbrief ENTSCHÄRFT: ohne Eingaben und ohne Titel (shared/auftraege.ts); beim Abmelden gelöscht',
     quellen: ['src/renderer/src/shared/auftraege.ts']
   },
+  { id: 'klassenspiel-klang', art: 'localStorage', geraete: ['pc', 'ipad', 'browser', 'online'], personenbezug: 'keiner', inhalt: 'Klang am Beamer: an/aus, Lautstärke Musik und Geräusche (20.11.2026)', schutz: 'Klartext', quellen: ['src/renderer/src/modules/lernen/klassenspiel/klangbild.ts'] },
   { id: 'onlinetest-*', art: 'localStorage', geraete: ['browser'], personenbezug: 'schueler', inhalt: 'eigene Antworten des Kindes bis zur Abgabe (Schutz vor Verbindungsabbruch)', schutz: 'nach Abgabe und beim Abmelden gelöscht', quellen: ['src/renderer/src/modules/onlinetest/SchuelerBereich.tsx'] },
   { id: 'sa-regal-daten-*', art: 'sessionStorage', geraete: ['browser'], personenbezug: 'schueler', inhalt: 'Lernstand des Kindes (Regal), Zwischenspeicher der Sitzung', schutz: 'nur Sitzung, beim Abmelden gelöscht', quellen: ['src/renderer/src/modules/lernen/regal/regalDaten.ts'] },
   { id: 'sa-termin-onlinetests', art: 'localStorage', geraete: ['browser', 'online'], personenbezug: 'keiner', inhalt: 'Test zum Termin: Kurs, Vokabeltest-Kennung, Lerngruppen-Kennung, Termin und Einstellungen eines noch anzulegenden Onlinetests (keine Namen, keine Inhalte)', schutz: 'gelöscht, sobald der Onlinetest angelegt ist', quellen: ['src/renderer/src/shell/TestErstellen.tsx'] },

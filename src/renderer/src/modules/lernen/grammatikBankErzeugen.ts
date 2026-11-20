@@ -96,7 +96,17 @@ const ARTEN_LATEIN = ['bestimmen', 'mehrfach', 'umformen', 'luecke', 'uebersetze
 const stelleText = (ws: WortschatzStand): string => `${ws.stelle.buch}, ${ws.stelle.unit}, ${ws.stelle.abschnitt}`
 
 /** Auftrag an die KI: nur Wörter und Grammatik, die an der Einführungsstelle bekannt sind */
-export function wortschatzRegel(ws: WortschatzStand, formWorte: readonly string[] = []): string {
+const SPRACH_ADJEKTIV: Record<string, string> = { es: 'spanischen', fr: 'französischen', it: 'italienischen' }
+
+export function wortschatzRegel(ws: WortschatzStand, formWorte: readonly string[] = [], sprache = 'en'): string {
+  // Andere Sprachen als Englisch (20.11.2026, Spanisch ¡Apúntate! 2): ohne die englischen Beispiele (do/does, will, -ing)
+  if (sprache !== 'en') {
+    const adj = SPRACH_ADJEKTIV[sprache] ?? 'fremdsprachigen'
+    return [
+      `WORTSCHATZ UND GRAMMATIK (eingeführt in ${stelleText(ws)} – verbindlich): Die Lernenden kennen NUR diese ${adj} Wörter (dazu erfundene Vornamen, Zahlen und die regelmäßigen Formen dieser Wörter – Plural, Angleichung, Konjugation im Rahmen der bekannten Grammatik${formWorte.length ? ` – sowie die Wörter der geübten Form: ${formWorte.join(', ')}` : ''}): ${[...ws.bekannt].sort().join(', ')}.`,
+      `Bekannte Grammatik bis hier: ${ws.grammatik.join('; ')}. Verwende KEINE anderen Zeiten, Modi und Strukturen als diese und die geübte Form. Jedes ${adj.replace(/en$/, 'e')} Wort in Sätzen, Möglichkeiten, Lösungen und Kontexten muss aus der Liste stammen; Anweisungen und Erklärungen sind deutsch.`
+    ].join('\n')
+  }
   return [
     `WORTSCHATZ UND GRAMMATIK (eingeführt in ${stelleText(ws)} – verbindlich): Die Lernenden kennen NUR diese englischen Wörter (dazu erfundene Vornamen, Zahlen, Plural-s und Kurzformen wie I'm, isn't, can't${formWorte.length ? ` sowie die Wörter der geübten Form: ${formWorte.join(', ')}` : ''}): ${[...ws.bekannt].sort().join(', ')}.`,
     `Bekannte Grammatik bis hier: ${ws.grammatik.join('; ')}. Verwende KEINE anderen Formen und Strukturen – z. B. ${!ws.bekannt.has('has') ? 'kein has/have als Vollverb, kein does/did' : ws.grammatik.some((g) => /do\/does/.test(g)) ? 'kein have got/has got, kein did' : 'kein have got/has got, kein do/does in Fragen und Verneinung, kein did'}, keine Vergangenheit, kein will, kein -ing, wenn es oben nicht steht. Jedes englische Wort in Sätzen, Möglichkeiten, Lösungen und Kontexten muss aus der Liste stammen; Anweisungen und Erklärungen sind deutsch.`,
@@ -157,7 +167,7 @@ export async function erzeugeBankAufgaben(
         ? `Lernjahr Latein: etwa ${lateinLernjahr(a.jahrgang)}.\n${LATEIN_REGELN}`
         : niveauRegel(a, ger, a.niveau === 'g' ? 'grundlegend' : a.niveau === 'a' ? 'anspruchsvoll' : 'mittel'),
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
-      ws ? wortschatzRegel(ws, formWoerter(a.schluessel)) : '',
+      ws ? wortschatzRegel(ws, formWoerter(a.schluessel), a.sprache) : '',
       // Regeln für eindeutige Aufgaben (28.10.2026, nach der Prüfung der ganzen Bank – shared/grammatikAufgabenRegeln.ts)
       AUFGABEN_REGELN,
       LOESUNGEN_REGEL,
@@ -234,7 +244,7 @@ export async function erzeugeBankAufgaben(
   const bericht: BankBericht = { geprueft: 0, gestrichen: 0, zuLeicht: 0, gruende: [], zeitform: 0 }
   const geprueft = await gepruefterPool(
     start,
-    { thema: a.titel, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang, ...(ws ? { zusatzRegel: wortschatzRegel(ws, formWoerter(a.schluessel)) } : {}) },
+    { thema: a.titel, fach: a.fach, sprache: a.sprache, jahrgang: a.jahrgang, ...(ws ? { zusatzRegel: wortschatzRegel(ws, formWoerter(a.schluessel), a.sprache) } : {}) },
     ai,
     melde,
     gesperrt,

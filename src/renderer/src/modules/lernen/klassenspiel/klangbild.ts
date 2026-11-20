@@ -79,8 +79,8 @@ const MUSIK_JE_SPIEL: Record<string, { warten: string[]; spiel: string[]; zufall
   turnier: { warten: KNOBELN, spiel: KNOBELN },
   wette: { warten: KNOBELN, spiel: KNOBELN }
 }
-/** Ersatz, solange ein Klang noch nicht ausgewählt ist */
-const ERSATZ: Record<string, string> = { 'sfx-seil': 'sfx-schritt' }
+/** Ersatz, falls eine Datei fehlt */
+const ERSATZ: Record<string, string> = {}
 const BRUELLEN = ['sfx-bruellen-1', 'sfx-bruellen-2', 'sfx-bruellen-3', 'sfx-bruellen-4']
 /** Mindestabstand je Geräusch (ms) – viele Fehler zugleich sollen nicht prasseln */
 const ABSTAND: Partial<Record<KlangArt, number>> = { fehler: 280, aufstieg: 150, treffer: 70, abwehr: 120, schritt: 140, seil: 160, erobert: 120 }

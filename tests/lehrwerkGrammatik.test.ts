@@ -17,9 +17,10 @@ describe('Zuordnung zum Katalog', () => {
   it('jedes Thema und jede Teilform gibt es', () => {
     const fehlt = ALLE_KENNUNGEN.filter((k) => {
       const [id, teil] = k.split('/')
-      const t = en.find((x) => x.id === id)
+      // Seit 20.11.2026 auch Spanisch (¡Apúntate! 2, Ausgabe 2016)
+      const t = en.find((x) => x.id === id) ?? GRAMMAR_TOPICS.find((x) => x.id === id && x.subject === 'spanisch')
       if (!t) return true
-      return teil ? !teilformenFuer(t, { subjectId: 'englisch', grade: 10 }).some((x) => x.teil.id === teil) : false
+      return teil ? !teilformenFuer(t, { subjectId: t.subject, grade: 10 }).some((x) => x.teil.id === teil) : false
     })
     expect(fehlt).toEqual([])
   })

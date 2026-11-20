@@ -238,6 +238,26 @@ export const LEHRWERK_THEMEN: Record<
 // Lateinische Lehrwerke (07.10.2026): Pontes, Campus A, prima., prima.nova – lehrwerkeLatein.ts
 Object.assign(LEHRWERK_THEMEN, LEHRWERKE_LATEIN)
 
+// Spanisch (20.11.2026): ¡Apúntate! 2, Ausgabe 2016 – Titel aus Inhaltsverzeichnis/Grammatikliste der Lehrkraft und
+// schulinternen Curricula (Johanneum Lüneburg); Unidad 4 ohne gesicherten Titel. Grammatik: lehrwerkGrammatik.ts.
+LEHRWERK_THEMEN['¡Apúntate! 2 (Ausgabe 2016)'] = {
+  quelle: 'Cornelsen, ¡Apúntate! Ausgabe 2016 Band 2 (Inhaltsverzeichnis laut Lehrkraft, schulinterne Curricula Niedersachsen)',
+  fach: 'spanisch',
+  ausgabe: '2016',
+  kapitel: {
+    'Unidad 1': { titel: '¡Bienvenidos a mi barrio!', ort: 'Valencia', thema: 'Stadtviertel, Feste, Freizeit' },
+    'Módulo 1': { titel: '¿Qué te duele?', thema: 'Körper, Gesundheit' },
+    'Unidad 2': { titel: 'En el instituto', thema: 'Schule, Tagesablauf' },
+    'Módulo 2': { titel: 'De viaje: ¿qué llevo?', thema: 'Kleidung, Farben' },
+    'Unidad 3': { titel: 'De paseo por España', ort: 'Madrid', thema: 'Stadterkundung, Wegbeschreibung' },
+    'Módulo 3': { titel: 'Hacer la compra', thema: 'Lebensmittel, Mengenangaben' },
+    'Unidad 4': { titel: 'Unidad 4', thema: 'Essen, Erlebnisse in der Vergangenheit' },
+    'Unidad 5': { titel: 'Mi viaje a México', ort: 'México' },
+    'Unidad 6': { titel: 'Los medios y yo', thema: 'Medien, Internet' },
+    'Módulo 4': { titel: '¿Alguna vez has...?', thema: 'Erfahrungen' }
+  }
+}
+
 /*
  * Grammatik nach der Liste der Lehrkraft (Niedersachsen, je Station – lehrwerkGrammatik.ts, 07.10.2026) ersetzt die
  * Angabe aus den Klett-Planungsmustern; Kapitel, die nur dort vorkommen (Trailer), kommen ans Ende des Bandes.

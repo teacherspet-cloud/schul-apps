@@ -45,3 +45,4 @@ Ausgewählt von der Lehrkraft in der Hörprobe; Lautheit angeglichen (Musik −2
 | sfx-runde.mp3 | Glocke 2 | https://opengameart.org/content/100-cc0-sfx |
 | sfx-gebremst.mp3 | Windstoß | https://opengameart.org/content/wind-whoosh-loop |
 | amb-bergwind.mp3 | Bergwind | https://opengameart.org/content/wind-whoosh-loop |
+| sfx-seil.mp3 | Hau-ruck kurz (Ausschnitt aus „15 vocal male strain/hurt/pain/jump sounds“) | https://opengameart.org/content/15-vocal-male-strainhurtpainjump-sounds |

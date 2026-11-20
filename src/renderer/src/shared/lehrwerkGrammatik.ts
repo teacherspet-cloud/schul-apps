@@ -51,6 +51,88 @@ const [TA, TB, TC, TD, TE] = TRANSITION_2024_ABSCHNITTE
 export const QUELLE_NDS = 'Grammatikthemen Green Line Niedersachsen (Liste der Lehrkraft, 07.10.2026)'
 
 /**
+ * ¡Apúntate! 2, Ausgabe 2016 (Cornelsen, Niedersachsen Jg. 7) – Liste der Lehrkraft „Spanisch_Grammatik_nach_Abschnitten"
+ * (20.11.2026, nach dem Inhaltsverzeichnis), den spanischen Katalogthemen zugeordnet. Reiner Themenwortschatz und
+ * Redemittel (Uhrzeit, Wegbeschreibung, Ratschläge, Zahlen) haben kein Katalogthema und werden nur genannt.
+ * Módulos ohne Stationen ('' = ganzes Kapitel).
+ */
+const APUNTATE_2016_2: Band = {
+  'Unidad 1': {
+    '¡Acércate!': [P('das Verb gustar', ['es.pron.oi'], true), P('die indirekten Objektpronomen nos, os, les', ['es.pron.oi'])],
+    'Texto A': [P('estar + gerundio', ['es.verb.gerundio']), P('das Verb dar', ['es.verb.presente_irr'])],
+    'Texto B': [
+      P('die Verben salir, tener und hacer', ['es.verb.presente_irr'], true),
+      P('das Verb poner', ['es.verb.presente_irr']),
+      P('der Begleiter todo/-a', ['es.pron.indefinit'])
+    ]
+  },
+  'Módulo 1': { '': [P('das Verb doler', ['es.pron.oi', 'es.verb.presente_irr'])] },
+  'Unidad 2': {
+    '¡Acércate!': [P('die Schulfächer', [], true), P('bueno/-a, malo/-a; Verkürzung buen/mal', ['es.adj.angleichung'])],
+    'Texto A': [P('die Angabe der Uhrzeit', [], true), P('reflexive Verben (Singular)', ['es.verb.reflexiv', 'es.pron.reflexiv']), P('der Begleiter otro/-a', ['es.pron.indefinit'])],
+    'Texto B': [
+      P('die Diphthongverben o → ue', ['es.verb.presente_irr'], true),
+      P('das Verb jugar', ['es.verb.presente_irr']),
+      P('reflexive Verben (Plural)', ['es.verb.reflexiv', 'es.pron.reflexiv'])
+    ]
+  },
+  'Módulo 2': { '': [P('Personenbeschreibung', [], true), P('Kleidung und Farben (Themenwortschatz)', [])] },
+  'Unidad 3': {
+    '¡Acércate!': [P('die Adjektive', ['es.adj.angleichung'], true), P('die Zahlen bis 1000', []), P('der Superlativ', ['es.adj.komparation'])],
+    'Texto A': [
+      P('die direkten Objektpronomen', ['es.pron.od']),
+      P('der reale Bedingungssatz mit si', ['es.satz.bedingung_real']),
+      P('das Verb conocer', ['es.verb.presente_irr'])
+    ],
+    'Texto B': [
+      P('Wegbeschreibung', [], true),
+      P('der Komparativ', ['es.adj.komparation']),
+      P('die Verben decir und saber', ['es.verb.presente_irr']),
+      P('die Höflichkeitsformen usted/ustedes', ['es.pron.subjekt'])
+    ]
+  },
+  'Módulo 3': { '': [P('Lebensmittel und Mengenangaben (Themenwortschatz)', [])] },
+  'Unidad 4': {
+    '¡Acércate!': [P('mucho/-a, poco/-a, otro/-a', ['es.pron.indefinit'], true), P('Essen (Themenwortschatz)', [])],
+    'Texto A': [
+      P('ser/estar', ['es.verb.ser_estar_hay'], true),
+      P('das pretérito indefinido der Verben auf -ar', ['es.verb.indefinido_reg']),
+      P('das pretérito indefinido der Verben ir und ser', ['es.verb.indefinido_irr'])
+    ],
+    'Texto B': [
+      P('Ratschläge geben', [], true),
+      P('das pretérito indefinido der Verben auf -er und -ir', ['es.verb.indefinido_reg']),
+      P('antes de / después de + infinitivo', ['es.satz.infinitivkonstr'])
+    ]
+  },
+  'Unidad 5': {
+    '¡Acércate!': [
+      P('der Imperativ', ['es.verb.imperativo_afirm'], true),
+      P('die Zahlen über 1000', []),
+      P('der Imperativ der reflexiven Verben', ['es.verb.imperativo_afirm', 'es.pron.stellung'])
+    ],
+    'Texto A': [P('unregelmäßige Formen des pretérito indefinido (estar, hacer, venir)', ['es.verb.indefinido_irr']), P('nada, nadie, nunca', ['es.satz.negation'])],
+    'Texto B': [
+      P('die unregelmäßigen Verben im Präsens', ['es.verb.presente_irr'], true),
+      P('unregelmäßige Formen des pretérito indefinido (dar, poder, poner, tener)', ['es.verb.indefinido_irr']),
+      P('der absolute Superlativ (-ísimo/-a)', ['es.adj.superl_abs']),
+      P('no … nada/nadie/nunca', ['es.satz.negation'])
+    ]
+  },
+  'Unidad 6': {
+    '¡Acércate!': [P('¿para qué?, ¿en qué?, ¿de qué?, ¿a quién?', ['es.pron.interrogativ'])],
+    'Texto A': [P('die Fragewörter', ['es.pron.interrogativ'], true), P('die indirekte Rede/Frage im Präsens', ['es.satz.indirekte_rede'])],
+    'Texto B': [
+      P('Stellung der Objektpronomen beim Imperativ', ['es.pron.stellung']),
+      P('die Ordinalzahlen', []),
+      P('hay que + infinitivo', ['es.verb.perifrasis']),
+      P('die Verben encantar, interesar und parecer', ['es.pron.oi'])
+    ]
+  },
+  'Módulo 4': { '': [P('das pretérito perfecto', ['es.verb.perfecto']), P('Verwendung von pretérito indefinido und pretérito perfecto', ['es.verb.perf_vs_indef'])] }
+}
+
+/**
  * Die eingebaute Liste (unverändert seit 07.10.2026). Gelesen wird überall `LEHRWERK_GRAMMATIK` – die wirksame Fassung
  * mit den Bearbeitungen aus der App „Grammatikformen" (12.10.2026, siehe `wendeGrammatikAn`).
  */
@@ -406,6 +488,8 @@ export const LEHRWERK_GRAMMATIK_EINGEBAUT: Record<string, Band> = {
   }
 }
 
+LEHRWERK_GRAMMATIK_EINGEBAUT['¡Apúntate! 2 (Ausgabe 2016)'] = APUNTATE_2016_2
+
 const kopie = (b: Record<string, Band>): Record<string, Band> => JSON.parse(JSON.stringify(b)) as Record<string, Band>
 
 /**
@@ -515,7 +599,7 @@ export function fruehereBaendeDerReihe(band: string): string[] {
 }
 
 /** Reihenfolge der Abschnitte innerhalb einer Unit (wie in den Lehrwerksdateien) */
-export const ABSCHNITT_FOLGE = ['Check-in', 'Introduction', 'Station 1', 'Station 2', 'Station 3', 'Story', 'Unit task', 'Check-out']
+export const ABSCHNITT_FOLGE = ['Check-in', 'Introduction', 'Station 1', 'Station 2', 'Station 3', 'Story', 'Unit task', 'Check-out', 'Vocabulario', '¡Acércate!', 'Texto A', 'Texto B']
 
 /** Kurztext eines Kapitels aus der Liste („Artikel, to be …") – für Vorwissen und Planung */
 export function grammatikText(buch: string, kapitel: string): string | undefined {

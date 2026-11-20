@@ -94,6 +94,8 @@ const ERWARTET: Record<string, string | null> = {
   'decouvertes-2020-3': '978-3-12-624031-4',
   'decouvertes-2020-4': '978-3-12-624041-3',
   'decouvertes-2020-5': '978-3-12-624051-2',
+  // Ausgabe 2016 Band 2 seit 20.11.2026 wieder (mit Wortschatz der Lehrkraft)
+  'apuntate-2016-2': '978-3-06-121118-9',
   'apuntate-2024-1': '978-3-06-122987-0',
   'apuntate-2024-2': '978-3-06-123052-4',
   'apuntate-2024-3': '978-3-06-123053-1',
