@@ -15,7 +15,10 @@ type Datei = {
   regeln: Record<string, { titel: string; erklaerung: string; beispiele: string[] }>
   neu: { schluessel: string; aufgabe: Record<string, unknown> }[]
 }
-const d = JSON.parse(readFileSync('resources/grammatik-bank/apuntate2016-2-2026-11-25.json', 'utf8')) as Datei
+const haupt = JSON.parse(readFileSync('resources/grammatik-bank/apuntate2016-2-2026-11-25.json', 'utf8')) as Datei
+// Nachtrag 25.11.2026: die 5 fehlenden Aufgaben (u. a. indefinido mit venir) – gleiche Prüfungen
+const nachtrag = JSON.parse(readFileSync('resources/grammatik-bank/apuntate2016-2-nachtrag-2026-11-25.json', 'utf8')) as Datei
+const d: Datei = { regeln: { ...nachtrag.regeln, ...haupt.regeln }, neu: [...haupt.neu, ...nachtrag.neu] }
 
 describe('¡Apúntate! 2 (Ausgabe 2016), Spanisch (Handbetrieb)', () => {
   it('jede Aufgabe ohne Mangel, Selbsttest bestanden, eigene Lösung richtig, Wortschatz bis zur Stelle', () => {
@@ -51,5 +54,13 @@ describe('¡Apúntate! 2 (Ausgabe 2016), Spanisch (Handbetrieb)', () => {
 
   it('Stelle aus dem Band 2016, Band 1 (2024) als Vorwissen', () => {
     expect(wortschatzStandServer('es.pron.oi/mit-gustar', 'es')?.stelle).toMatchObject({ buch: '¡Apúntate! 2 (Ausgabe 2016)' })
+  })
+
+  // Grundwortschatz Spanisch (25.11.2026): venir fehlt in beiden Listen, gilt jetzt samt unregelmäßiger Formen als bekannt
+  it('venir mit vino/vinieron bekannt, Nachtrag vollständig', () => {
+    const ws = wortschatzStandServer('es.verb.indefinido_irr/i-stamm', 'es')!
+    const a = { art: 'luecke', anweisung: 'x', satz: 'Ayer Ana vino y sus amigos vinieron también.', loesungen: ['vino'], erklaerung: 'x', uebung: 'bilden' }
+    expect(unbekannteWoerter(a as never, ws.bekannt, [], ws.lexikon, 'es')).toEqual([])
+    expect(nachtrag.neu.length).toBe(5)
   })
 })

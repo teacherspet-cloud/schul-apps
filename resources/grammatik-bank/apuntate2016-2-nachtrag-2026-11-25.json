@@ -1,0 +1,126 @@
+{
+ "hinweis": "Erzeugt über den App-Weg im Handbetrieb (29.10.2026, tests/handbetrieb) – alle Absicherungen der App",
+ "regeln": {
+  "es.pron.od/formen": {
+   "titel": "Direkte Objektpronomen: me, te, lo/la, nos, os, los/las",
+   "erklaerung": "Das direkte Objektpronomen ersetzt eine Person oder Sache, die schon genannt wurde. Für Sachen und Personen in der 3. Person nimmst du lo, la, los oder las – passend zu Genus und Zahl des Bezugsworts. Das Pronomen steht vor dem konjugierten Verb oder wird an den Infinitiv bzw. das Gerundio angehängt; beim Gerundio brauchst du dann einen Akzent.",
+   "beispiele": [
+    "¿Conoces a Pablo? – Sí, lo conozco.",
+    "Las preguntas son difíciles, pero las vamos a responder.",
+    "¿Me llevas al museo? – Sí, te llevo."
+   ]
+  },
+  "mix:es.verb.imperativo_afirm/pronomen+es.verb.imperativo_afirm/vosotros-reflexiv": {
+   "titel": "Imperativ mit angehängtem Pronomen: tú und vosotros",
+   "erklaerung": "Beim bejahten Imperativ hängst du das Pronomen an das Verb an. Bei tú brauchst du dann oft einen Akzent, damit die Betonung bleibt: levanta → levántate, compra → cómpralo. Bei vosotros fällt vor dem Reflexivpronomen os das -d weg: sentad → sentaos, levantad → levantaos. Mit lo, la, los, las bleibt das -d: comed → comedlo.",
+   "beispiele": [
+    "Marta, despiértate, ya son las siete.",
+    "Chicos, levantaos y mirad el mapa.",
+    "La entrada está aquí: tómala."
+   ]
+  },
+  "es.verb.indefinido_irr/i-stamm": {
+   "titel": "Indefinido mit i-Stamm: hacer und venir",
+   "erklaerung": "hacer und venir sind im indefinido unregelmäßig: Sie bekommen einen neuen Stamm mit i – hic- und vin-. Die Endungen sind -e, -iste, -o, -imos, -isteis, -ieron, und diese Formen haben keinen Akzent. Bei hacer wird in der 3. Person Singular aus c ein z: hizo.",
+   "beispiele": [
+    "El sábado hice los deberes con mi abuela.",
+    "Mis tíos vinieron a la fiesta en tren.",
+    "¿Por qué no vinisteis al museo?"
+   ]
+  }
+ },
+ "neu": [
+  {
+   "schluessel": "es.pron.od/formen",
+   "aufgabe": {
+    "art": "umformen",
+    "anweisung": "Ersetze „a mis primos“ durch ein Pronomen. Schreibe den ganzen Satz.",
+    "satz": "Este verano voy a visitar a mis primos.",
+    "vorgabe": "Pronomen statt „a mis primos“",
+    "loesungen": [
+     "Este verano los voy a visitar.",
+     "Este verano voy a visitarlos.",
+     "Este verano yo los voy a visitar.",
+     "Este verano yo voy a visitarlos."
+    ],
+    "erklaerung": "„mis primos“ ist männlich Plural → los; vor „voy“ oder an „visitar“ angehängt.",
+    "uebung": "bilden",
+    "kontext": "Mis primos viven en Galicia, cerca del mar.",
+    "anfang": "Este verano",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "mix:es.verb.imperativo_afirm/pronomen+es.verb.imperativo_afirm/vosotros-reflexiv",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Imperativform.",
+    "satz": "Por favor, ___ y escuchad bien.",
+    "loesungen": [
+     "sentaos"
+    ],
+    "optionen": [
+     "sentaos",
+     "siéntate",
+     "sentados",
+     "sentaros"
+    ],
+    "erklaerung": "„escuchad“ zeigt: vosotros → sentad + os, das -d fällt weg: sentaos.",
+    "uebung": "erkennen",
+    "kontext": "La profesora habla con toda la clase antes de la presentación sobre el Popocatépetl.",
+    "niveau": "a"
+   }
+  },
+  {
+   "schluessel": "es.verb.indefinido_irr/i-stamm",
+   "aufgabe": {
+    "art": "auswahl",
+    "anweisung": "Wähle die richtige Form von venir.",
+    "satz": "El lunes tú no ___ a clase. ¿Qué pasó?",
+    "loesungen": [
+     "viniste"
+    ],
+    "optionen": [
+     "viniste",
+     "vino",
+     "veniste",
+     "vine"
+    ],
+    "erklaerung": "tú → viniste: Stamm vin- mit der Endung -iste (nicht *veniste).",
+    "uebung": "erkennen",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "es.verb.indefinido_irr/i-stamm",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Setze die richtige Form im indefinido ein.",
+    "satz": "El domingo Diego ___ un picnic en Chapultepec.",
+    "vorgabe": "(hacer)",
+    "loesungen": [
+     "hizo"
+    ],
+    "erklaerung": "él/ella → hizo: Stamm hic-, aber vor o wird c zu z; kein Akzent.",
+    "uebung": "bilden",
+    "niveau": "g"
+   }
+  },
+  {
+   "schluessel": "es.verb.indefinido_irr/i-stamm",
+   "aufgabe": {
+    "art": "luecke",
+    "anweisung": "Ergänze die passende Form im indefinido.",
+    "satz": "Nosotras ___ una presentación sobre las pirámides mayas.",
+    "vorgabe": "(hacer)",
+    "loesungen": [
+     "hicimos"
+    ],
+    "erklaerung": "Es war am Freitag → indefinido; nosotras → hicimos.",
+    "uebung": "anwenden",
+    "kontext": "El viernes Marta y yo estuvimos en clase de Historia.",
+    "niveau": "g"
+   }
+  }
+ ]
+}

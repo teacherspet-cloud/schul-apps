@@ -31,9 +31,23 @@ project poster team trainer job doctor nurse police
 `
 export const GRUNDWORTSCHATZ_EN: ReadonlySet<string> = new Set(WOERTER.toLowerCase().split(/\s+/).filter(Boolean))
 
-/** Bekannte Wörter um den Grundwortschatz der Sprache erweitert (nur Englisch) */
+/**
+ * Grundwortschatz Spanisch (25.11.2026, Auftrag der Lehrkraft „füge die fehlenden dinge hinzu"): ¡Apúntate! 2 (Ausgabe
+ * 2016) baut auf Band 1 der alten Reihe auf; als Vorwissen dient Band 1 der Ausgabe 2024, der einige Grundwörter erst in
+ * Band 2 führt (venir) oder gar nicht listet. Bei der ersten spanischen Bank mussten Aufgaben deshalb ausweichen oder fielen
+ * weg (vino/vinieron, cuidado, ejercicio …). Konjugierte Formen ergeben sich aus dem Infinitiv (spanischFormen.ts).
+ */
+const PALABRAS = `
+venir oír oir así primero primera segundo segunda pronto mismo misma cuidado ejercicio ejercicios funcionar preguntar
+desayuno comida comidas plato platos teléfono tren trenes mar euro euros cansado cansada cansados cansadas
+norte sur este oeste
+`
+export const GRUNDWORTSCHATZ_ES: ReadonlySet<string> = new Set(PALABRAS.toLowerCase().split(/\s+/).filter(Boolean))
+
+/** Bekannte Wörter um den Grundwortschatz der Sprache erweitert (Englisch, Spanisch) */
 export function mitGrundwortschatz(bekannt: ReadonlySet<string>, sprache: string): Set<string> {
   const aus = new Set(bekannt)
   if (sprache === 'en') for (const w of GRUNDWORTSCHATZ_EN) aus.add(w)
+  if (sprache === 'es') for (const w of GRUNDWORTSCHATZ_ES) aus.add(w)
   return aus
 }

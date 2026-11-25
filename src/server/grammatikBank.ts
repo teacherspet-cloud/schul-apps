@@ -590,7 +590,10 @@ const EINSPIELEN: [string, string][] = [
   // Erste spanische Bank (20.–25.11.2026, Auftrag der Lehrkraft „orientier dich beim vokabular an dem aus dem neueren
   // apuntate 1. und erstell die übungen"): ¡Apúntate! 2 (Ausgabe 2016), 83 Teilformen, Wortschatz mit Band 1 (2024) als
   // Vorwissen – gleicher Ablauf mit Prüfung, Blindproben und Überarbeitung
-  ['grammatik-bank-apuntate2016-2-2026-11-25', 'apuntate2016-2-2026-11-25.json']
+  ['grammatik-bank-apuntate2016-2-2026-11-25', 'apuntate2016-2-2026-11-25.json'],
+  // Nachtrag (25.11.2026, Auftrag der Lehrkraft „füge die fehlenden dinge hinzu"): die 5 Aufgaben, die fehlten, weil venir
+  // in keiner Wortliste stand (jetzt spanischer Grundwortschatz) bzw. Doppelpronomen gestrichen wurden
+  ['grammatik-bank-apuntate2016-2-nachtrag-2026-11-25', 'apuntate2016-2-nachtrag-2026-11-25.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
