@@ -586,7 +586,11 @@ const EINSPIELEN: [string, string][] = [
   // Runde 6 (14.11.2026): Green Line Transition Topic 1–5 (Klasse 11) – gleicher Ablauf
   ['grammatik-bank-greenline-runde6-2026-11-14', 'greenline-transition-2026-11-14.json'],
   // Nachtrag 2 (14.11.2026): be allowed to / Ersatzformen (bisher von der Zeitform-Sperre als Passiv gestrichen) und Restfelder
-  ['grammatik-bank-greenline-nachtrag2-2026-11-14', 'greenline-nachtrag2-2026-11-14.json']
+  ['grammatik-bank-greenline-nachtrag2-2026-11-14', 'greenline-nachtrag2-2026-11-14.json'],
+  // Erste spanische Bank (20.–25.11.2026, Auftrag der Lehrkraft „orientier dich beim vokabular an dem aus dem neueren
+  // apuntate 1. und erstell die übungen"): ¡Apúntate! 2 (Ausgabe 2016), 83 Teilformen, Wortschatz mit Band 1 (2024) als
+  // Vorwissen – gleicher Ablauf mit Prüfung, Blindproben und Überarbeitung
+  ['grammatik-bank-apuntate2016-2-2026-11-25', 'apuntate2016-2-2026-11-25.json']
 ]
 
 function ueberarbeitungEinmal(d: ReturnType<typeof datenbank>): void {
