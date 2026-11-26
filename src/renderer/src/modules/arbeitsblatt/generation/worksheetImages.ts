@@ -4,7 +4,7 @@ import { AiCall, chooseImages, Choice, gatherCandidates, ImageNeed, ImageService
 import { bildzugriff } from '../didactics/bildarbeit'
 import { runLimited } from '../../../shared/async'
 import { GREEN_SCREEN_PROMPT } from '../../../shared/images'
-import type { ImageBlock, ImageItem, WorksheetMeta, WsBlock } from '../model/types'
+import type { ImageBlock, ImageItem, ImageLabel, TaskBlock, WorksheetMeta, WsBlock } from '../model/types'
 import { findReusable, type ReusableImage } from '../../../shared/imageReuse'
 import { istZeitleiste, zeitleisteAusBeschreibung } from './zeitleiste'
 import { beschriftungsAufgaben, istSchaltplan, zeichneSchaltplan } from './schaltplan'
@@ -183,9 +183,25 @@ async function completeTargets(
    */
   const blindeBeschriftung = (b: ImageBlock): void => {
     if (!b.labels?.length || b.schaltplan) return
-    if (beschriftungsAufgaben([b], blocks).length) {
+    const aufgaben = beschriftungsAufgaben([b], blocks)
+    if (aufgaben.length) {
+      /*
+       * Befund „Gradnetz der Erde" (26.11.2026): Die Punkte wurden hier gelöscht, weil die Aufgabe nummerierte
+       * Schreiblinien hat – danach zeigte das Bild nichts mehr, und niemand wusste, welche Linie mit 1, 2, 3 gemeint ist.
+       * Jetzt werden die Punkte zu ZIFFERN in der Reihenfolge der Begriffe der Aufgabe (ein Beschriftungsweg: Ziffer im
+       * Bild, Begriff auf der nummerierten Linie). Punkte ohne passenden Begriff fallen weg.
+       */
+      const nummeriert = nummerierePunkte(b.labels, aufgaben)
+      if (nummeriert.length) {
+        b.labels = nummeriert
+        warn(
+          b,
+          `${(b.warnings ?? []).find((w) => w.startsWith('Bild:')) ?? 'Bild: automatisch gewählt.'} Die Ziffern 1–${nummeriert.length} wurden vor der Bildwahl geschätzt – bitte prüfen, ob jede Ziffer am gemeinten Bildteil sitzt, und ggf. verschieben.`
+        )
+        return
+      }
       delete b.labels
-      warn(b, `${(b.warnings ?? []).find((w) => w.startsWith('Bild:')) ?? 'Bild: automatisch gewählt.'} Die geschätzten Beschriftungspunkte wurden entfernt – die Aufgabe bietet die Schreiblinien.`)
+      warn(b, `${(b.warnings ?? []).find((w) => w.startsWith('Bild:')) ?? 'Bild: automatisch gewählt.'} Bitte im Bild die Ziffern zu den Schreiblinien der Aufgabe setzen (Beschriftungspunkt hinzufügen) – sonst ist unklar, welcher Bildteil gemeint ist.`)
       return
     }
     warn(
@@ -416,4 +432,25 @@ export function needsRealMaterial(b: Pick<ImageBlock, 'description' | 'caption'>
   return /stimmzettel|wahlzettel|urkunde|dokument|zeitung|plakat mit|formular|diagramm|statistik|tabelle|grafik mit|schaubild|\b[a-zäöü]*karte\b|stadtplan|fahrplan|screenshot|quittung|rechnung|brief mit|beschriftet|zeitleiste|zeitachse|zeitstrahl|ablaufschema|ablaufplan|organigramm|ereigniskarte|mit datum|datumsangabe|datiert|jahreszahl|mit zahlen|mit text|mit schrift/i.test(
     `${b.caption} ${b.description}`
   )
+}
+
+/**
+ * Beschriftungspunkte als Ziffern zu den nummerierten Linien einer Aufgabe (26.11.2026): Reihenfolge wie die Begriffe
+ * der Aufgabe (Lösungen der Linien), Text = Ziffer, keine leere Linie am Bild – geschrieben wird auf der Linie der Aufgabe.
+ */
+export function nummerierePunkte(labels: ImageLabel[] | undefined, aufgaben: TaskBlock[]): ImageLabel[] {
+  if (!labels?.length) return []
+  const begriffe = aufgaben.flatMap((t) => [t.answer, ...t.parts.map((p) => p.answer)].filter((a) => a?.kind === 'labels').flatMap((a) => a.labels ?? []))
+  const norm = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const frei = [...labels]
+  const aus: ImageLabel[] = []
+  begriffe.forEach((begriff, i) => {
+    const k = frei.findIndex((l) => norm(l.text) === norm(begriff) || norm(l.text).includes(norm(begriff)) || norm(begriff).includes(norm(l.text)))
+    if (k < 0) return
+    const [l] = frei.splice(k, 1)
+    aus.push({ ...l, text: String(i + 1), blank: false })
+  })
+  // Ohne Textabgleich (Punkte ohne Text): in der gegebenen Reihenfolge
+  if (!aus.length && labels.length <= begriffe.length) return labels.map((l, i) => ({ ...l, text: String(i + 1), blank: false }))
+  return aus
 }

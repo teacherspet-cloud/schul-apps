@@ -333,12 +333,12 @@ export function medienFuer(
       ...(r.mehrdeutig && !opts.lage ? { mehrdeutig: true as const } : {}),
       ...(andere.length ? { andere } : {})
     }
-    if (r.b) return { ...bildAus(r.b), ...zusatz }
+    if (r.b) return { ...bildAus(r.b), ...zusatz, ...(r.vorlaeufig ? { ungesichert: true as const } : {}) }
     if (!r.altErlaubt) return zusatz
     for (const w of altSchluesselFuer(sprache, a)) {
       const f = finde(i, sprache, w)
       const alt = f ? i[f.schluessel] : undefined
-      if (alt && (alt.bild || Object.keys(alt.bildStufen ?? {}).length || alt.ohneBild?.length)) return { ...bildAus(alt), ...zusatz }
+      if (alt && (alt.bild || Object.keys(alt.bildStufen ?? {}).length || alt.ohneBild?.length)) return { ...bildAus(alt), ...zusatz, ungesichert: true as const }
     }
     return zusatz
   }

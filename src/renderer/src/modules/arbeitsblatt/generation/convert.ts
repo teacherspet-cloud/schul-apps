@@ -139,6 +139,8 @@ export function convertAnswer(a: any, rng: Rng): Answer {
   // Doppeltes an der Lücke aus der Lösung („to [[to reward]]“ → „to [[reward]]“, 02.10.2026)
   out.gapText = lueckentextOhneDoppelte(text(a?.gapText))
   out.labels = strings(a?.labels)
+  // Beschriftungsliste (26.11.2026, Befund „Gradnetz", Aufgabe 1a): 6 Begriffe, aber nur 3 nummerierte Linien – mindestens eine Linie je Begriff
+  if (out.kind === 'labels' && out.labels.length > out.count) out.count = Math.min(30, out.labels.length)
   // Zeichenfläche mit Achsen: bereinigt, damit Bereich und Schrittweite brauchbar sind
   if (out.kind === 'diagram') {
     const roh = a?.diagram ?? {}

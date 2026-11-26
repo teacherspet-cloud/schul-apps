@@ -83,6 +83,7 @@ import { ProblemWoerterFenster } from './ProblemWoerterFenster'
 import { GRAMMATIK_GEAENDERT, MehrAufgabenFenster } from '../lernen/kurs/KursGrammatik'
 import { KURS_GEAENDERT } from '../lernen/kurs/KursSeite'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
+import { VorhandeneReiheKnopf, VorhandenesBlattKnopf } from './VorhandenesHinzufuegen'
 import { useAppSettings } from '../../shared/settingsStore'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from './MaterialListe'
@@ -1039,6 +1040,9 @@ function FachAnsicht({ id, bedarfGeaendert }: { id: string; bedarfGeaendert?: ()
             <Button size="xs" variant="light" leftSection={<IconFileText size={14} />} onClick={() => void blattNeuFuerKlasse(d)} data-arbeitsblatt-erstellen>
               Arbeitsblatt erstellen
             </Button>
+            {/* Vorhandenes hinzufügen (26.11.2026): aus der eigenen Bibliothek wählen, dann freigeben bzw. zuweisen – Klasse vorgewählt */}
+            <VorhandenesBlattKnopf gewaehlt={(ws, docId) => setFreigabe({ ws, docId, titel: ws.meta.title || ws.meta.topic || 'Arbeitsblatt', erledigt: () => undefined })} />
+            <VorhandeneReiheKnopf gruppeId={d.id} fachId={fachAusName(d.fach)?.id} fertig={laden} />
             {/* Förder- und Fordermaterial (12.10.2026, Entscheidung der Lehrkraft): rechts neben „Arbeitsblatt erstellen" */}
             <Button
               size="xs"

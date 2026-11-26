@@ -17,15 +17,22 @@ import type { BlattAufgabe, BlattFeld } from './blattFreigabe'
 import { abgrenzen, datenRegel, neueMarke } from './kiSchutz'
 import { KRISEN_FELD, KRISEN_REGEL } from './krise'
 import { ohneTrenner } from './blattKiSchutz'
+import { kategorieInfo, werteDiktatAus, type DiktatRegeln } from './diktat'
 
 export type SchluesselTeil =
   | { teil: number; art: 'mc'; optionen: string[]; richtig: number[] }
   | { teil: number; art: 'rf'; aussagen: string[]; werte: boolean[] }
-  | { teil: number; art: 'luecke'; loesungen: string[] }
+  /** `exakt` (Lückendiktat, 26.11.2026): Groß-/Kleinschreibung und Buchstaben zählen genau */
+  | { teil: number; art: 'luecke'; loesungen: string[]; exakt?: boolean }
+  /** Diktat (26.11.2026): der ganze Text der Schreibfelder gegen den Diktattext (shared/diktat.ts) */
+  | { teil: number; art: 'diktat'; text: string; regeln: DiktatRegeln }
   /** Zuordnen: je Zeile links der Index der passenden Möglichkeit rechts (a = 0) */
   | { teil: number; art: 'zuordnen'; paare: number[] }
   /** Ordnen: je angezeigter Zeile die richtige Nummer (1 …) */
   | { teil: number; art: 'ordnen'; nummern: number[] }
+
+/** Ampel eines Diktats nach dem Notenvorschlag: 1–2 sicher, 3–4 teilweise, sonst noch nicht (Faustregel) */
+export const diktatEinschaetzung = (note: number): 'sicher' | 'teilweise' | 'noch nicht' => (note <= 2 ? 'sicher' : note <= 4 ? 'teilweise' : 'noch nicht')
 
 export interface AufgabenSchluessel {
   teile: SchluesselTeil[]
@@ -67,6 +74,12 @@ export const normLuecke = (t: string): string =>
     .trim()
 
 /** Stimmt der Eintrag mit der Lösung überein? Mehrere Lösungen mit „/", Eingeklammertes ist freiwillig */
+/** Lückendiktat: genau so geschrieben (nur Apostroph-Varianten und Leerraum am Rand gleich) */
+export const lueckeExakt = (eintrag: string, loesung: string): boolean => {
+  const n = (t: string): string => t.normalize('NFC').replace(/[’‘`´]/g, "'").replace(/\s+/g, ' ').trim()
+  return Boolean(n(eintrag)) && n(eintrag) === n(loesung)
+}
+
 export function lueckeRichtig(eintrag: string, loesung: string): boolean {
   const e = normLuecke(eintrag)
   if (!e) return false
@@ -162,7 +175,15 @@ export function schluesselBereinigt(roh: unknown): AufgabenSchluessel | undefine
       }
       case 'luecke': {
         const loesungen = (Array.isArray(t.loesungen) ? t.loesungen : []).slice(0, 200).map(text)
-        return loesungen.length ? [{ teil, art: 'luecke', loesungen }] : []
+        return loesungen.length ? [{ teil, art: 'luecke', loesungen, ...(t.exakt === true ? { exakt: true } : {}) }] : []
+      }
+      // Diktat (26.11.2026): der Text bis 12 000 Zeichen, Regeln nur aus den bekannten Werten
+      case 'diktat': {
+        const diktatText = String(t.text ?? '').slice(0, 12000)
+        const r = (t.regeln ?? {}) as Record<string, unknown>
+        const zaehlart = r.zaehlart === 'streng' || r.zaehlart === 'woerter' ? r.zaehlart : 'isb'
+        const sechs = Math.max(3, Math.min(25, Number(r.sechsAbProzent) || 10))
+        return diktatText.trim() ? [{ teil, art: 'diktat', text: diktatText, regeln: { zaehlart, kommasDiktiert: r.kommasDiktiert === true, sechsAbProzent: sechs } }] : []
       }
       case 'zuordnen': {
         const paare = zahlen(t.paare, 25)
@@ -200,6 +221,19 @@ export interface AufgabeAuto {
   nurAuto: boolean
   /** Sinngemäße Lücken, die nicht wörtlich der Musterlösung entsprechen – die KI beurteilt sie nach dem Inhalt */
   offen?: string[]
+  /** Eingetipptes Diktat (26.11.2026) */
+  diktat?: DiktatErgebnis
+}
+
+/** Ergebnis eines eingetippten Diktats – Notenvorschlag nur für die Lehrkraft */
+export interface DiktatErgebnis {
+  fehler: number
+  woerter: number
+  prozentRichtig: number
+  fehlerJe100: number
+  notenvorschlag: number
+  /** Die Fehlerstellen (Soll, Ist, Kategorie) */
+  stellen: { soll: string; ist: string; art: string; kategorie?: string; fehler: number; wiederholung?: boolean }[]
 }
 
 /*
@@ -255,9 +289,29 @@ export function autoPruefen(
       return b ? [{ f, b }] : []
     })
     const geprueft = new Set<string>()
+    let diktat: DiktatErgebnis | undefined
     let richtig = 0
     let gesamt = 0
     for (const t of s.teile) {
+      // Diktat: alle Schreibfelder der Aufgabe ohne Schlüsselstelle zusammen, Wort für Wort gegen den Diktattext
+      if (t.art === 'diktat') {
+        const schreib = eigene.filter((f) => !bezugAus(f.bezug))
+        const ist = schreib.map(wert).join(String.fromCharCode(10))
+        if (!schreib.length || !ist.trim()) continue
+        const d = werteDiktatAus(t.text, ist, t.regeln)
+        for (const f of schreib) geprueft.add(f.id)
+        gesamt += d.woerter
+        richtig += d.richtigeWoerter
+        diktat = {
+          fehler: d.fehler,
+          woerter: d.woerter,
+          prozentRichtig: d.prozentRichtig,
+          fehlerJe100: d.fehlerJe100,
+          notenvorschlag: d.notenvorschlag,
+          stellen: d.stellen.filter((x) => x.art !== 'richtig').map(({ soll, ist, art, kategorie, fehler, wiederholung }) => ({ soll, ist, art, fehler, ...(kategorie ? { kategorie } : {}), ...(wiederholung ? { wiederholung } : {}) }))
+        }
+        continue
+      }
       const fs = mitBezug.filter((x) => x.b.teil === t.teil && x.b.art === t.art)
       const an = (i: number, spalte?: number): BlattFeld | undefined => fs.find((x) => x.b.i === i && x.b.spalte === spalte)?.f
       // Nur prüfen, wenn das Blatt genau die Felder hat, die der Schlüssel erwartet – sonst ginge die Zuordnung schief
@@ -297,7 +351,9 @@ export function autoPruefen(
           gesamt++
           const ok =
             t.art === 'luecke'
-              ? lueckeRichtig(w, soll[i])
+              ? t.exakt
+                ? lueckeExakt(w, soll[i])
+                : lueckeRichtig(w, soll[i])
               : t.art === 'zuordnen'
                 ? buchstabe(w) === t.paare[i]
                 : /^\s*\d{1,3}\s*\.?\s*$/.test(w) && parseInt(w, 10) === t.nummern[i]
@@ -315,7 +371,13 @@ export function autoPruefen(
       }
     }
     if (gesamt || offen.length)
-      ergebnis[String(a.nr)] = { richtig, gesamt, nurAuto: eigene.length > 0 && eigene.every((f) => geprueft.has(f.id)), ...(offen.length ? { offen } : {}) }
+      ergebnis[String(a.nr)] = {
+        richtig,
+        gesamt,
+        nurAuto: eigene.length > 0 && eigene.every((f) => geprueft.has(f.id)),
+        ...(offen.length ? { offen } : {}),
+        ...(diktat ? { diktat } : {})
+      }
   }
   return { marken, aufgaben: ergebnis }
 }
@@ -351,6 +413,10 @@ export interface AbgabeFeedback {
   auto?: { richtig: number; gesamt: number }
   /** ✓/✗ je Feld dieser Aufgabe */
   marken?: Record<string, FeldMarke>
+  /** Diktat (26.11.2026): markierte Fehlerstellen im eigenen Text */
+  markierungen?: { zitat: string; art: 'fehler'; text: string; zeichen: string }[]
+  /** Diktat: Auswertung OHNE Notenvorschlag (den rechnet nur die Lehrkraftansicht aus `sechsAbProzent`) */
+  diktat?: Omit<DiktatErgebnis, 'notenvorschlag'> & { sechsAbProzent: number }
 }
 
 /** Feedback-Runden „prüfen lassen" – die Einträge vom Einreichen zählen nicht mit */
@@ -508,4 +574,37 @@ export function autoBefund(
     text: [kopf, ...zeilen].join('\n'),
     ...(einschaetzung ? { einschaetzung } : {})
   }
+}
+
+/**
+ * Rückmeldung zum eingetippten Diktat (26.11.2026, abgestimmt): Vor der letzten Runde nur MARKIEREN, was falsch ist,
+ * mit dem Hinweis auf die Strategie – die Lernenden berichtigen selbst (wie beim Mehrstufendiktat). In der letzten Runde
+ * steht die richtige Schreibung dabei. Dazu Fehlerzahl und Anteil richtig geschriebener Wörter, Fehler nach Schwerpunkt.
+ */
+export function diktatRueckmeldung(d: DiktatErgebnis, letzteRunde: boolean): { text: string; markierungen: { zitat: string; art: 'fehler'; text: string; zeichen: string }[] } {
+  const zaehl = new Map<string, number>()
+  for (const s of d.stellen) if (s.fehler > 0 && s.kategorie) zaehl.set(s.kategorie, (zaehl.get(s.kategorie) ?? 0) + 1)
+  const nachArt = [...zaehl].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n}× ${kategorieInfo(k).label} (${kategorieInfo(k).strategie})`)
+  const fehlend = d.stellen.filter((s) => s.art === 'fehlt').length
+  const fehlerText = d.fehler === 0 ? 'Fehlerfrei – stark!' : `${String(d.fehler).replace('.', ',')} Fehler`
+  const text = [
+    `${fehlerText} · ${d.prozentRichtig} % der Wörter richtig geschrieben.`,
+    nachArt.length ? `Fehler nach Schwerpunkt: ${nachArt.join('; ')}.` : '',
+    fehlend ? `${fehlend} Wort${fehlend === 1 ? '' : 'e'} fehl${fehlend === 1 ? 't' : 'en'}.` : '',
+    d.fehler > 0 && !letzteRunde ? 'Die Fehlerstellen sind markiert – verbessere sie selbst und reiche noch einmal ein.' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const markierungen = d.stellen
+    .filter((s) => s.ist && s.art !== 'zeichen' && (s.fehler > 0 || s.wiederholung))
+    .map((s) => {
+      const info = kategorieInfo(s.kategorie)
+      return {
+        zitat: s.ist.split(' ')[0],
+        art: 'fehler' as const,
+        text: letzteRunde ? `Richtig: „${s.soll || '(Wort zu viel)'}“ – ${info.label}, Strategie: ${info.strategie}.` : `Prüfe die Schreibung – Strategie: ${info.strategie}.`,
+        zeichen: s.art === 'grossklein' ? 'Gr' : 'R'
+      }
+    })
+  return { text, markierungen }
 }

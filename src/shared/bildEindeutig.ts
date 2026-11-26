@@ -229,10 +229,17 @@ export function bildAuswahl<T extends BildWort & { id: string; bild?: string; bi
  * Verwechslungsgruppen (give/bring …), und von zwei verwechselbaren Wörtern bzw. zwei Wörtern mit demselben Bild der
  * Medienbank bleibt nur eines – sonst wäre im Spiel eine von zwei gleichen Karten „falsch".
  */
-export function spielBildWoerter<T extends BildWort & { id: string; bild?: string }>(woerter: T[], sprache = 'en'): T[] {
+export function spielBildWoerter<T extends BildWort & { id: string; bild?: string; bildUngesichert?: boolean }>(woerter: T[], sprache = 'en'): T[] {
   const out: T[] = []
   for (const w of woerter) {
     if (!w.bild) continue
+    /*
+     * Befund der Lehrkraft (26.11.2026): Im Spiel „Wort → Bild" passten Bilder teils gar nicht zu den Vokabeln.
+     * Nur Bilder, die sicher zur Bedeutung der Liste gehören (oder in der Liste selbst hinterlegt sind), und nur
+     * abbildbare Wörter – keine abstrakten Wörter, Verwandtschaften, Funktionswörter oder Wendungen.
+     */
+    if (w.bildUngesichert) continue
+    if (!bildVorpruefung(w, sprache).ok) continue
     if (bildGruppen(w, sprache).some((g) => g.startsWith('v'))) continue
     if (out.some((x) => bildVerwechselbar(w, x, sprache))) continue
     out.push(w)

@@ -84,6 +84,9 @@ import {
   autoHinweis,
   autoBefund,
   autoPruefen,
+  diktatEinschaetzung,
+  diktatRueckmeldung,
+  schluesselVon,
   abgabeKriseAus,
   bezugAus,
   einschaetzungAus,
@@ -507,6 +510,22 @@ async function pruefungBeimEinreichen(p: {
       const marken = Object.fromEntries(eigene.filter((f) => auto.marken[f.id]).map((f) => [f.id, auto.marken[f.id]]))
       const mitMarken = Object.keys(marken).length ? { marken } : {}
       const au = auto.aufgaben[String(a.nr)]
+      // Diktat (26.11.2026): Fehlerstellen markieren (erst selbst berichtigen), Zahl und Anteil, Fehler nach Schwerpunkt
+      if (au?.nurAuto && au.diktat) {
+        const r = diktatRueckmeldung(au.diktat, p.letzteRunde)
+        const { notenvorschlag, ...ohneNote } = au.diktat
+        const regeln = schluesselVon(a)?.teile.find((t) => t.art === 'diktat')
+        eintraege[String(a.nr)] = {
+          einschaetzung: diktatEinschaetzung(notenvorschlag),
+          text: r.text,
+          zeit,
+          abgabe: p.abgabe,
+          auto: { richtig: au.richtig, gesamt: au.gesamt },
+          markierungen: r.markierungen,
+          diktat: { ...ohneNote, sechsAbProzent: regeln && regeln.art === 'diktat' ? regeln.regeln.sechsAbProzent : 10 }
+        }
+        continue
+      }
       if (au?.nurAuto) {
         eintraege[String(a.nr)] = {
           einschaetzung: einschaetzungAus(au.richtig, au.gesamt),

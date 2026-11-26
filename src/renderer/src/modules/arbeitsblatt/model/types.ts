@@ -921,6 +921,12 @@ export interface DiktatBlock extends BaseBlock {
   sechsAbProzent: number
   /** Zwillingstext für das Mehrstufendiktat (ein bis zwei Wochen später) */
   zwilling?: string
+  /**
+   * Vorlesestimme (26.11.2026): beim Freigeben einmal vertont, je Sinnabschnitt eine Zeile. `url` = Abspielseite der
+   * Hörtext-Freigabe (MP3 unter `${url}/ton.mp3`), `zeitmarken` = Beginn je Abschnitt, `fingerabdruck` = Text und
+   * Kommaregel beim Vertonen (ändert sich etwas, wird neu vertont).
+   */
+  ton?: { url: string; zeitmarken: number[]; sekunden?: number; fingerabdruck: string }
 }
 
 export type WsBlock =

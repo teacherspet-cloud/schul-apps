@@ -55,7 +55,8 @@ export function BlattWaehlenKnopf({ freigegeben }: { freigegeben: () => void }):
   )
 }
 
-function Auswahl({ schliessen, gewaehlt }: { schliessen: () => void; gewaehlt: (ws: Worksheet) => void }): React.JSX.Element {
+/** Eigenes Arbeitsblatt aus der Bibliothek wählen – auch aus „Meine Klassen" (26.11.2026: „Vorhandenes Blatt hinzufügen") */
+export function Auswahl({ schliessen, gewaehlt }: { schliessen: () => void; gewaehlt: (ws: Worksheet, docId: string) => void }): React.JSX.Element {
   const [liste, setListe] = useState<SavedWorksheetMeta[] | null>(null)
   const [suche, setSuche] = useState('')
   const [laedt, setLaedt] = useState<string | null>(null)
@@ -75,7 +76,7 @@ function Auswahl({ schliessen, gewaehlt }: { schliessen: () => void; gewaehlt: (
       const ws = w.payload as Worksheet
       if (!ws?.sheets?.length) throw new Error('Das Arbeitsblatt ist leer.')
       // Der gespeicherte Name ist der Titel, unter dem die Lehrkraft das Blatt kennt
-      gewaehlt(ws.meta.title || ws.meta.topic ? ws : { ...ws, meta: { ...ws.meta, title: w.name } })
+      gewaehlt(ws.meta.title || ws.meta.topic ? ws : { ...ws, meta: { ...ws.meta, title: w.name } }, id)
     } catch (e) {
       notifyError(e, 'Arbeitsblatt nicht geöffnet')
     } finally {

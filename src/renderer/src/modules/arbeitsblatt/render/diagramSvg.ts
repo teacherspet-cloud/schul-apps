@@ -47,6 +47,9 @@ const steps = (min: number, max: number, step: number): number => Math.max(1, Ma
 const textWidthMm = (s: string, size: number): number => s.length * size * 0.55
 
 /** Koordinatensystem – auch für Verlaufskurven (Kategorien, Stufen) und Millimeterpapier. */
+/** Kästchen eines Koordinatensystems mindestens so groß (mm), soweit die Breite reicht */
+export const MIN_ZELLE_MM = 7
+
 function kartesisch(spec: DiagramSpec, widthMm: number): DiagramDrawing {
   const axes = spec.axes
   const kategorien = spec.kind === 'spannung' ? spec.xCategories : []
@@ -60,7 +63,14 @@ function kartesisch(spec: DiagramSpec, widthMm: number): DiagramDrawing {
   const rows = stufen.length ? stufen.length : steps(axes.yMin, axes.yMax, axes.yStep)
   const availW = widthMm - padLeft - padRight
   const availH = spec.heightMm - padTop - padBottom
-  let cell = Math.max(3, Math.min(25, Math.floor(Math.min(availW / cols, availH / rows))))
+  /*
+   * Mindestgröße zum Eintragen (26.11.2026, Befund „Gradnetz der Erde", Aufgabe 4c): 16 × 12 Kästchen in 70 mm Höhe
+   * ergaben 4-mm-Kästchen – zu klein, um Kreuze, Punkte und Achsenwerte einzutragen, obwohl die Breite fast 10 mm
+   * erlaubt hätte. Jetzt bestimmt die Höhe die Kästchen nicht mehr unter 7 mm: Die Fläche wird höher, solange die
+   * Breite reicht (FAUSTREGEL: Heftkästchen 5 mm, zum Eintragen mit Beschriftung großzügiger).
+   */
+  const minZelle = spec.kind === 'mm' ? 0 : MIN_ZELLE_MM
+  let cell = Math.max(3, Math.min(25, Math.floor(Math.min(availW / cols, Math.max(availH / rows, minZelle)))))
   if (spec.kind === 'mm') cell = Math.max(5, Math.floor(cell / 5) * 5)
   const left = padLeft
   const top = padTop

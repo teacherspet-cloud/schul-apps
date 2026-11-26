@@ -254,3 +254,48 @@ export function fehlerKategorie(soll: string, ist: string, vorher = '', satzanfa
     for (const [, f2] of REGELN) if (g1(a) && f2(f1(a)) === f2(f1(b))) return k1
   return 'lauttreu'
 }
+
+export interface DiktatSchwerpunkt {
+  value: string
+  label: string
+  gruppe: string
+  beispiele: string[]
+  strategie: string
+  /** Üblich ab Klasse */
+  ab: number
+}
+
+/**
+ * Rechtschreibschwerpunkte zur Auswahl (Mehrfachauswahl, 26.11.2026).
+ * BELEGT: VERA-8-Lupenstellen (QUA-LiS NRW), AFRA-Kategorien in VERA-3, KMK-Bildungsstandards 2022,
+ * Rechtschreibrahmen Sachsen 2025, LehrplanPLUS Bayern Gymnasium 5–8, OLFA 3–9 (Thomé 2023).
+ * FAUSTREGEL: „ab Klasse" aus diesen Quellen zusammengeführt – kein einzelner Lehrplan gibt es so vor.
+ */
+export const DIKTAT_SCHWERPUNKTE: DiktatSchwerpunkt[] = [
+  { value: 'lauttreu', label: 'Laute vollständig (Wortdurchgliederung)', gruppe: 'Laut und Buchstabe', beispiele: ['Erdbeere', 'Strumpf', 'plötzlich'], strategie: 'Schwingen', ab: 2 },
+  { value: 'besondere', label: 'sp/st, qu, x/chs, pf, nk', gruppe: 'Laut und Buchstabe', beispiele: ['Spinne', 'Qualle', 'Fuchs'], strategie: 'Merken, Schwingen', ab: 2 },
+  { value: 'fvph', label: 'f, v oder ph', gruppe: 'Laut und Buchstabe', beispiele: ['Vogel', 'voll', 'Strophe'], strategie: 'Merken', ab: 3 },
+  { value: 'ie', label: 'Langes i (ie)', gruppe: 'Vokallänge und -kürze', beispiele: ['Biene', 'liegen', 'Tiger'], strategie: 'Schwingen', ab: 2 },
+  { value: 'dehnung', label: 'Dehnungs-h und Doppelvokal', gruppe: 'Vokallänge und -kürze', beispiele: ['fahren', 'Zahl', 'Boot'], strategie: 'Merken', ab: 3 },
+  { value: 'silbenh', label: 'Silbentrennendes h', gruppe: 'Vokallänge und -kürze', beispiele: ['gehen', 'Schuh', 'sieht'], strategie: 'Schwingen, Verlängern', ab: 3 },
+  { value: 'doppelkonsonant', label: 'Doppelkonsonant', gruppe: 'Vokallänge und -kürze', beispiele: ['Teller', 'kommt', 'Ball'], strategie: 'Schwingen, Verlängern', ab: 2 },
+  { value: 'ck_tz', label: 'ck und tz', gruppe: 'Vokallänge und -kürze', beispiele: ['Decke', 'Katze', 'schmeckt'], strategie: 'Schwingen, Verlängern', ab: 3 },
+  { value: 'slaute', label: 's-Laute (s, ss, ß)', gruppe: 'Vokallänge und -kürze', beispiele: ['Straße', 'Fluss', 'reisen'], strategie: 'Verlängern, Merken', ab: 4 },
+  { value: 'auslaut', label: 'Auslautverhärtung (d/t, b/p, g/k)', gruppe: 'Wortbausteine', beispiele: ['Hund', 'Korb', 'Zug'], strategie: 'Verlängern', ab: 2 },
+  { value: 'umlaut', label: 'Umlaut ä/äu ableiten', gruppe: 'Wortbausteine', beispiele: ['Äpfel', 'Bäume', 'läuft'], strategie: 'Ableiten', ab: 2 },
+  { value: 'nachsilben', label: 'Nachsilben -ig/-lich, -ung/-heit/-keit/-nis', gruppe: 'Wortbausteine', beispiele: ['ruhig', 'fröhlich', 'Ergebnis'], strategie: 'Verlängern, Zerlegen', ab: 3 },
+  { value: 'vorsilben', label: 'Vorsilben (ver-/vor-, ent-/end-) und Morphemgrenzen', gruppe: 'Wortbausteine', beispiele: ['verlieren', 'endlich', 'Schifffahrt'], strategie: 'Zerlegen', ab: 4 },
+  { value: 'gross_nomen', label: 'Großschreibung: Nomen und Satzanfang', gruppe: 'Groß- und Kleinschreibung', beispiele: ['Haus', 'Freundlichkeit', 'Satzanfang'], strategie: 'Artikelprobe, Erweitern', ab: 2 },
+  { value: 'gross_nominal', label: 'Nominalisierung und Tageszeiten', gruppe: 'Groß- und Kleinschreibung', beispiele: ['das Laufen', 'beim Lesen', 'heute Abend'], strategie: 'Artikelprobe, Erweitern', ab: 5 },
+  { value: 'gross_anrede', label: 'Anredepronomen und Eigennamen', gruppe: 'Groß- und Kleinschreibung', beispiele: ['Sie', 'Ihnen', 'das Schwarze Meer'], strategie: 'Merken', ab: 5 },
+  { value: 'getrennt', label: 'Getrennt- und Zusammenschreibung', gruppe: 'Getrennt und zusammen', beispiele: ['Rad fahren', 'kennenlernen', 'zum Beispiel'], strategie: 'Betonung, Zerlegen', ab: 6 },
+  { value: 'gleichklang', label: 'das/dass und gleich klingende Wörter', gruppe: 'Gleich klingende Wörter', beispiele: ['dass', 'seit', 'wieder'], strategie: 'Ersatzprobe (dieses, welches)', ab: 5 },
+  { value: 'fremdwoerter', label: 'Fremdwörter (th, rh, y, c, -ieren)', gruppe: 'Fremd- und Merkwörter', beispiele: ['Rhythmus', 'Theater', 'Computer'], strategie: 'Merken, Nachschlagen', ab: 6 },
+  { value: 'zeichen_satz', label: 'Satzschluss und wörtliche Rede', gruppe: 'Zeichensetzung', beispiele: ['„Komm her!“, rief sie.', 'Fragezeichen', 'Ausrufezeichen'], strategie: 'Satzbau', ab: 2 },
+  { value: 'komma_neben', label: 'Komma bei Aufzählung und Nebensatz', gruppe: 'Zeichensetzung', beispiele: ['…, weil …', '…, dass …', 'Äpfel, Birnen und Pflaumen'], strategie: 'Verbprobe', ab: 4 },
+  { value: 'komma_infinitiv', label: 'Komma bei Infinitiv, Partizip und Apposition', gruppe: 'Zeichensetzung', beispiele: ['…, um zu …', '…, vor Freude strahlend, …', 'Herr Meier, unser Nachbar, …'], strategie: 'Satzbau', ab: 7 }
+]
+
+/** Name und Strategie einer Kategorie (für Rückmeldung) */
+export const kategorieInfo = (id: string | undefined): { label: string; strategie: string } =>
+  DIKTAT_SCHWERPUNKTE.find((s) => s.value === id) ?? { label: 'Laute vollständig', strategie: 'Schwingen' }

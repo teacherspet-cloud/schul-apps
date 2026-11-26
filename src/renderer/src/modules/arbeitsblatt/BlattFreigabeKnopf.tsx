@@ -15,7 +15,10 @@ import { IconQrcode, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { BlattAufgabe } from '@shared/blattFreigabe'
 import { appFreigegeben, aufServer, qrHakenText } from '../../shared/plattform'
-import { notifyError, notifySuccess } from '../../shared/util'
+import { notifyError, notifyInfo, notifySuccess } from '../../shared/util'
+import { useAppSettings } from '../../shared/settingsStore'
+import { diktateVertonen, tonAktuell } from './diktatVertonung'
+import { legeArbeitsblattAb } from './library'
 import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { STANDARD_ANREDE } from '../rueckmeldung/render/texte'
@@ -47,7 +50,7 @@ export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
     const nr = nummern.get(b.id) ?? 0
     const teile = b.parts.map((p, i) => `${String.fromCharCode(97 + i)}) ${plainText(p.instruction)}`)
     // Lösungsschlüssel für die automatische Prüfung beim Einreichen (08.10.2026)
-    const schluessel = aufgabenSchluessel(b)
+    const schluessel = aufgabenSchluessel(b, sheet.blocks)
     return [
       {
         nr,
@@ -253,8 +256,23 @@ export function BlattFreigabeDialog({
     if (!sheet) return
     setLaeuft(true)
     try {
+      // Diktat (26.11.2026): Vorlesestimme einmal beim Freigeben – nur, wenn sie fehlt oder der Text sich geändert hat
+      let quelle = ws
+      if (sheet.blocks.some((b) => b.type === 'diktat' && !tonAktuell(b))) {
+        const stimme = useAppSettings.getState().settings.audio.voices.de ?? ''
+        const t = await diktateVertonen(ws, sheet.id, stimme)
+        quelle = t.ws
+        if (t.fehler) notifyInfo(`Das Diktat ist ohne Vorlesestimme freigegeben (${t.fehler}). Du kannst es selbst vorlesen.`)
+        // Nur die Aufnahme übernehmen – sonst nichts am gespeicherten Blatt ändern
+        const toene = new Map(t.ws.sheets.flatMap((s) => s.blocks).flatMap((b) => (b.type === 'diktat' && b.ton ? [[b.id, b.ton] as const] : [])))
+        if (t.vertont && quelleId)
+          void legeArbeitsblattAb(quelleId, ws, (aktuell) => ({
+            ...aktuell,
+            sheets: aktuell.sheets.map((s) => ({ ...s, blocks: s.blocks.map((b) => (b.type === 'diktat' && toene.has(b.id) ? { ...b, ton: toene.get(b.id)! } : b)) }))
+          }))
+      }
       // Fassung mit Korrekturrand nach Wahl; weicht sie vom Original ab oder fehlt die Messung, neu messen (wie im Editor)
-      const fassung = korrekturrand === Boolean(ws.meta.correctionMargin) ? ws : { ...ws, meta: { ...ws.meta, correctionMargin: korrekturrand } }
+      const fassung = korrekturrand === Boolean(quelle.meta.correctionMargin) ? quelle : { ...quelle, meta: { ...quelle.meta, correctionMargin: korrekturrand } }
       const plaene = fassung === ws && layouts.size ? layouts : await messeSeiten(fassung, logo, schoolName)
       // Schülerfassung: nur dieses Blatt, OHNE Lösungsteil
       const html = buildWorksheetHtml(fassung, plaene, { sheetIds: [sheet.id], includeKey: false }, logo, schoolName)

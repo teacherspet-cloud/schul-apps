@@ -35,7 +35,9 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconArrowLeft, IconDownload, IconEye, IconHelp, IconLayoutSidebarRight, IconMessageCircle, IconMessageDots, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { notenvorschlag } from '@shared/diktat'
+import DiktatAbspieler, { diktatToeneAus } from './DiktatAbspieler'
 import { useBlaettern } from '../lernen/regal/blaettern'
 import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
@@ -173,7 +175,12 @@ type AufgabenFb = {
   krise?: boolean
   auto?: AbgabeFeedback['auto']
   marken?: Record<string, FeldMarke>
+  /** Eingetipptes Diktat (26.11.2026) – ohne Notenvorschlag; den rechnet nur die Lehrkraftansicht */
+  diktat?: AbgabeFeedback['diktat']
 }
+
+/** Ansicht der Lehrkraft (App „Freigegebene Blätter"): zeigt z. B. den Notenvorschlag eines Diktats */
+const LehrkraftSicht = createContext(false)
 
 // Wie das ausfüllbare PDF, dazu die leeren Zellen von Ausfülltabellen
 
@@ -580,7 +587,15 @@ export type ProbeFeedback = (x: {
   material: string
 }) => Promise<{ einschaetzung: string; text: string; krise?: boolean }>
 
-export function Ausfuellen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: { zurueck: () => void }; probe?: ProbeFeedback }): React.JSX.Element {
+export function Ausfuellen(p: { d: BlattDaten; lehrkraft?: { zurueck: () => void }; probe?: ProbeFeedback }): React.JSX.Element {
+  return (
+    <LehrkraftSicht.Provider value={Boolean(p.lehrkraft)}>
+      <AusfuellenInnen {...p} />
+    </LehrkraftSicht.Provider>
+  )
+}
+
+function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: { zurueck: () => void }; probe?: ProbeFeedback }): React.JSX.Element {
   const [antworten, setAntworten] = useState<Record<string, string>>(d.antworten)
   // Im Fachordner geöffnet (09.10.2026): dessen „Zurück" blättert zurück – kein eigener Rückweg
   const ordnerBlatt = useBlaettern()
@@ -1013,6 +1028,8 @@ export function Ausfuellen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?:
     }
   }
   const lehrkraftSicht = Boolean(lehrkraft)
+  // Vorlesestimme eines Diktats (26.11.2026): Anker im Blatt, nie der Text
+  const diktatToene = useMemo(() => diktatToeneAus(d.html), [d.html])
   // Aus einer Unterrichtsreihe geöffnet (`?reihe=`): Rückweg und „Weiter" dorthin
   const reiheId = useMemo(() => {
     if (lehrkraft) return null
@@ -1090,6 +1107,12 @@ export function Ausfuellen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?:
       }
     >
     <Stack data-blatt-ausfuellen>
+      {/* Diktat (26.11.2026): Abspieler schwebt unten links – beim Schreiben bleibt er im Blick (nicht für die Lehrkraft) */}
+      {!lehrkraft && diktatToene.length > 0 && (
+        <div style={{ position: 'fixed', left: 16, bottom: 96, zIndex: 40, maxWidth: 'calc(100vw - 32px)', boxShadow: '0 4px 16px rgba(0,0,0,.18)', borderRadius: 8 }}>
+          <DiktatAbspieler ton={diktatToene[0]} />
+        </div>
+      )}
       {/* Stift-Diagnose (26.10.2026): nur mit ?diagnose=stift in der Adresse */}
       {stiftDiagnoseAktiv() && <StiftDiagnose />}
       {lehrkraft ? (
@@ -1526,8 +1549,25 @@ function LoesungTeil({ nr, html, offenVorgabe = false }: { nr: number; html: str
 
 function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.Element | null {
   const l = liste?.at(-1)
+  const lehrkraft = useContext(LehrkraftSicht)
   if (!l) return null
   const farbe = l.einschaetzung === 'sicher' ? 'green' : l.einschaetzung === 'teilweise' ? 'yellow' : 'orange'
+  // Diktat (26.11.2026): ohne KI geprüft – keine KI-Marke; Notenvorschlag nur für die Lehrkraft
+  if (l.diktat)
+    return (
+      <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback data-diktat-feedback {...(l.abgabe ? { 'data-abgabe-feedback': l.einschaetzung } : {})}>
+        <Text size="xs" fw={700} c="dimmed">
+          Diktat · nach dem Einreichen
+        </Text>
+        <Text size="sm">{l.text}</Text>
+        {lehrkraft && (
+          <Text size="xs" mt={4} data-diktat-note>
+            Notenvorschlag (nur für dich, Faustregel {l.diktat.sechsAbProzent} % = 6): {notenvorschlag(l.diktat.fehler, l.diktat.woerter, l.diktat.sechsAbProzent)} ·{' '}
+            {String(l.diktat.fehlerJe100).replace('.', ',')} Fehler je 100 Wörter
+          </Text>
+        )}
+      </Alert>
+    )
   // Gegliedert seit 03.10.2026: gelungen / noch offen / nächster Schritt; ältere Antworten als Text
   if (!l.gelungen && !l.fehlt && !l.schritt)
     return (

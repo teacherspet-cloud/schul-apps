@@ -441,7 +441,8 @@ export function teilbareAntwort(
       }
     }
     case 'labels': {
-      const einheiten = Array.from({ length: Math.max(0, answer.count) }, (_, i) => (
+      // Eine Linie je Begriff (26.11.2026) – auch bei älteren Blättern mit zu kleiner Zahl
+      const einheiten = Array.from({ length: Math.max(0, answer.count, answer.labels?.length ?? 0) }, (_, i) => (
         <div key={i} className="ws-label-row" {...u}>
           <span className="ws-label-num">{i + 1}</span>
           {key ? <span className="ws-key-text">{answer.labels[i] ?? ''}</span> : <span className="ws-label-line" />}

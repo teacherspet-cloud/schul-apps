@@ -3,6 +3,7 @@ import { notenvorschlag } from '@shared/diktat'
 import type { DiktatBlock } from '../../model/types'
 import { diktatInhalt } from '../../didactics/diktat'
 import { isKeyMode, useWs } from '../WsContext'
+import { tonAktuell } from '../../diktatVertonung'
 import { Feld, useSetter } from './hilfen'
 
 /**
@@ -17,9 +18,18 @@ export function DiktatView({ block }: { block: DiktatBlock }): React.JSX.Element
   const lehrkraft = edit || isKeyMode(mode)
   const set = useSetter(block)
   const teile = diktatInhalt(block, lehrkraft, notenvorschlag)
-  if (!teile.length) return null
+  /*
+   * Vorlesestimme (26.11.2026): Auf dem Schülerblatt nur ein unsichtbarer Anker mit Adresse und Zeitmarken – kein Text.
+   * Die digitale Ansicht (onlinetest/DiktatAbspieler.tsx) liest ihn und zeigt den Abspieler.
+   */
+  const ton =
+    !lehrkraft && tonAktuell(block) ? (
+      <span hidden className="ws-diktat-ton" data-diktat-ton={block.ton!.url} data-zeitmarken={block.ton!.zeitmarken.join(',')} data-sekunden={block.ton!.sekunden ?? ''} />
+    ) : null
+  if (!teile.length) return ton
   return (
     <div className={`ws-block ws-diktat ${lehrkraft ? 'ws-diktat-lehrkraft' : ''}`} data-diktat={block.form}>
+      {ton}
       {lehrkraft && (
         <div className="ws-diktat-titel" data-unit>
           <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as DiktatBlock).title = v))} />

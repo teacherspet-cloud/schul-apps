@@ -91,6 +91,12 @@ export interface BildTeil {
   vorlaeufig?: true
   mehrdeutig?: true
   andere?: BedeutungKurz[]
+  /**
+   * Auch für Lernende (26.11.2026, Befund „Wort → Bild"): Das Bild gehört nicht sicher zur Bedeutung der Liste –
+   * nur vermutet (einzige gespeicherte Bedeutung, andere Übersetzung) oder ein altes Bild ohne Bedeutung. Die
+   * Bilderspiele lassen solche Bilder weg; Karten zeigen sie weiter.
+   */
+  ungesichert?: true
 }
 
 /** Bedeutung, die ein Aufrufer beim Schreiben meint: Kennung (falls bekannt), Wortart und deutsche Bedeutung */

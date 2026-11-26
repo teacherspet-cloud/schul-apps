@@ -1120,7 +1120,8 @@ export function ReiheEditor({
   )
 }
 
-function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reihe; schliessen: () => void }): React.JSX.Element {
+/** Reihe zuweisen – auch aus „Meine Klassen" mit vorgewählter Lerngruppe (26.11.2026) */
+export function Zuweisen({ reiheId, reihe, schliessen, gruppeVorwahl }: { reiheId: string; reihe: Reihe; schliessen: () => void; gruppeVorwahl?: string }): React.JSX.Element {
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'gaeste'>('gruppe')
   // Gäste per QR-Code (05.10.2026): zusätzlich zu Lerngruppe/Einzelnen oder allein
   const [mitGaesten, setMitGaesten] = useState(false)
@@ -1128,7 +1129,7 @@ function Zuweisen({ reiheId, reihe, schliessen }: { reiheId: string; reihe: Reih
   const [plan, setPlan] = useState<PlanWahl>(planStart)
   const [qr, setQr] = useState<{ code: string; link: string } | null>(null)
   const [gruppen, setGruppen] = useState<{ id: string; name: string; fach?: string }[]>([])
-  const [gruppe, setGruppe] = useState<string | null>(null)
+  const [gruppe, setGruppe] = useState<string | null>(gruppeVorwahl ?? null)
   // Mitglieder aller eigenen Lerngruppen (für „einzelne Lernende" – auch aus verschiedenen Gruppen)
   const [alle, setAlle] = useState<{ gruppe: string; gruppeId: string; benutzer: string; name: string }[]>([])
   const [einzelne, setEinzelne] = useState<string[]>([])

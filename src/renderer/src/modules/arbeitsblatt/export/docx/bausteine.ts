@@ -731,7 +731,7 @@ export async function answerContent(ctx: Ctx, a: Answer, indent: number): Promis
     case 'labels':
       return await Promise.all(
         Array.from(
-          { length: a.count },
+          { length: Math.max(a.count, a.labels?.length ?? 0) },
           async (_, i) =>
             new Paragraph({
               indent: { left: indent },

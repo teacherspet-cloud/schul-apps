@@ -180,6 +180,7 @@ try {
   pruefe((await s.locator('[data-phrasen-feld]').count()) >= 1, 'Knopf „Formulierungshilfen" am Schreibfeld von Aufgabe 1')
   await phrKnopf.click()
   const leiste = s.locator('[data-phrasen-leiste]')
+  await leiste.waitFor({ timeout: 5000 }).catch(() => undefined)
   pruefe((await leiste.isVisible()) && (await leiste.innerText()).includes('In my opinion'), 'Leiste zeigt die Useful phrases')
   const feldId = await phrKnopf.getAttribute('data-phrasen-feld')
   await s.locator(`textarea[data-feld="${feldId}"]`).click()

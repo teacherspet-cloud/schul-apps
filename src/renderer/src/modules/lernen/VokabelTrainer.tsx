@@ -279,11 +279,18 @@ async function mitMedien(liste: Liste): Promise<Liste> {
   return {
     ...liste,
     woerter: liste.woerter.map((w) => {
-      const b = bildVon(m[w.term], w, liste.sprache)?.bild
+      const teil = bildVon(m[w.term], w, liste.sprache)
+      const b = teil?.bild
       const url = b?.url
       // Bildnachweis für Lernende (22.10.2026, Prüfung des Schulträgers)
       const nachweis = b ? lernendenNachweis(b) : null
-      return w.bild || !url ? w : { ...w, bild: url, ...(nachweis ? { bildNachweis: nachweis } : {}) }
+      /*
+       * Bilderspiele (26.11.2026, Vorgabe der Lehrkraft): nur Bilder, die in der Vokabelliste hinterlegt (w.bild) oder
+       * dort mit KI erzeugt wurden – kein Bild aus der Bildsuche, keins, das nur vermutet zur Bedeutung passt.
+       * Karten und Trainer zeigen diese Bilder weiter.
+       */
+      const nurFuerKarten = Boolean(teil?.ungesichert) || b?.herkunft !== 'ki' || Boolean(b?.kiAbgelehnt)
+      return w.bild || !url ? w : { ...w, bild: url, ...(nachweis ? { bildNachweis: nachweis } : {}), ...(nurFuerKarten ? { bildUngesichert: true } : {}) }
     })
   }
 }

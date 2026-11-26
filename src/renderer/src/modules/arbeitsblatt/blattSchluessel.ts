@@ -8,7 +8,8 @@
 import { plainText } from '../../shared/richtext/parse'
 import type { AufgabenSchluessel, SchluesselTeil } from '@shared/blattPruefung'
 import { lueckenLoesungen } from '@shared/blattPruefung'
-import type { Answer, TaskBlock } from './model/types'
+import type { Answer, DiktatBlock, TaskBlock, WsBlock } from './model/types'
+import { diktatOhnePausen } from './didactics/diktat'
 
 function teilVon(a: Answer, teil: number): SchluesselTeil | null {
   switch (a.kind) {
@@ -38,7 +39,21 @@ function teilVon(a: Answer, teil: number): SchluesselTeil | null {
   }
 }
 
-export function aufgabenSchluessel(b: TaskBlock): AufgabenSchluessel | undefined {
+export function aufgabenSchluessel(b: TaskBlock, bloecke: WsBlock[] = []): AufgabenSchluessel | undefined {
+  /*
+   * Niederschrift eines Diktats (26.11.2026): klassisch – der ganze Text gegen den Diktattext (shared/diktat.ts);
+   * Lückendiktat – die Lücken GENAU (Groß/klein zählt, anders als bei Verstehenslücken).
+   */
+  const diktat = b.diktat ? bloecke.find((x): x is DiktatBlock => x.type === 'diktat' && x.id === b.diktat) : undefined
+  if (diktat) {
+    if (b.answer.kind === 'gapText') {
+      const loesungen = lueckenLoesungen(b.answer.gapText ?? '')
+      return loesungen.length ? { teile: [{ teil: -1, art: 'luecke', loesungen, exakt: true }] } : undefined
+    }
+    return {
+      teile: [{ teil: -1, art: 'diktat', text: diktatOhnePausen(diktat.text), regeln: { zaehlart: diktat.zaehlart, kommasDiktiert: diktat.kommasDiktiert, sechsAbProzent: diktat.sechsAbProzent } }]
+    }
+  }
   const teile = (b.parts.length ? b.parts.map((p, i) => teilVon(p.answer, i)) : [teilVon(b.answer, -1)]).filter((t): t is SchluesselTeil => Boolean(t))
   return teile.length ? { teile } : undefined
 }
