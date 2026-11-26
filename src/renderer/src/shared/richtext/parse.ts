@@ -70,6 +70,24 @@ export function parseInline(text: string): Inline[] {
   return mergeText(out)
 }
 
+/** Stellen der Inline-Formeln ($…$ samt Zeichen) – dieselbe Regel wie die Anzeige. */
+export function formelStellen(text: string): { von: number; bis: number }[] {
+  const out: { von: number; bis: number }[] = []
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\' && text[i + 1] === '$') {
+      i++
+      continue
+    }
+    if (text[i] !== '$') continue
+    const end = findClosingDollar(text, i + 1)
+    if (end > i + 1) {
+      out.push({ von: i, bis: end + 1 })
+      i = end
+    }
+  }
+  return out
+}
+
 function splitMath(text: string): { math: boolean; value: string }[] {
   const parts: { math: boolean; value: string }[] = []
   let buf = ''
@@ -96,15 +114,31 @@ function splitMath(text: string): { math: boolean; value: string }[] {
   return parts
 }
 
+/**
+ * Schließendes $ einer Formel – nach der Regel von Pandoc, damit Währungsangaben („$5 und $10“,
+ * „5 $ pro Stück“) Text bleiben: Nach dem öffnenden $ steht kein Leerraum, vor dem schließenden
+ * keiner, und direkt dahinter keine Ziffer. Dazu: Ein „Formelinhalt“ aus mehreren normalen Wörtern
+ * ohne LaTeX-Befehl ist Fließtext (Fund 26.11.2026: Text zwischen zwei $ wurde kursiv und ohne
+ * Wortabstände gesetzt).
+ */
 function findClosingDollar(text: string, from: number): number {
+  if (from >= text.length || /\s/.test(text[from])) return -1
   for (let j = from; j < text.length; j++) {
     if (text[j] === '\\') {
       j++
       continue
     }
-    if (text[j] === '$') return j
+    if (text[j] !== '$') continue
+    if (/\s/.test(text[j - 1]) || /\d/.test(text[j + 1] ?? '')) continue
+    return istFormelInhalt(text.slice(from, j)) ? j : -1
   }
   return -1
+}
+
+function istFormelInhalt(inhalt: string): boolean {
+  if (inhalt.includes('\\')) return true
+  const woerter = inhalt.match(/\p{L}{2,}/gu) ?? []
+  return !(woerter.length >= 3 && /\p{L}{2,}\s+\p{L}{2,}/u.test(inhalt))
 }
 
 function parseEmphasis(text: string): Inline[] {

@@ -38,6 +38,8 @@ import { pruefeBlattNeu } from './generation/generate'
 import { repariereBausteine } from './generation/reparatur'
 import { systemPrompt, taskContext } from './generation/prompts'
 import { anredeFuerMeta } from './didactics/anrede'
+import { folgeketteAnpassen, folgeMeldung, LEERE_FOLGE } from './generation/folgekette'
+import { addVersion } from './model/versions'
 import { anredeRegel } from '../../shared/anrede'
 import { lerngruppeSatz, ohneHinweise, wendeReparaturAn } from '../../shared/kiBeheben'
 import type { WorksheetMeta } from './model/types'
@@ -338,6 +340,101 @@ export function bausteinAuftrag(
     arbeit,
     abschluss: () => 'Fertig – im Blatt übernommen',
     ablegen: (aendern, ws) => legeArbeitsblattAb(docId, ws, (aktuell) => aendereBaustein(aktuell, blockId, aendern))
+  })
+}
+
+/**
+ * Baustein mit der KI überarbeiten UND die Folgekette nachziehen (26.11.2026): Aufgaben, Hilfen
+ * und spätere Bausteine, die auf den geänderten Baustein aufbauen, passt die KI an
+ * (generation/folgekette.ts). Alles landet in EINEM Schritt im Blatt; jeder geänderte Baustein
+ * behält seinen bisherigen Stand als Entwurf.
+ */
+export function bausteinMitFolgeAuftrag(
+  worksheet: Worksheet,
+  docId: string,
+  art: string,
+  blockId: string,
+  arbeit: (ws: Worksheet, k: AuftragsKontext) => Promise<WsBlock>,
+  profile: LearnerProfile
+): void {
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art,
+    eingabe: worksheet,
+    istOffen: () => blattOffen(docId),
+    sperrt: false,
+    schluessel: blockId,
+    fehlerTitel: `${art} fehlgeschlagen`,
+    arbeit: async (ws, k) => {
+      const fresh = await arbeit(ws, k)
+      const blatt = ws.sheets.find((s) => s.blocks.some((b) => b.id === blockId))
+      const alt = blatt?.blocks.find((b) => b.id === blockId)
+      let folge = LEERE_FOLGE
+      if (blatt && alt) {
+        try {
+          folge = await folgeketteAnpassen({ bloecke: blatt.blocks, alt, neu: fresh, meta: ws.meta, profile, ai: k.ai, melde: (t) => k.melde(t) })
+        } catch (e) {
+          if (istAbbruch(e)) throw e
+          // Der überarbeitete Baustein zählt; die Folgekette meldet sich nur
+          folge = { ...LEERE_FOLGE, zusammenfassung: 'Die Bausteine, die darauf aufbauen, konnten nicht geprüft werden – bitte selbst ansehen.' }
+        }
+      }
+      return { fresh, folge, meldung: [folgeMeldung(folge, blatt?.blocks ?? []), folge.bloecke.size ? '' : folge.zusammenfassung].filter(Boolean).join(' ') }
+    },
+    abschluss: (erg) => erg.meldung || 'Fertig – im Blatt übernommen',
+    ablegen: async (erg, ws) => {
+      await legeArbeitsblattAb(docId, ws, (aktuell) => ({
+        ...aktuell,
+        sheets: aktuell.sheets.map((s) =>
+          s.blocks.some((b) => b.id === blockId || erg.folge.bloecke.has(b.id))
+            ? {
+                ...s,
+                blocks: s.blocks.map((b) =>
+                  b.id === blockId ? addVersion(b, erg.fresh) : erg.folge.bloecke.has(b.id) ? addVersion(b, erg.folge.bloecke.get(b.id)!) : b
+                )
+              }
+            : s
+        )
+      }))
+      if (erg.meldung) notifyInfo(erg.meldung)
+    }
+  })
+}
+
+/**
+ * Nach einer Handbearbeitung (26.11.2026, abgestimmt): Die Folgekette läuft NICHT von selbst,
+ * sondern über „Darauf aufbauende Bausteine anpassen" im KI-Menü. Die KI kennt dann nur den
+ * aktuellen Stand und prüft die Kette dagegen.
+ */
+export function folgeAnpassenAuftrag(worksheet: Worksheet, docId: string, blockId: string, profile: LearnerProfile): void {
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art: 'Darauf aufbauende Bausteine anpassen',
+    eingabe: worksheet,
+    istOffen: () => blattOffen(docId),
+    sperrt: false,
+    schluessel: blockId,
+    fehlerTitel: 'Die darauf aufbauenden Bausteine konnten nicht angepasst werden',
+    arbeit: async (ws, k) => {
+      const blatt = ws.sheets.find((s) => s.blocks.some((b) => b.id === blockId))
+      const b = blatt?.blocks.find((x) => x.id === blockId)
+      if (!blatt || !b) throw new Error('Der Baustein ist nicht mehr vorhanden.')
+      const folge = await folgeketteAnpassen({ bloecke: blatt.blocks, alt: b, neu: b, meta: ws.meta, profile, ai: k.ai, melde: (t) => k.melde(t) })
+      return { folge, meldung: folgeMeldung(folge, blatt.blocks) || 'Nichts baut auf diesem Baustein auf.' }
+    },
+    abschluss: (erg) => erg.meldung,
+    ablegen: async (erg, ws) => {
+      if (erg.folge.bloecke.size)
+        await legeArbeitsblattAb(docId, ws, (aktuell) => ({
+          ...aktuell,
+          sheets: aktuell.sheets.map((s) => ({ ...s, blocks: s.blocks.map((b) => (erg.folge.bloecke.has(b.id) ? addVersion(b, erg.folge.bloecke.get(b.id)!) : b)) }))
+        }))
+      notifyInfo(erg.meldung)
+    }
   })
 }
 

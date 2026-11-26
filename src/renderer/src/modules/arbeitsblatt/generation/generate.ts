@@ -539,7 +539,8 @@ async function regenerateBlockEinmal(
     old.type === 'task' ? old.points : 0
   )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  const neu = { ...block, id: old.id, stars: old.stars, ...layoutBehalten(old, block) }
+  // Kennung des Materials bleibt (26.11.2026): Aufgaben verweisen mit „M{kennung}" darauf
+  const neu = { ...block, id: old.id, stars: old.stars, ...(old.ref ? { ref: old.ref } : {}), ...layoutBehalten(old, block) }
   // Nummern, die die KI schreibt, werden zu Kennungen – gezählt über das ganze Blatt; der neue Baustein steht an der Stelle des alten
   const [aufgeloest] = verschluesseleMaterialverweise(
     [neu],
@@ -605,7 +606,8 @@ ${describeSheet(sheet)}`,
     old.type === 'task' ? old.points : 0
   )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  const neu = { ...block, id: old.id, stars: old.stars, ...layoutBehalten(old, block) }
+  // Kennung des Materials bleibt (26.11.2026): Aufgaben verweisen mit „M{kennung}" darauf
+  const neu = { ...block, id: old.id, stars: old.stars, ...(old.ref ? { ref: old.ref } : {}), ...layoutBehalten(old, block) }
   // Nummern, die die KI schreibt, werden zu Kennungen – gezählt über das ganze Blatt; der neue Baustein steht an der Stelle des alten
   const [aufgeloest] = verschluesseleMaterialverweise(
     [neu],

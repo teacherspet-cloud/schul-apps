@@ -97,6 +97,27 @@ export function digitalisieren(doc: Document): number {
       if (seite && seite.parentNode) seite.parentNode.removeChild(seite)
     })
   }
+  /*
+   * Seitenzahlen neu zählen (26.11.2026): Nach dem Entfernen der Hilfekarten- und Leerseiten stand auf der letzten
+   * sichtbaren Seite noch „Seite 3 / 4". Gezählt wird je Gruppe (data-sa-gruppe: Niveaublatt, Testvariante), wie bei
+   * der Seitenauswahl im Druck. Keine Importe – der Server reicht diese Funktion als Quelltext an den Browser.
+   */
+  const gruppen = new Map<string, Element[]>()
+  doc.querySelectorAll('.ws-page').forEach((s) => {
+    if (!s.querySelector('[data-sa-nr]')) return
+    const g = (s.closest('[data-sa-gruppe]') ?? s.querySelector('[data-sa-gruppe]'))?.getAttribute('data-sa-gruppe') ?? ''
+    gruppen.set(g, [...(gruppen.get(g) ?? []), s])
+  })
+  gruppen.forEach((liste) =>
+    liste.forEach((s, i) => {
+      if (liste.length <= 1) {
+        s.querySelectorAll('[data-sa-zahl]').forEach((z) => (z.textContent = ''))
+        return
+      }
+      s.querySelectorAll('[data-sa-nr]').forEach((z) => (z.textContent = String(i + 1)))
+      s.querySelectorAll('[data-sa-von]').forEach((z) => (z.textContent = String(liste.length)))
+    })
+  )
   return verschoben
 }
 

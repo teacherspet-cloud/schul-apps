@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { texToSvg } from '../src/renderer/src/shared/richtext/math'
-import { parseRichText, plainText } from '../src/renderer/src/shared/richtext/parse'
+import { parseInline, parseRichText, plainText } from '../src/renderer/src/shared/richtext/parse'
 
 describe('Textformat mit Formeln', () => {
   it('erkennt fett, kursiv, Formeln und Listen', () => {
@@ -46,5 +46,22 @@ describe('Nummerierte Überschriften', () => {
   it('behält die Startnummer („3. Umkehren“ bleibt 3.)', () => {
     const blocks = parseRichText('3. Umkehren: Ist das Dreieck rechtwinklig?')
     expect(blocks[0]).toMatchObject({ t: 'list', ordered: true, start: 3 })
+  })
+})
+
+describe('Dollarzeichen als Währung (26.11.2026)', () => {
+  it('lässt Beträge und Text zwischen zwei $ als normalen Text', () => {
+    for (const s of ['It costs $5 and $10 per ticket.', 'Er hat 5 $ und später 10 $ bezahlt.', 'The fee is $20, but members pay $15 only.']) {
+      const inl = parseInline(s)
+      expect(inl.every((i) => i.t === 'text')).toBe(true)
+      expect(inl.map((i) => (i.t === 'text' ? i.text : '')).join('')).toBe(s)
+    }
+  })
+  it('lässt mehrere Wörter zwischen $…$ als Text', () => {
+    expect(parseInline('Price US$ and some other US$').every((i) => i.t === 'text')).toBe(true)
+  })
+  it('erkennt Formeln weiterhin', () => {
+    expect(parseInline('Es gilt $a^2 + b^2 = c^2$ und $x$.').filter((i) => i.t === 'math')).toHaveLength(2)
+    expect(parseInline('$\\text{Preis in Euro} = 5$').filter((i) => i.t === 'math')).toHaveLength(1)
   })
 })

@@ -45,7 +45,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ART_NAME,
   GRAMMATIK_SPIELE,
-  normiert,
   regelBeispiele,
   woerterVon,
   type GrammatikAufgabe,
@@ -1677,8 +1676,8 @@ function Spiel({ d, spiel, fertig }: { d: Daten; spiel: GrammatikSpielId; fertig
             ergebnis={urteil ? { urteil } : null}
             antworten={(x, w) => {
               const a = runde as GrammatikAufgabe
-              const okWort = a.art !== 'fehler' || (w !== undefined && normiert(w) === normiert(a.fehlerWort ?? ''))
-              const ok = okWort && a.loesungen.some((l) => normiert(l) === normiert(x))
+              // Dieselbe Prüfung wie in der Übung (Kurzformen „He's“ = „He is“, Alternativen) – 26.11.2026
+              const ok = pruefeGrammatik(a, x, w).urteil === 'richtig'
               if (ok && GETIPPT.includes(a.art)) apostrophHinweis(x)
               naechste(ok, a.id)
             }}

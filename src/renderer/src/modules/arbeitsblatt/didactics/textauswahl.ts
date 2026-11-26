@@ -12,7 +12,7 @@
  *     der Sprache, Zeilenangabe),
  *   - die Sprache der Erklärungen (Deutsch oder einsprachig in der Zielsprache).
  */
-import { emphasisAbschnitte, type Auszeichnung } from '../../../shared/richtext/parse'
+import { emphasisAbschnitte, formelStellen, type Auszeichnung } from '../../../shared/richtext/parse'
 import { operatorSatz, type OperatorAnrede } from '@shared/operatoren/satzbau'
 import type { Listensprache } from '@shared/operatoren/typen'
 import { CEFR_SCALE, type CefrLevel } from '@shared/types'
@@ -159,12 +159,16 @@ export function formatiereAbsatz(absatz: string, von: number, bis: number, art: 
   const flag = FLAG[art]
   // Stücke: Formeln ($…$) und Zeilenwechsel bleiben, wie sie sind
   const stuecke: { text: string; start: number; fest: boolean }[] = []
-  const re = /\$[^$]*\$|\n/g
+  const festeStellen = [
+    ...formelStellen(absatz),
+    ...[...absatz.matchAll(/\n/g)].map((m) => ({ von: m.index!, bis: m.index! + 1 }))
+  ].sort((a, b) => a.von - b.von)
   let pos = 0
-  for (let m = re.exec(absatz); m; m = re.exec(absatz)) {
-    if (m.index > pos) stuecke.push({ text: absatz.slice(pos, m.index), start: pos, fest: false })
-    stuecke.push({ text: m[0], start: m.index, fest: true })
-    pos = m.index + m[0].length
+  for (const f of festeStellen) {
+    if (f.von < pos) continue
+    if (f.von > pos) stuecke.push({ text: absatz.slice(pos, f.von), start: pos, fest: false })
+    stuecke.push({ text: absatz.slice(f.von, f.bis), start: f.von, fest: true })
+    pos = f.bis
   }
   if (pos < absatz.length) stuecke.push({ text: absatz.slice(pos), start: pos, fest: false })
   // Zeichen der berührten Stücke mit ihrer Auszeichnung

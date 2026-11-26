@@ -17,6 +17,7 @@ import {
   IconTimeline,
   IconPlus,
   IconCircleNumber0,
+  IconArrowsRightDown,
   IconClipboardCheck,
   IconCopy,
   IconHeadphones,
@@ -71,7 +72,8 @@ import { useThemenbereich } from '../../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../../shared/ueberthema'
 import '../../render/ws.css'
 import { aiCall, useArbeitsblatt } from '../../store'
-import { bausteinAuftrag, hinweiseBeheben, maskottchenZeichnen } from '../../auftraege'
+import { bausteinAuftrag, bausteinMitFolgeAuftrag, folgeAnpassenAuftrag, hinweiseBeheben, maskottchenZeichnen } from '../../auftraege'
+import { folgeBausteine } from '../../generation/folgekette'
 import { useLaufendeSchluessel } from '../../../../shared/auftraege'
 import { defaultWorksheetName, setPreviewLayouts } from '../../library'
 import '../../../vokabeltest/steps/editor.css'
@@ -290,7 +292,8 @@ function EditorInhalt(): React.JSX.Element {
     // Hörtext (01.10.2026): Das Skript ändert sich, die Aufgaben dazu ziehen mit – ein Rückgängig-Schritt
     block.type === 'audio'
       ? hoertextWunschAuftrag(ws, docId, block.id, art, instruction, profile)
-      : bausteinAuftrag(ws, docId, art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten', block.id, block.id, async (w, k) => {
+      : // Folgekette (26.11.2026): Aufgaben und Hilfen, die darauf aufbauen, ziehen automatisch mit
+        bausteinMitFolgeAuftrag(ws, docId, art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten', block.id, async (w, k) => {
           const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
           const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction, art)
           await completeOriginalSources([fresh], browserSourceServices())
@@ -304,8 +307,8 @@ function EditorInhalt(): React.JSX.Element {
               },
               await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild })
             )
-          return (current) => addVersion(current, fresh)
-        })
+          return fresh
+        }, profile)
   /**
    * Vorschläge aus dem Hinweis zur Seitenzahl umsetzen (Paket 7; „Vorschlag der App umsetzen",
    * 30.09.2026). Lokale Vorschläge – Hilfen auf die Hilfekarten, Schreibraum und Bilder eine Stufe
@@ -561,6 +564,12 @@ function EditorInhalt(): React.JSX.Element {
             {block.type === 'task' && key && (
               <Menu.Item leftSection={<IconClipboardCheck size={14} />} onClick={() => addSolution(block)}>
                 Lösung im Erwartungshorizont generieren
+              </Menu.Item>
+            )}
+            {/* Nach einer Handbearbeitung (26.11.2026): die Folgekette auf Knopfdruck nachziehen */}
+            {folgeBausteine(sheet.blocks, block.id).length > 0 && (
+              <Menu.Item leftSection={<IconArrowsRightDown size={14} />} onClick={() => folgeAnpassenAuftrag(ws, docId, block.id, profile)} data-folge-anpassen>
+                Darauf aufbauende Bausteine anpassen ({folgeBausteine(sheet.blocks, block.id).length})
               </Menu.Item>
             )}
           </KiMenue>

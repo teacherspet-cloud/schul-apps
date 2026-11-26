@@ -13,6 +13,7 @@ import { amSatzanfang, grossAmSatzanfang } from '@shared/grossKlein'
 import { materialMitZeilen } from './materialZeilen'
 import type { Stil } from './objektOptionen'
 import { HilfeModal, hilfekartenAus, oeffneHilfeFenster, type Hilfekarten } from './hilfeFenster'
+import { FormulierungsKasten, FormulierungsKnopf, formulierungshilfenAus, type Formulierungshilfe } from './formulierungsLeiste'
 import {
   ActionIcon,
   Alert,
@@ -33,7 +34,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconDownload, IconEye, IconHelp, IconLayoutSidebarRight, IconMessageCircle, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
+import { IconArrowLeft, IconDownload, IconEye, IconHelp, IconLayoutSidebarRight, IconMessageCircle, IconMessageDots, IconPrinter, IconSend, IconShare, IconZoomIn } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useBlaettern } from '../lernen/regal/blaettern'
 import { FokusRahmen, seiteNachOben, seiteRollenUm } from '../lernen/fokus/FokusRahmen'
@@ -122,6 +123,8 @@ interface AufgabeInfo {
   freiwillig?: boolean
   /** Hilfekarten zu dieser Aufgabe (06.10.2026) – digital am ?-Symbol rechts */
   hilfe?: Hilfekarten
+  /** Formulierungshilfen (Phrases, Wortspeicher, Satzanfänge) – digital am Schreibfeld (26.11.2026) */
+  phrasen?: Formulierungshilfe[]
 }
 
 export interface BlattDaten {
@@ -527,6 +530,12 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
   for (const a of aufgaben) {
     const h = hilfen.get(a.nr)
     if (h) a.hilfe = h
+  }
+  // Formulierungshilfen je Aufgabe, dazu die Kästen fürs ganze Blatt (26.11.2026)
+  const phrasen = formulierungshilfenAus(doc)
+  for (const a of aufgaben) {
+    const liste = [...(phrasen.jeAufgabe.get(a.nr) ?? []), ...phrasen.allgemein]
+    if (liste.length) a.phrasen = liste
   }
   // Bilder zum Vergrößern und Markieren (25.10.2026, shared/blattBilder.ts – dieselbe Auswahl wie am Server)
   const bilder: BildLage[] = blattBilder(doc).map((b, i) => {
@@ -1854,6 +1863,13 @@ function Ebene(p: {
           vorgabe={p.vorgaben}
         />
       ))}
+      {/* Formulierungshilfen am Schreibfeld (26.11.2026): Knopf rechts oben am Feld, Leiste daneben, nur ansehen */}
+      {p.felder.map((f) => {
+        if (f.art !== 'zeilen' || (f.zeilen ?? 1) < 2) return null
+        const hilfen = p.aufgaben.find((a) => a.nr === f.nr)?.phrasen
+        if (!hilfen?.length) return null
+        return <FormulierungsKnopf key={`phr-${f.id}`} hilfen={hilfen} feldId={f.id} stil={{ position: 'absolute', left: f.x + f.w + 6, top: f.y - 2 }} />
+      })}
       {/* Hilfekarten rechts neben der Aufgabe (06.10.2026): eigenes kleines Fenster, Karten schrittweise */}
       {p.hilfeOeffnen &&
         p.aufgaben
@@ -1988,6 +2004,8 @@ function Liste(p: {
     const nummern = [...new Set([...p.felder.map((f) => f.nr), ...p.aufgaben.filter((a) => a.zeichnen).map((a) => a.nr)])].sort((a, b) => a - b)
     return nummern.map((nr) => ({ nr, aufgabe: p.aufgaben.find((a) => a.nr === nr), felder: p.felder.filter((f) => f.nr === nr) }))
   }, [p.felder, p.aufgaben])
+  // Formulierungshilfen je Aufgabe aufgeklappt (26.11.2026)
+  const [phrasenAuf, setPhrasenAuf] = useState<number | null>(null)
   return (
     <Stack data-blatt-liste>
       {p.tinte && (
@@ -2027,6 +2045,19 @@ function Liste(p: {
                   Hilfe
                 </Button>
               )}
+              {g.aufgabe?.phrasen?.length && g.felder.some((f) => f.art === 'zeilen' && (f.zeilen ?? 1) >= 2) ? (
+                <Button
+                  size="xs"
+                  variant={phrasenAuf === g.nr ? 'filled' : 'light'}
+                  color="indigo"
+                  leftSection={<IconMessageDots size={14} />}
+                  onClick={() => setPhrasenAuf((x) => (x === g.nr ? null : g.nr))}
+                  style={{ flexShrink: 0 }}
+                  data-phrasen-nr={g.nr}
+                >
+                  Wendungen
+                </Button>
+              ) : null}
               {p.pruefen && g.nr > 0 && rest > 0 && (
                 <Button
                   size="xs"
@@ -2042,6 +2073,7 @@ function Liste(p: {
               )}
             </Group>
             <Stack gap={6}>
+              {phrasenAuf === g.nr && g.aufgabe?.phrasen && <FormulierungsKasten hilfen={g.aufgabe.phrasen} schliessen={() => setPhrasenAuf(null)} />}
               {g.aufgabe?.zeichnen && (
                 <Alert variant="light" color="grape" p="xs" data-auf-dem-blatt={g.nr}>
                   <Group justify="space-between" gap="xs">

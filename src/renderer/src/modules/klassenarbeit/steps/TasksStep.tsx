@@ -45,6 +45,7 @@ import {
   IconChevronDown,
   IconChevronUp,
   IconFileImport,
+  IconArrowsRightDown,
   IconPlaylistAdd,
   IconArrowLeft,
   IconArrowBackUp
@@ -70,6 +71,8 @@ import { BlockSettings } from '../../arbeitsblatt/steps/BlockSettings'
 import { EinfuegenUntermenue } from '../../arbeitsblatt/steps/EinfuegenMenue'
 import WarningButton from '../../../shared/components/WarningButton'
 import { regenerateBlock } from '../../arbeitsblatt/generation/generate'
+import { folgeBausteine, folgeketteAnpassen, folgeMeldung, LEERE_FOLGE } from '../../arbeitsblatt/generation/folgekette'
+import { istAbbruch } from '@shared/abbruch'
 import { profileFromMeta } from '../../arbeitsblatt/render/SheetPages'
 import { addVersion, switchVersion } from '../../arbeitsblatt/model/versions'
 import { newBlock } from '../../arbeitsblatt/model/factory'
@@ -495,20 +498,75 @@ function TasksInhalt({ exam }: { exam: Exam }): React.JSX.Element {
       arbeit: async (e, k) => {
         k.melde(neu ? 'Die KI erzeugt den Baustein neu …' : 'Die KI überarbeitet den Baustein …')
         const ws = examToWorksheet(e, f)
-        return regenerateBlock(ws, ws.sheets[0], block.id, profileFromMeta(ws.meta), k.ai, '', instruction, wie)
+        const profil = profileFromMeta(ws.meta)
+        const fresh = await regenerateBlock(ws, ws.sheets[0], block.id, profil, k.ai, '', instruction, wie)
+        // Folgekette (26.11.2026): Aufgaben, Hilfen und spätere Bausteine, die darauf aufbauen, ziehen mit
+        const alt = ws.sheets[0].blocks.find((b) => b.id === block.id)
+        let folge = LEERE_FOLGE
+        if (alt)
+          try {
+            folge = await folgeketteAnpassen({ bloecke: ws.sheets[0].blocks, alt, neu: fresh, meta: ws.meta, profile: profil, ai: k.ai, melde: (t) => k.melde(t) })
+          } catch (err) {
+            if (istAbbruch(err)) throw err
+            folge = { ...LEERE_FOLGE, zusammenfassung: 'Die Bausteine, die darauf aufbauen, konnten nicht geprüft werden – bitte selbst ansehen.' }
+          }
+        const meldung = [folgeMeldung(folge, ws.sheets[0].blocks), folge.bloecke.size ? '' : folge.zusammenfassung].filter(Boolean).join(' ')
+        return { fresh, folge, meldung }
       },
-      abschluss: () => (neu ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
-      ablegen: (fresh, e) =>
-        legeArbeitAb(docId, e, (aktuell) => ({
+      abschluss: (erg) => erg.meldung || (neu ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
+      ablegen: async (erg, e) => {
+        await legeArbeitAb(docId, e, (aktuell) => ({
           ...aktuell,
           parts: aktuell.parts.map((p) =>
             mitBloecken(
               p,
               f,
-              bloeckeDerFassung(p, f).map((b) => (b.id === block.id ? addVersion(b, fresh) : b))
+              bloeckeDerFassung(p, f).map((b) =>
+                b.id === block.id ? addVersion(b, erg.fresh) : erg.folge.bloecke.has(b.id) ? addVersion(b, erg.folge.bloecke.get(b.id)!) : b
+              )
             )
           )
         }))
+        if (erg.meldung) notifyInfo(erg.meldung)
+      }
+    })
+  }
+
+  /** Nach einer Handbearbeitung (26.11.2026): die Folgekette auf Knopfdruck nachziehen – nur in dieser Fassung */
+  const folgeAnpassen = (block: WsBlock): void => {
+    const f = fassung
+    void starteAuftrag({
+      moduleId: 'klassenarbeit',
+      docId,
+      titel,
+      art: 'Darauf aufbauende Bausteine anpassen',
+      eingabe: exam,
+      istOffen: () => arbeitOffen(docId),
+      sperrt: false,
+      schluessel: `block-${block.id}`,
+      fehlerTitel: 'Die darauf aufbauenden Bausteine konnten nicht angepasst werden',
+      arbeit: async (e, k) => {
+        const ws = examToWorksheet(e, f)
+        const b = ws.sheets[0].blocks.find((x) => x.id === block.id)
+        if (!b) throw new Error('Der Baustein ist nicht mehr vorhanden.')
+        const folge = await folgeketteAnpassen({ bloecke: ws.sheets[0].blocks, alt: b, neu: b, meta: ws.meta, profile: profileFromMeta(ws.meta), ai: k.ai, melde: (t) => k.melde(t) })
+        return { folge, meldung: folgeMeldung(folge, ws.sheets[0].blocks) || 'Nichts baut auf diesem Baustein auf.' }
+      },
+      abschluss: (erg) => erg.meldung,
+      ablegen: async (erg, e) => {
+        if (erg.folge.bloecke.size)
+          await legeArbeitAb(docId, e, (aktuell) => ({
+            ...aktuell,
+            parts: aktuell.parts.map((p) =>
+              mitBloecken(
+                p,
+                f,
+                bloeckeDerFassung(p, f).map((b) => (erg.folge.bloecke.has(b.id) ? addVersion(b, erg.folge.bloecke.get(b.id)!) : b))
+              )
+            )
+          }))
+        notifyInfo(erg.meldung)
+      }
     })
   }
 
@@ -640,6 +698,11 @@ function TasksInhalt({ exam }: { exam: Exam }): React.JSX.Element {
               <NurExperte>
                 <LevelnMenue block={block} meta={exam.meta} onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)} />
               </NurExperte>
+              {folgeBausteine((worksheet.sheets[fassung] ?? worksheet.sheets[0])?.blocks ?? [], block.id).length > 0 && (
+                <Menu.Item leftSection={<IconArrowsRightDown size={14} />} onClick={() => folgeAnpassen(block)} data-folge-anpassen>
+                  Darauf aufbauende Bausteine anpassen ({folgeBausteine((worksheet.sheets[fassung] ?? worksheet.sheets[0])?.blocks ?? [], block.id).length})
+                </Menu.Item>
+              )}
             </KiMenue>
             <NurExperte>
               <BlockSettings block={block} combined={false} update={(fn, gruppe) => updateExam((d) => aendereBaustein(d, block.id, fn), gruppe)} />

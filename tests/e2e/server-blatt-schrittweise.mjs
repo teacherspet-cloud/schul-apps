@@ -55,6 +55,17 @@ const mitKaesten = (payload) => {
   // Hilfekarten zu Aufgabe 1 (am ?-Symbol), Satzanfänge hinter Aufgabe 2 (gesperrt bis zur Freischaltung)
   const aufgabenIdx = bloecke.map((b, i) => (b.type === 'task' ? i : -1)).filter((i) => i >= 0)
   bloecke.splice(aufgabenIdx[1] + 1, 0, { id: 'satz2', type: 'scaffold', variant: 'satzanfaenge', title: 'Satzanfänge', items: ['Zunächst …', 'Außerdem …'] })
+  // Formulierungshilfen zu Aufgabe 1 (26.11.2026): Knopf am Schreibfeld, Leiste daneben – dafür Schreiblinien an Aufgabe 1
+  const a1 = bloecke[aufgabenIdx[0]]
+  if (a1.parts?.length) a1.parts[0].answer = { ...a1.parts[0].answer, kind: 'lines', count: 4 }
+  else a1.answer = { ...(a1.answer ?? {}), kind: 'lines', count: 4 }
+  bloecke.splice(aufgabenIdx[0] + 1, 0, {
+    id: 'phr1',
+    type: 'phrases',
+    title: 'Useful phrases',
+    hint: '',
+    groups: [{ label: 'Giving your opinion', items: [{ text: 'In my opinion …' }, { text: 'I think that …' }] }]
+  })
   bloecke.splice(aufgabenIdx[0] + 1, 0, {
     id: 'karten1',
     type: 'scaffold',
@@ -160,6 +171,22 @@ try {
   const abgelegt = await blatt.locator('#sa-hilfekarten .ws-scaffold-hilfekarten').count()
   pruefe(kartenSeite === 0 && abgelegt === 1, `Seite „Tipp- und Hilfekarten" digital entfernt, Karten abgelegt (${kartenSeite}/${abgelegt})`)
   pruefe((await s.locator('[data-hilfe-nr="1"]').count()) === 1, '?-Symbol rechts neben Aufgabe 1')
+  // Seitenzahl (26.11.2026): nach dem Entfernen der Hilfekarten-Seite neu gezählt – die letzte Seite heißt „n / n"
+  const zahlen = await blatt.locator('.ws-page').evaluateAll((ps) => ps.map((x) => [x.querySelector('[data-sa-nr]')?.textContent ?? '', x.querySelector('[data-sa-von]')?.textContent ?? '']))
+  const letzte = zahlen[zahlen.length - 1]
+  pruefe(zahlen.length === 1 || (letzte[0] === String(zahlen.length) && letzte[1] === String(zahlen.length)), `Seitenzahlen neu gezählt (${JSON.stringify(zahlen)})`)
+  // Formulierungshilfen am Schreibfeld (26.11.2026): Knopf öffnet die Leiste, sie bleibt beim Tippen offen
+  const phrKnopf = s.locator('[data-phrasen-feld]').first()
+  pruefe((await s.locator('[data-phrasen-feld]').count()) >= 1, 'Knopf „Formulierungshilfen" am Schreibfeld von Aufgabe 1')
+  await phrKnopf.click()
+  const leiste = s.locator('[data-phrasen-leiste]')
+  pruefe((await leiste.isVisible()) && (await leiste.innerText()).includes('In my opinion'), 'Leiste zeigt die Useful phrases')
+  const feldId = await phrKnopf.getAttribute('data-phrasen-feld')
+  await s.locator(`textarea[data-feld="${feldId}"]`).click()
+  await s.keyboard.type('I think that ')
+  pruefe(await leiste.isVisible(), 'Leiste bleibt beim Tippen offen')
+  await s.screenshot({ path: join(out, '2a-formulierungshilfen.png') })
+  await phrKnopf.click()
   const [fenster] = await Promise.all([s.waitForEvent('popup', { timeout: 10000 }), s.locator('[data-hilfe-nr="1"]').click()])
   await fenster.waitForLoadState()
   pruefe(

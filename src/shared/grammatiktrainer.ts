@@ -453,8 +453,10 @@ export function normiert(s: string): string {
       // Alle Apostroph-Zeichen (’ ‘ ʼ ´ ` …) zählen gleich (08.10.2026)
       .replace(APOSTROPHE, "'")
       .replace(/[“”„]/g, '"')
+      // Unsichtbare Zeichen (iPad-Tastatur, Einfügen) und Satzzeichen-Folgen am Ende („…“, „...“, „?!“) – 26.11.2026
+      .replace(/[​-‍⁠﻿]/g, '')
       .replace(/\s+/g, ' ')
-      .replace(/\s*([.,!?;:])\s*$/g, '')
+      .replace(/[\s.,!?;:…]+$/g, '')
       .trim()
       .toLowerCase()
   )
