@@ -40,6 +40,7 @@ import { systemPrompt, taskContext } from './generation/prompts'
 import { anredeFuerMeta } from './didactics/anrede'
 import { folgeketteAnpassen, folgeMeldung, LEERE_FOLGE } from './generation/folgekette'
 import { addVersion } from './model/versions'
+import { istDiktatBlatt } from './didactics/diktat'
 import { anredeRegel } from '../../shared/anrede'
 import { lerngruppeSatz, ohneHinweise, wendeReparaturAn } from '../../shared/kiBeheben'
 import type { WorksheetMeta } from './model/types'
@@ -161,6 +162,13 @@ interface Plan {
 
 /** Material, Versuch, Gliederung – Schritt 1 → 2 (auch Teil des Direktwegs im Standardmodus) */
 async function planen(ws: Worksheet, k: Kontext): Promise<Plan> {
+  // Diktat (26.11.2026): keine Gliederung – das Blatt ist das Diktat (generation/diktatBlatt.ts)
+  if (istDiktatBlatt(ws.meta))
+    return {
+      outline: { title: ws.meta.title || ws.meta.topic, learningGoals: [], minutes: 45, teacherNote: '', items: [] },
+      material: null,
+      versuch: null
+    }
   const material = await materialBeschaffen(ws, k).catch((e) => {
     if (istAbbruch(e) || k.signal.aborted) throw e
     notifyInfo(`Die Materialsuche ist fehlgeschlagen (${e instanceof Error ? e.message : String(e)}). Das Blatt entsteht mit einem eigenen Text.`)

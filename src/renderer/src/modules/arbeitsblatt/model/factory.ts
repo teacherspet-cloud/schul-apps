@@ -87,6 +87,9 @@ export function newBlock(type: WsBlockType, anrede: Anrede = 'du', lerngruppe: {
     case 'protocol':
       // Versuchsprotokoll (29.09.2026): Vorschlag nach Fach und Jahrgang (didactics/protokoll.ts)
       return { id, type, ...leeresProtokoll(lerngruppe) }
+    case 'diktat':
+      // Diktat (26.11.2026, didactics/diktat.ts): leer, Regeln nach dem abgestimmten Standard
+      return { id, type, title: 'Diktat', form: 'klassisch', text: '', phaenomene: [], zielwoerter: [], kommasDiktiert: false, zaehlart: 'isb', sechsAbProzent: 10 }
   }
 }
 
@@ -122,7 +125,8 @@ export const BLOCK_LABELS: Record<WsBlockType, string> = {
   selfCheck: 'Selbsteinschätzung',
   divider: 'Abschnittsüberschrift',
   illustration: 'Illustration (Maskottchen)',
-  protocol: 'Versuchsprotokoll / Protokoll'
+  protocol: 'Versuchsprotokoll / Protokoll',
+  diktat: 'Diktat (Deutsch)'
 }
 
 /**

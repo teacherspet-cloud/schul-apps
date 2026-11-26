@@ -7,6 +7,7 @@
  * verwendet wie im Arbeitsblatt – dadurch funktionieren Darstellung, Seitenumbruch und Export
  * unverändert weiter.
  */
+import { diktatBlattErzeugen } from '../../arbeitsblatt/generation/diktatBlatt'
 import { schreibGrammatikRegeln } from '../didactics/schreibGrammatik'
 import { fachRegeln, mitProtokoll, versuchFuerArbeit } from './fachRegeln'
 import { fachDerArbeit, formatArt, inhaltsanteil, sprachfolge, zweiterTeil } from '../model/faecher'
@@ -787,6 +788,8 @@ export async function reviseExamPart(exam: Exam, part: ExamPart, number: number,
     const teil = { ...part, notes: [part.notes, `Änderungswunsch (hat Vorrang): ${instruction}`].filter(Boolean).join('\n') }
     return sprechBausteine(exam, part, await generateSprechDaten(exam, teil, ai))
   }
+  // Diktat (26.11.2026): neuer Diktattext mit dem Wunsch der Lehrkraft
+  if (part.diktat && exam.meta.subjectId === 'deutsch') return diktatTeilBloecke(exam, part, ai, instruction)
   const meta = worksheetMetaFor(exam, part)
   const profile = profileFor(meta)
   const current = part.blocks.map((b) => describeBlock(b)).join('\n\n')
@@ -916,6 +919,19 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
       const sprechBloecke = sprechBausteine(exam, part, sprechDaten)
       let fertig: ExamPart = { ...part, sprechDaten, blocks: sprechBloecke }
       for (let f = 1; f < anzahl; f++) fertig = mitBloecken(fertig, f, structuredClone(sprechBloecke))
+      parts.push(fertig)
+      zeige(`Teil ${i + 1} steht: ${part.label}`)
+      continue
+    }
+    /*
+     * Diktat (26.11.2026): der Rechtschreibteil als Diktat – eigener Weg (arbeitsblatt/generation/diktatBlatt.ts);
+     * alle Fassungen schreiben dasselbe Diktat. Die Punkte des Teils trägt die Niederschrift.
+     */
+    if (part.diktat && exam.meta.subjectId === 'deutsch') {
+      onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label} – Diktat …`)
+      const bloecke = await diktatTeilBloecke(exam, part, ai)
+      let fertig: ExamPart = { ...part, blocks: bloecke }
+      for (let f = 1; f < anzahl; f++) fertig = mitBloecken(fertig, f, structuredClone(bloecke))
       parts.push(fertig)
       zeige(`Teil ${i + 1} steht: ${part.label}`)
       continue
@@ -1280,4 +1296,13 @@ function fassungenAbschliessen(exam: Exam, part: ExamPart, index: number, notes:
     return neu
   })
   return { ...part, weitereFassungen: weitere }
+}
+
+/** Diktat als Teil einer Klassenarbeit/Lernzielkontrolle (26.11.2026) */
+export async function diktatTeilBloecke(exam: Exam, part: ExamPart, ai: AiCall, wunsch = ''): Promise<WsBlock[]> {
+  const meta = { ...worksheetMetaFor(exam, part), skillFocus: 'diktat' as const, diktat: part.diktat }
+  const ws = await diktatBlattErzeugen({ meta, sheets: [], sources: [], outline: null } as unknown as import('../../arbeitsblatt/model/types').Worksheet, profileFor(meta), ai, undefined, wunsch)
+  const bloecke = ws.sheets[0]?.blocks ?? []
+  // Punkte: die Niederschrift trägt den Teil; Zusatzaufgaben teilen sich nichts davon (Lehrkraft verteilt bei Bedarf)
+  return bloecke.map((b) => (b.type === 'task' && b.diktat ? { ...b, points: part.points } : b.type === 'task' ? { ...b, points: 0 } : b))
 }

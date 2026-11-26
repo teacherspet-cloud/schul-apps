@@ -1,4 +1,6 @@
 import VersuchKarte from '../../arbeitsblatt/steps/VersuchKarte'
+import DiktatKarte from '../../arbeitsblatt/steps/DiktatKarte'
+import { STANDARD_DIKTAT } from '../../arbeitsblatt/didactics/diktat'
 import { NurExperte } from '../../../shared/components/NurExperte'
 import { hatProtokolle, versuchAnfrage, versuchAus } from '../../arbeitsblatt/didactics/protokoll'
 import { lzkLerngruppe } from '../model/versuch'
@@ -481,6 +483,23 @@ export default function SetupStep(): React.JSX.Element {
                     <VersuchKarte lerngruppe={lzkLerngruppe(m)} versuch={m.versuch} patchVersuch={(versuch) => patch({ versuch })} pruefung />
                   )}
                 </NurExperte>
+                {/* Diktat (26.11.2026): Lernzielkontrolle als Diktat – das Diktat steht im Zentrum, Zusätze nur auf Wunsch */}
+                {m.subjectId === 'deutsch' && (
+                  <Card withBorder padding="md" radius="md">
+                    <Switch
+                      label="Als Diktat"
+                      description="Diktat mit Lehrkraftblatt und Niederschrift statt einzelner Aufgaben"
+                      checked={Boolean(m.diktat)}
+                      onChange={(e) => patch({ diktat: e.currentTarget.checked ? { ...STANDARD_DIKTAT } : undefined })}
+                      data-lzk-diktat
+                    />
+                    {m.diktat && (
+                      <Box mt="sm">
+                        <DiktatKarte setup={{ ...STANDARD_DIKTAT, ...m.diktat }} klasse={m.grade} nurPruefung onChange={(diktat) => patch({ diktat })} />
+                      </Box>
+                    )}
+                  </Card>
+                )}
               </Stack>
             </Grid.Col>
 

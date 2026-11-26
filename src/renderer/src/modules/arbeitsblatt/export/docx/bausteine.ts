@@ -43,6 +43,8 @@ import { anredeFuerMeta, anweisungsSprache } from '../../didactics/anrede'
 import { Child, PX_PER_MM, PX_MM, tint, Ctx, materialNo } from './grundlagen'
 import { rich, richRun } from './kopf'
 import { taskContent } from './aufgaben'
+import { diktatInhalt } from '../../didactics/diktat'
+import { notenvorschlag } from '@shared/diktat'
 import { protokollDocx } from './protokoll'
 
 export function boxTable(ctx: Ctx, children: Child[], opts: { fill?: string; leftColor?: string; dashed?: boolean; color?: string }): Table {
@@ -582,6 +584,27 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
       return illustrationDocx(ctx, block.maskottchenId, block.pose, block.bubble, 24)
     case 'protocol':
       return protokollDocx(ctx, block)
+    case 'diktat': {
+      // Diktat (26.11.2026): dieselben Teile wie auf dem Blatt (didactics/diktat.ts › diktatInhalt)
+      const teile = diktatInhalt(block, key, notenvorschlag)
+      if (!teile.length) return []
+      const out: Child[] = []
+      if (key) out.push(new Paragraph({ keepNext: true, spacing: { after: 80 }, children: [run(block.title, { bold: true, color: ctx.accent })] }))
+      for (const t of teile) {
+        if (t.art === 'hinweis') out.push(new Paragraph({ spacing: { after: 80 }, children: [run(t.text, { size: ctx.size - 2 })] }))
+        else if (t.art === 'text') {
+          if (t.titel) out.push(new Paragraph({ keepNext: true, spacing: { before: 80 }, children: [run(t.titel, { bold: true })] }))
+          out.push(...(await rich(ctx, t.text)))
+        } else if (t.art === 'liste') {
+          out.push(new Paragraph({ keepNext: true, spacing: { before: 80 }, children: [run(t.titel, { bold: true })] }))
+          t.punkte.forEach((p, k) => out.push(new Paragraph({ indent: { left: 280, hanging: 280 }, children: [run(`${k + 1}.	${p}`)] })))
+        } else {
+          out.push(new Paragraph({ keepNext: true, spacing: { before: 80 }, children: [run(`✂ ${t.titel}`, { bold: true })] }))
+          for (const [k, st] of t.streifen.entries()) out.push(boxTable(ctx, [new Paragraph({ children: [run(`${k + 1}  `, { bold: true, color: ctx.accent }), run(st)] })], { dashed: true }), spacer())
+        }
+      }
+      return out
+    }
     case 'divider':
       return [
         new Paragraph({

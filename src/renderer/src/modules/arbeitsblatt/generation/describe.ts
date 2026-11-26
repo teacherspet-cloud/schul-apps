@@ -103,6 +103,8 @@ export function describeBlockMit(b: WsBlock, wortzahl: boolean): string {
       return `Selbsteinschätzung: ${b.statements.join('; ')}`
     case 'divider':
       return `Abschnitt: ${b.title}`
+    case 'diktat':
+      return `Diktat „${b.title}" (${b.form}${b.phaenomene.length ? `, Schwerpunkt ${b.phaenomene.join(', ')}` : ''}): ${b.text.replace(/\s*\/\s*/g, ' ')}${b.zielwoerter.length ? ` | Zielwörter: ${b.zielwoerter.join(', ')}` : ''}`
     case 'protocol':
       return [
         `${b.title} (Protokoll, zum Ausfüllen) – Abschnitte: ${b.abschnitte.map((a) => a.titel).join(', ')}`,

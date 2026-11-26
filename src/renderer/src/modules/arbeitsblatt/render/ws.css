@@ -3431,3 +3431,43 @@ html[data-griff-zug] * {
   border-right: 0.25mm solid #444;
   border-bottom: 0.25mm solid #444;
 }
+
+/* Diktat (26.11.2026, baustein/diktat.tsx) */
+.ws-diktat-lehrkraft {
+  border: 0.4mm solid var(--ws-accent);
+  border-radius: 2mm;
+  padding: 3mm 4mm;
+}
+.ws-diktat-titel {
+  font-weight: 700;
+  font-size: 1.1em;
+  color: var(--ws-accent);
+  margin-bottom: 1.5mm;
+}
+.ws-diktat-hinweis {
+  font-size: 0.9em;
+  opacity: 0.85;
+  margin-bottom: 2mm;
+}
+.ws-diktat-teiltitel {
+  font-weight: 700;
+  margin: 2mm 0 1mm;
+}
+.ws-diktat-text {
+  line-height: 1.7;
+}
+.ws-diktat-liste ol {
+  margin: 0;
+  padding-left: 6mm;
+}
+.ws-diktat-streifen-eins {
+  border: 0.3mm dashed #777;
+  padding: 2.5mm 3mm;
+  margin: 1.5mm 0;
+  break-inside: avoid;
+}
+.ws-diktat-nr {
+  font-weight: 700;
+  color: var(--ws-accent);
+  margin-right: 2mm;
+}

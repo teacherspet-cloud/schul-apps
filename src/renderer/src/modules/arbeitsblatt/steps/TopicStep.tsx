@@ -7,6 +7,8 @@ import InterkulturSchalter from './InterkulturSchalter'
 import VideoTranskript, { videoMaterialArt } from './VideoTranskript'
 import { sehtextQuelle } from '../didactics/sehtext'
 import VersuchKarte from './VersuchKarte'
+import DiktatKarte from './DiktatKarte'
+import { istDiktatBlatt, STANDARD_DIKTAT } from '../didactics/diktat'
 import { versuchAuftrag } from '../auftraege'
 import { hatProtokolle } from '../didactics/protokoll'
 import { nimmFachVorgabe, nimmJahrgangVorgabe, nimmLerngruppeVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
@@ -583,6 +585,8 @@ export default function TopicStep(): React.JSX.Element {
                           allowDeselect={false}
                         />
                       )}
+                      {/* Diktat (26.11.2026): Form, Schwerpunkte (mehrere), Wortzahl, Zählregel, Vor-/Nachbereitung nur auf Wunsch */}
+                      {istDiktatBlatt(meta) && <DiktatKarte setup={{ ...STANDARD_DIKTAT, ...meta.diktat }} klasse={meta.grade} onChange={(diktat) => patch({ diktat })} />}
                       {/* Interkulturelle Kompetenz (02.10.2026): eigener Schwerpunkt (nur Teilbereiche) oder Zusatzschalter */}
                       <NurExperte geaendert={meta.interkulturell?.aktiv && meta.skillFocus !== 'interkulturell' && 'Interkulturell'}>
                         {subject.foreignLanguage && (

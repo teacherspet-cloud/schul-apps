@@ -14,7 +14,7 @@ import { SPRECHEN_DIALOGISCH, SPRECHEN_MONOLOGISCH } from '../../../../shared/sp
 
 /** Kompetenzschwerpunkt eines Fremdsprachenblattes (Auswahl in Schritt 1). */
 export const SKILL_FOCUS: {
-  value: 'mixed' | 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary' | 'speaking' | 'interaction' | 'interkulturell'
+  value: 'mixed' | 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary' | 'speaking' | 'interaction' | 'interkulturell' | 'diktat'
   label: string
   description: string
   prompt: string
@@ -23,6 +23,13 @@ export const SKILL_FOCUS: {
     value: 'mixed',
     label: 'Gemischt',
     description: 'Aufgaben zu Leseverstehen, Wortschatz und Grammatik, wie es das Thema verlangt.',
+    prompt: ''
+  },
+  // Diktat (26.11.2026, nur Deutsch): eigener Erzeugungsweg (generation/diktatBlatt.ts), die Regeln stehen in didactics/diktat.ts
+  {
+    value: 'diktat',
+    label: 'Diktat / Rechtschreibung',
+    description: 'Ein Diktat mit Lehrkraftblatt und Niederschrift; Vor- und Nachbereitung nur auf Wunsch.',
     prompt: ''
   },
   {
@@ -119,15 +126,15 @@ const SEHVERSTEHEN_PROMPT =
  */
 export function skillFocusOptions(subjectId: string): typeof SKILL_FOCUS {
   // Interkulturelle Kompetenz nur in den modernen Fremdsprachen (nicht Latein/Griechisch, nicht DaZ)
-  if (subjectById(subjectId).foreignLanguage) return SKILL_FOCUS.filter((f) => f.value !== 'interkulturell' || interkulturMoeglich(subjectId))
+  if (subjectById(subjectId).foreignLanguage) return SKILL_FOCUS.filter((f) => f.value !== 'diktat' && (f.value !== 'interkulturell' || interkulturMoeglich(subjectId)))
   // DaZ arbeitet mit denselben Schwerpunkten wie die Fremdsprachen, ohne Sprachmittlung
-  if (subjectId === 'daz') return SKILL_FOCUS.filter((f) => f.value !== 'mediation' && f.value !== 'interkulturell')
+  if (subjectId === 'daz') return SKILL_FOCUS.filter((f) => f.value !== 'mediation' && f.value !== 'interkulturell' && f.value !== 'diktat')
   /*
    * Deutsch hat als einziges Fach ausserhalb der Fremdsprachen einen eigenen
    * Hoer-Kompetenzbereich: Verstehend zuhoeren ist Kernbereich der KMK-Bildungsstandards
    * (ESA/MSA 2022) und getestete Domaene in VERA-8. Lesen gehoert dort ebenfalls dazu.
    */
-  if (subjectId === 'deutsch') return SKILL_FOCUS.filter((f) => ['mixed', 'listening', 'reading', 'grammar', 'vocabulary'].includes(f.value))
+  if (subjectId === 'deutsch') return SKILL_FOCUS.filter((f) => ['mixed', 'listening', 'reading', 'grammar', 'vocabulary', 'diktat'].includes(f.value))
   return SKILL_FOCUS.filter((f) => f.value === 'mixed')
 }
 

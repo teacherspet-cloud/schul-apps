@@ -26,6 +26,7 @@ import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
 import { ProtokollView } from './protokoll'
+import { DiktatView } from './diktat'
 import { EINSCHAETZUNG_KOPF, kopfSpracheVon, wortzahlText, zaehleWoerter } from '../../../../shared/kopfSprache'
 import { anmerkungenVon, ohneFussnotenMarken, type Anmerkung } from '../../didactics/anmerkungen'
 import { fassungWechseln } from '../../didactics/textauswahl'
@@ -761,6 +762,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       )
     case 'protocol':
       return <ProtokollView block={block} placed={placed} />
+    case 'diktat':
+      return <DiktatView block={block} />
   }
 }
 

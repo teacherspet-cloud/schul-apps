@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { istDiktatBlatt } from '../didactics/diktat'
+import { diktatBlattErzeugen } from './diktatBlatt'
 import { LUECKEN_PRUEFUNG_DE } from '@shared/luecken'
 import { sehverstehenMitVideo } from '../didactics/sehtext'
 import { wunschAuftrag, type WunschArt } from '../../../shared/kiWunsch'
@@ -708,6 +710,8 @@ export async function mitBlindprobe(sheet: Sheet, ai: AiCall, melde?: (text: str
 
 export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, opts: GenerateOptions): Promise<Worksheet> {
   const { meta } = ws
+  // Diktat (26.11.2026): eigener Weg, eine Anfrage – das Diktat steht im Zentrum (generation/diktatBlatt.ts)
+  if (istDiktatBlatt(meta)) return diktatBlattErzeugen(ws, profile, opts.ai, (m) => opts.onProgress?.(m, 0, 1))
   const levels: (Stars | null)[] =
     meta.differentiation.levels > 1 && meta.differentiation.mode === 'separate' ? ([1, 2, 3] as Stars[]).slice(0, meta.differentiation.levels) : [null]
   /*

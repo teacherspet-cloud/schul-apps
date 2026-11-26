@@ -494,6 +494,20 @@ function convertBlockRoh(b: any, rng: Rng, images: { index: number; dataUrl: str
     case 'protocol':
       // Platzhalter: Die App setzt das Protokoll aus dem ausgearbeiteten Versuch ein (setzeVersuchEin)
       return { ...base, type, title: text(b.title) || 'Versuchsprotokoll', art: 'versuch', stufe: 'offen', stil: 'praesens', abschnitte: [] }
+    case 'diktat':
+      // Diktat (26.11.2026): entsteht im eigenen Weg (generation/diktatBlatt.ts); hier nur ein lesbarer Rückfall
+      return {
+        ...base,
+        type,
+        title: text(b.title) || 'Diktat',
+        form: 'klassisch',
+        text: text(b.text ?? b.body),
+        phaenomene: [],
+        zielwoerter: [],
+        kommasDiktiert: false,
+        zaehlart: 'isb',
+        sechsAbProzent: 10
+      }
   }
 }
 

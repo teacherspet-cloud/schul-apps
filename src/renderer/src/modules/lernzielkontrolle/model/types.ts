@@ -133,6 +133,8 @@ export interface KurztestMeta {
   nachteilsausgleich: Nachteilsausgleich
   /** Versuch mit Protokoll (29.09.2026, arbeitsblatt/model/protokoll.ts) – fehlt = keiner */
   versuch?: import('../../arbeitsblatt/model/protokoll').VersuchSetup
+  /** Diktat (26.11.2026, nur Deutsch): die Lernzielkontrolle als Diktat – fehlt = keins */
+  diktat?: import('../../arbeitsblatt/model/types').DiktatSetup
   bewertung: Bewertungseinstellung
 
   /** Lösungsblatt für die Lehrkraft erzeugen */

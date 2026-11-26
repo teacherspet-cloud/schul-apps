@@ -564,6 +564,8 @@ export interface TaskBrief {
 
 export interface TaskBlock extends BaseBlock {
   type: 'task'
+  /** Niederschrift eines Diktats (26.11.2026): Kennung des Diktat-Bausteins – Grundlage der Prüfung beim Eintippen */
+  diktat?: string
   /** Freiwillig in einem Reihen-Schritt (05.10.2026): sichtbar, mit Feedback, zählt nicht für den Erfolg */
   freiwillig?: boolean
   instruction: string
@@ -893,6 +895,34 @@ export interface ProtocolBlock extends BaseBlock, ProtokollInhalt {
   type: 'protocol'
 }
 
+/**
+ * Diktat (Deutsch, 26.11.2026) – Didaktik und Regeln in didactics/diktat.ts.
+ * Der Baustein trägt den Diktattext; was davon auf dem SCHÜLERblatt steht, hängt von der Form ab
+ * (klassisch: nichts – nur die Niederschrift-Aufgabe; Laufdiktat: Streifen; Lückendiktat: die
+ * Aufgabe mit Lücken). Im Lösungsteil steht das Lehrkraftblatt: Text mit Diktierpausen,
+ * Zielwörter, Wortzahl, Ablauf und Fehlerschlüssel.
+ */
+export type DiktatForm = 'klassisch' | 'lueckendiktat' | 'laufdiktat' | 'partnerdiktat' | 'dosendiktat' | 'wendediktat' | 'mehrstufen' | 'pruefung'
+
+export interface DiktatBlock extends BaseBlock {
+  type: 'diktat'
+  title: string
+  form: DiktatForm
+  /** Diktattext; „/" trennt die Sinnabschnitte (Diktierpausen), Leerzeilen trennen Absätze */
+  text: string
+  /** Rechtschreibphänomene, z. B. „s/ss/ß" */
+  phaenomene: string[]
+  /** Zielwörter des Phänomens – auf dem Lehrkraftblatt hervorgehoben, beim Lückendiktat die Lücken */
+  zielwoerter: string[]
+  /** Kommas werden mitdiktiert (sonst zählen Kommafehler nicht) */
+  kommasDiktiert: boolean
+  zaehlart: 'isb' | 'streng' | 'woerter'
+  /** Note 6 ab diesem Fehleranteil in Prozent (Vorschlag) */
+  sechsAbProzent: number
+  /** Zwillingstext für das Mehrstufendiktat (ein bis zwei Wochen später) */
+  zwilling?: string
+}
+
 export type WsBlock =
   | LearningGoalsBlock
   | InfoBoxBlock
@@ -910,8 +940,25 @@ export type WsBlock =
   | DividerBlock
   | IllustrationBlock
   | ProtocolBlock
+  | DiktatBlock
 
 export type WsBlockType = WsBlock['type']
+
+/** Einstellungen eines Diktatblatts (Schritt 1) – Vor- und Nachbereitung nur, wenn die Lehrkraft sie wählt */
+export interface DiktatSetup {
+  form: DiktatForm
+  /** Rechtschreibschwerpunkte (Mehrfachauswahl, Schlüssel aus DIKTAT_SCHWERPUNKTE; 26.11.2026) */
+  schwerpunkte: string[]
+  /** Eigener Schwerpunkt in Worten (frei) */
+  eigenerSchwerpunkt?: string
+  /** Wortzahl (0 = nach Klassenstufe) */
+  woerter: number
+  kommasDiktiert: boolean
+  zaehlart: 'isb' | 'streng' | 'woerter'
+  sechsAbProzent: number
+  /** Gewählte Zusatzaufgaben (Schlüssel aus DIKTAT_ZUSATZ) */
+  zusatz: string[]
+}
 
 export interface Sheet {
   id: string
@@ -1059,7 +1106,7 @@ export interface WorksheetMeta {
   themenbereich?: string
   /** Fremdsprachen: Kompetenzschwerpunkt des Blattes ('mixed' = gemischt) */
   // 'interkulturell' (02.10.2026): eigener Schwerpunkt nur des Arbeitsblatts (didactics/interkulturalitaet.ts)
-  skillFocus?: LanguageSkill | 'mixed' | 'interkulturell'
+  skillFocus?: LanguageSkill | 'mixed' | 'interkulturell' | 'diktat'
   /**
    * Interkultureller Zusatzschwerpunkt (02.10.2026): setzt auf jeden Schwerpunkt auf; in der
    * Klassenarbeit der einzige Weg (integrativ). Siehe didactics/interkulturalitaet.ts.
@@ -1194,6 +1241,8 @@ export interface WorksheetMeta {
   video?: VideoSetup
   /** Versuch mit Protokoll (29.09.2026, model/protokoll.ts) – fehlt = keiner */
   versuch?: VersuchSetup
+  /** Diktat (Deutsch, 26.11.2026, didactics/diktat.ts) – fehlt = kein Diktatblatt */
+  diktat?: DiktatSetup
   sheetType: SheetType
   /**
    * Vorgegebene Seitenzahl als Richtwert bzw. Untergrenze einer Spanne – 0 = automatisch, die

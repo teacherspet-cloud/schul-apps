@@ -3,6 +3,8 @@ import { useExperte } from '../../../shared/settingsStore'
 import { NurExperte, OptionenBereich, useAlleOptionen } from '../../../shared/components/NurExperte'
 import SchreibGrammatikFeld from './SchreibGrammatikFeld'
 import SprechpruefungKarte from './SprechpruefungKarte'
+import DiktatKarte from '../../arbeitsblatt/steps/DiktatKarte'
+import { STANDARD_DIKTAT } from '../../arbeitsblatt/didactics/diktat'
 import TeilOperatoren from './TeilOperatoren'
 import { sprechpruefungAlsArbeit } from '../generation/sprechpruefung'
 import { BY_GYM_ZWEIG_KERNFAECHER as BY_GYM_ZWEIGE, nachweisFuer, NACHWEIS_BEZEICHNUNGEN, type ByZweig } from '../model/nachweise'
@@ -835,6 +837,31 @@ export default function FrameStep(): React.JSX.Element {
                                     {formatArt(part.formatId) !== 'speaking' && (
                                       <Box mt="xs">
                                         <TeilOperatoren exam={exam} part={part} setzen={(ops) => update((d) => (d.parts[i].operatoren = ops))} />
+                                      </Box>
+                                    )}
+                                    {/* Diktat (26.11.2026): der Rechtschreibteil als Diktat – nur Formen zur Leistungsfeststellung */}
+                                    {part.formatId === 'de-rechtschreibung' && (
+                                      <Box mt="xs">
+                                        <Switch
+                                          label="Als Diktat"
+                                          description={exam.meta.stateId === 'BY' ? 'Hinweis: In Bayern ist das Diktat als Schulaufgabe nicht zulässig.' : 'Diktat mit Lehrkraftblatt und Niederschrift'}
+                                          checked={Boolean(part.diktat)}
+                                          onChange={(e) => {
+                                            const an = e.currentTarget.checked
+                                            update((d) => (d.parts[i].diktat = an ? { ...STANDARD_DIKTAT } : undefined), `diktat:${part.id}`)
+                                          }}
+                                          data-teil-diktat
+                                        />
+                                        {part.diktat && (
+                                          <Box mt="xs">
+                                            <DiktatKarte
+                                              setup={{ ...STANDARD_DIKTAT, ...part.diktat }}
+                                              klasse={exam.meta.grade}
+                                              nurPruefung
+                                              onChange={(s) => update((d) => (d.parts[i].diktat = s), `diktat:${part.id}`)}
+                                            />
+                                          </Box>
+                                        )}
                                       </Box>
                                     )}
                                     {formatArt(part.formatId) === 'speaking' && (

@@ -183,7 +183,8 @@ describe('Grammatik-Arbeitsblatt', () => {
      * Kernbereich der KMK-Bildungsstandards Deutsch (ESA/MSA 2022) und getestete Domaene in
      * VERA-8. Sprachmittlung gibt es dort weiterhin nicht.
      */
-    expect(skillFocusOptions('deutsch').map((f) => f.value)).toEqual(['mixed', 'vocabulary', 'grammar', 'reading', 'listening'])
+    // Seit 26.11.2026 auch das Diktat (didactics/diktat.ts)
+    expect(skillFocusOptions('deutsch').map((f) => f.value)).toEqual(['mixed', 'diktat', 'vocabulary', 'grammar', 'reading', 'listening'])
     expect(skillFocusOptions('geschichte').map((f) => f.value)).toEqual(['mixed'])
   })
 

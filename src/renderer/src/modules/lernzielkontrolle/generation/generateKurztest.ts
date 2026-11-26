@@ -17,6 +17,8 @@ import { pruefungsVersuchRegeln, setzeProtokollInPruefung } from '../../arbeitsb
 import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
 import { worksheetMetaForKurztest } from '../render/kurztestWorksheet'
+import { diktatBlattErzeugen } from '../../arbeitsblatt/generation/diktatBlatt'
+import { profileFromMeta } from '../../arbeitsblatt/render/SheetPages'
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { AiCall } from '../../../shared/imageChoice'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
@@ -228,6 +230,17 @@ export async function generateKurztest(
   /** Live-Vorschau (02.10.2026): die Aufgaben, sobald sie entworfen sind – vor der Blindprobe */
   zwischenstand?: (blocks: WsBlock[]) => void
 ): Promise<WsBlock[]> {
+  // Diktat (26.11.2026): eigener Weg (arbeitsblatt/generation/diktatBlatt.ts) – Varianten schreiben dasselbe Format mit eigenem Text
+  if (test.meta.subjectId === 'deutsch' && test.meta.diktat) {
+    onStep(variante ? `Diktat für Variante ${variante} …` : 'Die KI schreibt das Diktat …')
+    const meta = { ...worksheetMetaForKurztest(test), skillFocus: 'diktat' as const, diktat: test.meta.diktat }
+    const ws = await diktatBlattErzeugen({ meta, sheets: [], sources: [], outline: null } as unknown as import('../../arbeitsblatt/model/types').Worksheet, profileFromMeta(meta), ai)
+    const blocks = ws.sheets[0]?.blocks ?? []
+    if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)
+    else for (const a of aufgabenIn(blocks)) a.points = 0
+    zwischenstand?.(blocks)
+    return blocks
+  }
   onStep(variante ? `Variante ${variante} wird entworfen …` : 'Aufgaben werden entworfen …')
   const data = await ai<{ blocks: Record<string, unknown>[] }>({
     system: kurztestPrompt(test, variante),

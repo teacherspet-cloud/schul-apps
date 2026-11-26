@@ -106,6 +106,8 @@ export interface ExamPart {
   sprechen?: import('../../../shared/sprechen/laender').SprechSetup
   /** Sprechprüfung: die erzeugten Karten und Inhalte des Prüferbogens – daraus entstehen die Bausteine */
   sprechDaten?: import('../generation/sprechpruefung').SprechDaten
+  /** Rechtschreibteil als Diktat (26.11.2026, arbeitsblatt/didactics/diktat.ts) – fehlt = kein Diktat */
+  diktat?: import('../../arbeitsblatt/model/types').DiktatSetup
   /** Material und Aufgaben des Teils – bei mehreren Fassungen die der Fassung A */
   blocks: WsBlock[]
   /**
