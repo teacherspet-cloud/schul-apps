@@ -65,3 +65,13 @@ describe('Dollarzeichen als Währung (26.11.2026)', () => {
     expect(parseInline('$\\text{Preis in Euro} = 5$').filter((i) => i.t === 'math')).toHaveLength(1)
   })
 })
+
+describe('Befund „Cars in the Lion City" (26.11.2026): Singapur-Dollar S$ und $ im selben Absatz', () => {
+  it('bleibt normaler Text – keine Formel, keine Kursivschrift', () => {
+    const absatz =
+      'The cost of a certificate has jumped to a fresh record high of S$146,002 ($106,619; £87,684). For example, a new Toyota Camry Hybrid costs around S$250,000 in Singapore.'
+    const inl = parseInline(absatz)
+    expect(inl.every((i) => i.t === 'text' && !i.italic)).toBe(true)
+    expect(inl.map((i) => (i.t === 'text' ? i.text : '')).join('')).toBe(absatz)
+  })
+})
