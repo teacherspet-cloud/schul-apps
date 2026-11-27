@@ -188,16 +188,46 @@ try {
   pruefe(await leiste.isVisible(), 'Leiste bleibt beim Tippen offen')
   await s.screenshot({ path: join(out, '2a-formulierungshilfen.png') })
   await phrKnopf.click()
-  const [fenster] = await Promise.all([s.waitForEvent('popup', { timeout: 10000 }), s.locator('[data-hilfe-nr="1"]').click()])
-  await fenster.waitForLoadState()
+  // Verschiebbare Fenster in der Seite (27.11.2026): kein eigenes Browserfenster/Tab mehr
+  pruefe(!(await leiste.isVisible()), 'Formulierungshilfen mit dem Knopf wieder geschlossen')
+  let neuerTab = false
+  s.context().once('page', () => (neuerTab = true))
+  await s.locator('[data-hilfe-nr="1"]').click()
+  const fenster = s.locator('[data-hilfe-fenster="1"]')
+  await fenster.waitFor({ timeout: 5000 }).catch(() => undefined)
+  pruefe(!neuerTab && (await fenster.isVisible()), 'Hilfe öffnet ein Fenster in der Seite, keinen Tab')
   pruefe(
     (await fenster.locator('[data-karte]').count()) === 1 && (await fenster.locator('[data-karte="1"]').innerText()).includes('Erste Hilfe'),
-    'Eigenes Fenster: zuerst nur Hilfe 1'
+    'Zuerst nur Hilfe 1'
   )
-  await fenster.locator('#weiter').click()
+  await fenster.locator('[data-hilfe-weiter]').click()
   pruefe((await fenster.locator('[data-karte]').count()) === 2, 'Nächste Hilfe öffnet Karte 2')
-  await fenster.screenshot({ path: join(out, '2b-hilfefenster.png') })
-  await fenster.close()
+  // Verschieben am Kopf
+  const vorher = await fenster.boundingBox()
+  const griff = await fenster.locator('[data-schwebefenster-griff]').boundingBox()
+  if (vorher && griff) {
+    await s.mouse.move(griff.x + 40, griff.y + griff.height / 2)
+    await s.mouse.down()
+    await s.mouse.move(griff.x - 160, griff.y + 120, { steps: 6 })
+    await s.mouse.up()
+  }
+  const nachher = await fenster.boundingBox()
+  pruefe(Boolean(vorher && nachher && Math.abs(nachher.x - vorher.x) > 60 && Math.abs(nachher.y - vorher.y) > 60), `Hilfefenster lässt sich verschieben (${JSON.stringify([vorher?.x, vorher?.y, nachher?.x, nachher?.y])})`)
+  await s.screenshot({ path: join(out, '2b-hilfefenster.png') })
+  // Mitlaufen: weiter unten im Feld bleibt das ? im Bild
+  const hilfeKnopf = s.locator('[data-hilfe-nr="1"]')
+  const y0 = (await hilfeKnopf.boundingBox())?.y ?? 0
+  const weg = Math.round(y0 - 20)
+  await s.evaluate((dy) => {
+    const sc = document.querySelector('.sa-fokus[data-fokus="an"] > .sa-fokus-inhalt')
+    if (sc) sc.scrollBy(0, dy)
+    else window.scrollBy(0, dy)
+  }, weg)
+  await s.waitForTimeout(400)
+  const y1 = (await hilfeKnopf.boundingBox())?.y ?? 0
+  // Ohne Mitlaufen stünde es jetzt bei y0 - weg (≈ 20 px, unter der Werkzeugleiste); mitlaufend tiefer
+  pruefe(y1 > y0 - weg + 30, `?-Symbol läuft beim Rollen mit (${Math.round(y0)} → ${Math.round(y1)}, gerollt ${weg})`)
+  await fenster.locator('[data-schwebefenster-zu]').click()
   await s.waitForTimeout(800)
   const spaet = await blatt
     .locator('.ws-flow[data-fluss="spaetmat"] > .ws-block')

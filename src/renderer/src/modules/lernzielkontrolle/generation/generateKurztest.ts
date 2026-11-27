@@ -13,6 +13,7 @@
  */
 import { PAGE_FORMAT_FIELD } from '../../arbeitsblatt/generation/schemas'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
+import { spanischeZeichenRegel } from '@shared/feedbackRegeln'
 import { pruefungsVersuchRegeln, setzeProtokollInPruefung } from '../../arbeitsblatt/didactics/protokoll'
 import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
@@ -165,6 +166,7 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
     `Vorgesehene Bearbeitungszeit: ${m.minutes} Minuten. Der Umfang richtet sich nach dieser Zeit, nicht umgekehrt.`,
     `Thema: ${m.thema || fach.label}.`,
     LUECKEN_REGELN_DE,
+    spanischeZeichenRegel(m.subjectId),
     m.stoff ? `Im Unterricht wurde unmittelbar vorher behandelt: ${m.stoff}` : '',
     ...stoffQuellenTeil(test),
     format?.stoffStunden

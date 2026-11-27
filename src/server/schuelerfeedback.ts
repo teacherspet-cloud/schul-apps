@@ -246,7 +246,7 @@ async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, au
     // Zeilenangaben prüfbar machen (03.10.2026): das Material so nummeriert, wie es gedruckt ist
     // (Seit 22.10.2026 kommt das Material nur noch vom Server aus dem gespeicherten Blatt – arbeitsblaetter.ts materialVon)
     if (material)
-      anfrage.user += `\n${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; nicht Teil der Antwort):'}\n${material}`
+      anfrage.user += `\n${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; eigenes Wissen über das Material hinaus ist erlaubt, siehe Regel EIGENES WISSEN; nicht Teil der Antwort):'}\n${material}`
     // Krise (22.10.2026): Regel in den Anweisungen, Feld im Schema (strict → auch in `required`)
     anfrage.system += `\n${KRISEN_REGEL}`
     const schema = anfrage.schema as { properties?: Record<string, unknown>; required?: string[] }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'fs'
-import { escBeendet, fokusVorgabe, imVollbild, istEigenerEintrag, mitFokus, vollbildAnfordern, vollbildMoeglich, vollbildVerlassen, type VollbildDokument } from '../src/renderer/src/modules/lernen/fokus/fokusLogik'
+import { escBeendet, fokusVorgabe, imVollbild, istEigenerEintrag, istIpad, mitFokus, vollbildAnfordern, vollbildMoeglich, vollbildVerlassen, type VollbildDokument } from '../src/renderer/src/modules/lernen/fokus/fokusLogik'
 
 // Vollbild beim Lernen (09.10.2026): Vorgabe, Fullscreen-API mit/ohne Vorsilbe, Esc, Verlauf, Feld im Server
 describe('Vollbild beim Lernen', () => {
@@ -36,6 +36,17 @@ describe('Vollbild beim Lernen', () => {
     expect(vollbildAnfordern(iphone)).toBe(false)
     // Schon im Vollbild: nicht noch einmal
     expect(vollbildAnfordern(dok({ fullscreenEnabled: true, fullscreenElement: {}, el: { requestFullscreen: () => undefined } }))).toBe(false)
+  })
+
+  it('iPad: kein echtes Vollbild (WebKit beendet es beim Rollen, 27.11.2026)', () => {
+    const ipadOs = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15', maxTouchPoints: 5 }
+    const mac = { ...ipadOs, maxTouchPoints: 0 }
+    expect(istIpad(ipadOs)).toBe(true)
+    expect(istIpad({ userAgent: 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X)', maxTouchPoints: 5 })).toBe(true)
+    expect(istIpad(mac)).toBe(false)
+    const d = dok({ webkitFullscreenEnabled: true, el: { webkitRequestFullscreen: () => undefined } })
+    expect(vollbildMoeglich(d, ipadOs)).toBe(false)
+    expect(vollbildMoeglich(d, mac)).toBe(true)
   })
 
   it('Abgelehnt oder Fehler: still', async () => {

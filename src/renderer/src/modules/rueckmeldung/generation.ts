@@ -4,6 +4,7 @@
  */
 import { antwortSpracheAus, type AntwortSprache } from './antwortSprache'
 import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
+import { EIGENWISSEN_REGEL, SPANISCH_ZEICHEN_KORREKTUR } from '@shared/feedbackRegeln'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
 import { abgrenzen, datenRegel, neueMarke } from '@shared/kiSchutz'
@@ -433,6 +434,9 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
     ...abgabeRegeln(r, a, marke),
     // Fundstellen im Material (23.10.2026): Verweise auf Zeilen bzw. Kurzzitate, damit die Lernenden nachlesen können
     r.grundlage.aufgaben.trim() ? fundstellenRegel(r.grundlage, 'bogen') : '',
+    // Eigenwissen und plausible Annahmen sind erlaubt, gerügt wird nur Widerspruch/Falsches (27.11.2026); Spanisch: ¿ ¡
+    EIGENWISSEN_REGEL,
+    m.subjectId === 'spanisch' ? SPANISCH_ZEICHEN_KORREKTUR : '',
     // Geschichte, „zusammenfassen"/„beurteilen" (12.10.2026): Vorlagen der Lehrkraft + Vorprüfung als Fakten (Zitate ohne Trennzeichen)
     ohneTrenner(schreibformRegeln(r, a), marke)
   ]

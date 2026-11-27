@@ -1,3 +1,4 @@
+import { spanischeZeichenRegel } from '@shared/feedbackRegeln'
 import { aufgabenSpanne } from '../../didactics/anzahlSpanne'
 import { versuchRegeln } from '../../didactics/protokoll'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
@@ -107,6 +108,7 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     '- Aufzählungen mit „- " am Zeilenanfang; Absätze durch eine Leerzeile.',
     '- Lückentexte: jede Lücke als [[Lösung]].',
     LUECKEN_REGELN_DE,
+    spanischeZeichenRegel(meta.subjectId),
     '',
     'BILDER (Baustein „image“):',
     '- Nur, wo ein Bild dem Lernen dient: Foto eines Objekts/Phänomens, Schema oder Diagramm, Karte, Versuchsaufbau, Bewegungsablauf, Kunstwerk, Bildquelle.',

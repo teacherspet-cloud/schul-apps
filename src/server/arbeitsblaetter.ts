@@ -18,6 +18,8 @@
  *  Lernende:   GET /s/api/blaetter · GET /s/api/blatt?id= · POST /s/api/blatt/speichern|aufgabe|abgeben
  *  Gäste:      GET /s/api/blatt/zugang?code= · POST /s/api/blatt/gast   (Seite /s/w/<CODE>)
  */
+import { istWoerterbuch, woerterbuecherAus, type WoerterbuchId } from '../shared/woerterbuecher'
+import { nachschlagen } from './woerterbuch'
 import { istRandObjekt, NOTIZRAND_SCHLUESSEL, RAND_TINTE_MUSTER } from '../shared/blattNotizrand'
 import { mitlehrkraftDarfSehen } from './ueberthemen'
 import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
@@ -202,6 +204,8 @@ export interface BlattEinstellungen {
    * Einzel-Freigabe (`schueler` nicht leer); jede Person sieht ohnehin nur ihre eigenen Blätter.
    */
   fuerDich?: boolean
+  /** Freigeschaltete Wörterbücher für die Lernenden (27.11.2026, shared/woerterbuecher.ts) */
+  woerterbuecher?: WoerterbuchId[]
 }
 
 export interface Zeile {
@@ -487,6 +491,8 @@ async function pruefungBeimEinreichen(p: {
   abgabe: number
   letzteRunde: boolean
   bilder: string[]
+  /** Seiten mit Stift-Einträgen (27.11.2026): Handschrift in den Schreiblinien zählt als Antwort */
+  tinteSeiten?: number[]
   material: string
   aufruf: Aufruf
 }): Promise<{ eintraege: Record<string, AbgabeFeedback>; fehler?: string; meldung?: string; krise?: boolean }> {
@@ -539,7 +545,10 @@ async function pruefungBeimEinreichen(p: {
       }
       const leer = !eigene.some((f) => (p.antworten[f.id] ?? '').trim())
       // Zeichenaufgabe ohne Felder (Zeitleiste, Diagramm): zählt, wenn etwas gezeichnet bzw. eingetragen ist
-      const gezeichnet = !eigene.length && (p.bilder.length > 0 || objekte.length > 0)
+      // Handschrift in den Schreiblinien (27.11.2026, Befund der Lehrkraft: „wird nicht erkannt"): Tinte auf der Seite eines
+      // eigenen Felds zählt als Antwort – die KI liest sie vom Seitenbild ab, statt „nichts eingetragen" zu melden
+      const handschriftlich = eigene.some((f) => p.tinteSeiten?.includes(f.seite)) && p.bilder.length > 0
+      const gezeichnet = (!eigene.length && (p.bilder.length > 0 || objekte.length > 0)) || handschriftlich
       if (leer && !gezeichnet) {
         if (!a.freiwillig) eintraege[String(a.nr)] = { einschaetzung: 'noch nicht', text: 'Hier hast du noch nichts eingetragen.', zeit, abgabe: p.abgabe }
         continue
@@ -735,7 +744,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               stift: e.stift,
               ...(e.grossKlein === false ? { grossKlein: false } : {}),
               ...(e.schrittweise ? { schrittweise: true } : {}),
-              ...(e.merkAmEnde ? { merkAmEnde: true } : {})
+              ...(e.merkAmEnde ? { merkAmEnde: true } : {}),
+              ...(e.woerterbuecher?.length ? { woerterbuecher: e.woerterbuecher } : {})
             },
             freigeschaltet: json_(a?.freigeschaltet ?? '[]', [] as number[]),
             hilfen: json_(a?.hilfen ?? '{}', {} as Record<string, number>),
@@ -746,6 +756,16 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           }),
           true
         )
+      }
+      // Wörterbuch (27.11.2026): nur die von der Lehrkraft freigeschalteten, auf Blättern mit ähnlichen Wörtern
+      if (req.method === 'GET' && url.pathname === '/s/api/blatt/woerterbuch') {
+        const wb = url.searchParams.get('wb')
+        if (!istWoerterbuch(wb) || !e.woerterbuecher?.includes(wb)) return (json(res, 403, { fehler: 'Dieses Wörterbuch ist für das Blatt nicht freigeschaltet.' }), true)
+        try {
+          return (json(res, 200, nachschlagen(wb, String(url.searchParams.get('q') ?? ''), false)), true)
+        } catch {
+          return (json(res, 503, { fehler: 'Das Wörterbuch ist auf dem Server noch nicht eingerichtet.' }), true)
+        }
       }
       if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
       // Ausgefülltes Blatt als PDF (speichern/drucken, 03.10.2026) – die App setzt es zusammen, der Server druckt ohne Skripte
@@ -998,6 +1018,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               abgabe: genutzt + 1,
               letzteRunde: genutzt + 1 >= max,
               bilder: Object.keys(tinte).length ? bilder : [],
+              tinteSeiten: Object.keys(tinte)
+                .filter((k) => !k.startsWith('bild:') && tinte[k])
+                .map(Number),
               material,
               aufruf
             })
@@ -1139,6 +1162,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         ...(e0.fristHart === true && typeof e0.bis === 'number' && e0.bis > 0 ? { fristHart: true } : {}),
         // „Für dich" (12.10.2026, Förder-/Fordermaterial): nur bei Einzel-Freigabe
         ...(e0.fuerDich === true && einzelne.length ? { fuerDich: true } : {}),
+        // Wörterbücher (27.11.2026)
+        ...(woerterbuecherAus(e0.woerterbuecher).length ? { woerterbuecher: woerterbuecherAus(e0.woerterbuecher) } : {}),
         ...(e0.quelle && typeof (e0.quelle as { docId?: unknown }).docId === 'string'
           ? {
               quelle: {
@@ -1359,6 +1384,11 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       else delete neu.bis
       if (bis && ja(k0.fristHart, alt.fristHart)) neu.fristHart = true
       else delete neu.fristHart
+      if (k0.woerterbuecher !== undefined) {
+        const wb = woerterbuecherAus(k0.woerterbuecher)
+        if (wb.length) neu.woerterbuecher = wb
+        else delete neu.woerterbuecher
+      }
       db().prepare('UPDATE blatt_freigaben SET einstellungen = ? WHERE id = ?').run(JSON.stringify(neu), z.id)
       if (neu.runden !== alt.runden) verknuepfteFreigabeRunden(z.rueckmeldung_id, neu.runden)
       protokolliereServer('arbeitsblatt', 'Einstellungen einer Freigabe geändert', ich.id)

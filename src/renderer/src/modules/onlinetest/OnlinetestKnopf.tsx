@@ -4,6 +4,9 @@
  * Verteilung der Fassungen, Figur; danach Code, Link und QR-Code für die Lernenden. Gestartet
  * wird in der App „Onlinetest" – für alle gemeinsam.
  */
+import { fachIdVon } from '../../shared/fachfarben'
+import { WoerterbuchWahl } from '../freigaben/WoerterbuchWahl'
+import type { WoerterbuchId } from '@shared/woerterbuecher'
 import { AlleOptionen, NurExperte, OptionenBereich } from '../../shared/components/NurExperte'
 import { Alert, Button, Checkbox, Group, Image, Modal, Select, Stack, Text, TextInput, Radio } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceLaptop, IconEye } from '@tabler/icons-react'
@@ -160,6 +163,8 @@ export function Erstellen({
   const jubelnd = doc ? maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'jubelnd') : undefined
   const [mitFigur, setMitFigur] = useState(Boolean(figurWahl))
   const [handschrift, setHandschrift] = useState(true)
+  // Wörterbücher (27.11.2026): Vorgabe keins; im Test nur exakte Suche
+  const [woerterbuecher, setWoerterbuecher] = useState<WoerterbuchId[]>([])
   // Etappe 3 (02.10.2026): nur mit Schülerkonto oder auch Gäste mit Namen
   const [gaeste, setGaeste] = useState(true)
   const [gruppe, setGruppe] = useState<string | null>(null)
@@ -189,6 +194,7 @@ export function Erstellen({
         ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
         handschrift,
         gaeste,
+        ...(woerterbuecher.length ? { woerterbuecher } : {}),
         ...(termin ? { termin, terminVerborgen } : {}),
         zeitMin: zeit,
         zuteilung: zuteilung === 'abwechselnd' || zuteilung === 'zufall' ? zuteilung : Number(zuteilung)
@@ -353,6 +359,12 @@ export function Erstellen({
                 data-handschrift-wahl
               />
             </NurExperte>
+            <WoerterbuchWahl
+              wert={woerterbuecher}
+              setze={setWoerterbuecher}
+              pruefung
+              fachId={doc ? fachIdVon(doc.settings.targetLanguage) ?? undefined : fachIdVon(blatt?.fach ?? '') ?? undefined}
+            />
             <AlleOptionen />
             <Alert variant="light">
               Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang,

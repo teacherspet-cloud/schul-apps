@@ -45,7 +45,11 @@ export function feedbackOhneLeck(fb: AufgabenFeedback, erwartung: string, antwor
   const gelungen = feld(fb.gelungen, NEUTRAL.gelungen)
   const fehlt = feld(fb.fehlt, NEUTRAL.fehlt)
   const schritt = feld(fb.schritt, NEUTRAL.schritt)
-  const markierungen = fb.markierungen?.map((m) => ({ ...m, text: feld(m.text, NEUTRAL.rand) ?? '' }))
+  const markierungen = fb.markierungen?.map(({ verbesserung, ...m }) => {
+    const ok = verbesserung && verbesserungNahAmZitat(m.zitat, verbesserung)
+    if (verbesserung && !ok) ersetzt++
+    return { ...m, text: feld(m.text, NEUTRAL.rand) ?? '', ...(ok ? { verbesserung } : {}) }
+  })
   const strukturiert = Boolean(fb.gelungen || fb.fehlt || fb.schritt)
   // Zusammengefasster Text: aus den gefilterten Feldern neu, sonst selbst prüfen (ältere Antworten nur mit „text")
   const text = strukturiert
@@ -62,6 +66,41 @@ export function feedbackOhneLeck(fb: AufgabenFeedback, erwartung: string, antwor
     },
     ersetzt
   }
+}
+
+/** Wörter klein, ohne Satzzeichen (¿ ¡ zählen nicht als Wort) */
+const woerter = (t: string): string[] =>
+  String(t ?? '')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}'’]+/u)
+    .filter(Boolean)
+
+function abstand(a: string, b: string): number {
+  if (a === b) return 0
+  const z = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    let vor = z[0]
+    z[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const alt = z[j]
+      z[j] = Math.min(z[j] + 1, z[j - 1] + 1, vor + (a[i - 1] === b[j - 1] ? 0 : 1))
+      vor = alt
+    }
+  }
+  return z[b.length]
+}
+
+/**
+ * Verbesserung im Randkommentar (27.11.2026, Wunsch der Lehrkraft: bei Rechtschreibung, Präposition, Ausdruck die
+ * Verbesserung zeigen). Sie darf nur die markierte Stelle berichtigen – keine Lösung durch die Hintertür. Faustregel:
+ * höchstens 3 Wörter, die im Zitat (auch falsch geschrieben) nicht vorkommen, und höchstens 3 Wörter länger als das Zitat.
+ */
+export function verbesserungNahAmZitat(zitat: string, verbesserung: string): boolean {
+  const z = woerter(zitat)
+  const v = woerter(verbesserung)
+  if (!v.length || v.length > z.length + 3) return false
+  const neu = v.filter((w) => !z.some((x) => abstand(x, w) <= Math.max(1, Math.floor(Math.max(x.length, w.length) / 3))))
+  return neu.length <= 3
 }
 
 /** Kurzer Hinweis (Einreichen, Feedback je Aufgabe) */

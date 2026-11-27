@@ -1,16 +1,17 @@
 /**
  * Hilfekarten digital (06.10.2026, Wunsch der Lehrkraft): nicht mehr am Ende des Materials, sondern über ein
- * Hilfesymbol rechts neben der Aufgabe – in einem kleinen, von der App/dem Browser unabhängigen Fenster. Die Karten
- * öffnen sich schrittweise: zuerst nur die erste, mit „Nächste Hilfe" die zweite usw. Jede neu geöffnete Karte wird
- * gemeldet (`gezeigt`), damit die Lehrkraft in der Auswertung sieht, wie viele Hilfen genutzt wurden.
+ * Hilfesymbol rechts neben der Aufgabe. Die Karten öffnen sich schrittweise: zuerst nur die erste, mit „Nächste Hilfe"
+ * die zweite usw. Jede neu geöffnete Karte wird gemeldet (`gezeigt`), damit die Lehrkraft in der Auswertung sieht, wie
+ * viele Hilfen genutzt wurden.
  *
- * Wo kein eigenes Fenster möglich ist (iPad-App, Pop-up-Sperre), erscheint dieselbe Ansicht als Pop-up in der Seite.
+ * Seit 27.11.2026 immer als verschiebbares Fenster in der Seite (Schwebefenster): Das frühere eigene Browserfenster
+ * öffnete auf dem iPad einen neuen Tab und beendete dabei das Vollbild (Befund der Lehrkraft).
  */
 import { sicheresHtml } from '../../shared/sicheresHtml'
-import { Badge, Button, Group, Modal, Paper, Stack, Text } from '@mantine/core'
+import { Badge, Button, Group, Paper, Stack, Text } from '@mantine/core'
 import { IconBulb, IconChevronRight } from '@tabler/icons-react'
 import { useState } from 'react'
-import { aufIos } from '../../shared/plattform'
+import { Schwebefenster } from '../../shared/Schwebefenster'
 
 export interface Hilfekarten {
   nr: number
@@ -19,82 +20,19 @@ export interface Hilfekarten {
   karten: string[]
 }
 
-const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
-const STIL = `
-:root{color-scheme:light dark}
-*{box-sizing:border-box}
-body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:#fffdf5;color:#1d2a33;padding:16px}
-@media (prefers-color-scheme:dark){body{background:#1b1f24;color:#e6edf1}.karte{background:#262c33!important;border-color:#5c4a12!important}}
-h1{font-size:1.05rem;margin:0 0 4px}
-.unter{font-size:.85rem;opacity:.75;margin:0 0 12px}
-.karte{background:#fff;border:2px solid #f2c94c;border-radius:12px;padding:12px 14px;margin:0 0 10px}
-.karte b.kopf{display:block;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:#b8860b;margin-bottom:4px}
-button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 14px;background:#f2c94c;color:#3a2c00;cursor:pointer;width:100%}
-button[disabled]{opacity:.45;cursor:default}
-`
-
-/**
- * Eigenes kleines Fenster; Rückgabe false, wenn keins möglich ist (dann Pop-up in der Seite).
- * `offen`: wie viele Karten schon geöffnet waren (mindestens 1 wird gezeigt).
- */
-export function oeffneHilfeFenster(h: Hilfekarten, offen: number, gezeigt: (karten: number) => void): boolean {
-  if (aufIos() || typeof window.open !== 'function') return false
-  const w = window.open('', `schulapps-hilfe-${h.nr}`, 'popup,width=440,height=560,resizable=yes,scrollbars=yes')
-  if (!w || w.closed) return false
-  try {
-    const d = w.document
-    d.open()
-    d.write(
-      `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hilfe zu Aufgabe ${h.nr}</title><style>${STIL}</style></head><body><h1>Hilfe zu Aufgabe ${h.nr}</h1><p class="unter">${esc(h.titel)}</p><div id="karten"></div><button id="weiter" type="button"></button></body></html>`
-    )
-    d.close()
-    let zahl = Math.max(1, Math.min(h.karten.length, offen))
-    const zeichne = (): void => {
-      const ziel = d.getElementById('karten')
-      if (!ziel) return
-      // Karten aus dem eigenen Blatt; Skripte und Ereignis-Attribute werden vorsichtshalber entfernt
-      ziel.innerHTML = h.karten
-        .slice(0, zahl)
-        .map(
-          (k, i) =>
-            `<div class="karte" data-karte="${i + 1}"><b class="kopf">Hilfe ${i + 1} von ${h.karten.length}</b>${k.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+="[^"]*"/gi, '')}</div>`
-        )
-        .join('')
-      const knopf = d.getElementById('weiter') as HTMLButtonElement | null
-      if (knopf) {
-        knopf.textContent = zahl < h.karten.length ? `Nächste Hilfe (${zahl + 1} von ${h.karten.length})` : 'Alle Hilfen geöffnet'
-        knopf.disabled = zahl >= h.karten.length
-      }
-      ziel.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }
-    d.getElementById('weiter')?.addEventListener('click', () => {
-      if (zahl >= h.karten.length) return
-      zahl++
-      zeichne()
-      gezeigt(zahl)
-    })
-    zeichne()
-    if (zahl > offen) gezeigt(zahl)
-    w.focus()
-    return true
-  } catch {
-    w.close()
-    return false
-  }
-}
-
-/** Dieselbe Ansicht als Pop-up in der Seite (Rückfall) */
-export function HilfeModal({
+/** Hilfekarten als verschiebbares Fenster; `offen`: wie viele Karten schon geöffnet waren (mindestens 1 wird gezeigt) */
+export function HilfeFenster({
   h,
   offen,
   gezeigt,
-  schliessen
+  schliessen,
+  start
 }: {
   h: Hilfekarten
   offen: number
   gezeigt: (karten: number) => void
   schliessen: () => void
+  start?: { x: number; y: number }
 }): React.JSX.Element {
   const [zahl, setZahl] = useState(() => {
     const z = Math.max(1, Math.min(h.karten.length, offen))
@@ -102,11 +40,21 @@ export function HilfeModal({
     return z
   })
   return (
-    <Modal opened onClose={schliessen} title={`Hilfe zu Aufgabe ${h.nr}`} size="md" data-hilfe-modal>
+    <Schwebefenster
+      titel={`Hilfe zu Aufgabe ${h.nr}`}
+      schliessen={schliessen}
+      merken="hilfe"
+      start={start}
+      breite={360}
+      farbe="var(--mantine-color-yellow-6)"
+      kennung={{ 'data-hilfe-fenster': String(h.nr) }}
+    >
       <Stack gap="sm">
-        <Text size="sm" c="dimmed">
-          {h.titel}
-        </Text>
+        {h.titel && (
+          <Text size="sm" c="dimmed">
+            {h.titel}
+          </Text>
+        )}
         {h.karten.slice(0, zahl).map((k, i) => (
           <Paper key={i} withBorder p="sm" radius="md" style={{ borderColor: 'var(--mantine-color-yellow-5)', borderWidth: 2 }} data-karte={i + 1}>
             <Badge color="yellow" variant="light" mb={6} leftSection={<IconBulb size={12} />}>
@@ -119,6 +67,7 @@ export function HilfeModal({
         <Group justify="flex-end">
           <Button
             color="yellow"
+            size="xs"
             rightSection={<IconChevronRight size={16} />}
             disabled={zahl >= h.karten.length}
             onClick={() => {
@@ -132,7 +81,7 @@ export function HilfeModal({
           </Button>
         </Group>
       </Stack>
-    </Modal>
+    </Schwebefenster>
   )
 }
 

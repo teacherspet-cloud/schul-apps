@@ -26,6 +26,8 @@
  * Seit 22.10.2026 (KI-Sicherheitsprüfung): Ergebnis und Lösungen erst, wenn die Lehrkraft den Test beendet oder freigibt;
  * Urteile der KI bleiben „vorläufig", bis die Lehrkraft sie bestätigt.
  */
+import { WoerterbuchFenster, WoerterbuchKnopf } from './WoerterbuchFenster'
+import type { WoerterbuchId } from '@shared/woerterbuecher'
 import { geraetAbmelden } from './erinnerungenGeraet'
 import { ErinnerungenFrage } from './ErinnerungenFrage'
 import { RekordKnopf } from './Rekorde'
@@ -144,6 +146,8 @@ interface Beitritt {
   figur: string[]
   /** Handschrift erlaubt (Schreibfläche mit Erkennung) */
   handschrift?: boolean
+  /** Freigeschaltete Wörterbücher (27.11.2026) – nur exakte Suche */
+  woerterbuecher?: WoerterbuchId[]
   aufgaben: OnlineAufgabe[]
   /** Stilregeln für Material-Karten (Grammatiktest, Lernzielkontrolle) */
   stil?: string
@@ -1690,6 +1694,7 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   const angemeldet = Boolean(window.__schulappsServer?.angemeldet)
   const [phase, setPhase] = useState<Phase>(angemeldet ? 'laden' : 'name')
   const [t, setT] = useState<Beitritt | null>(null)
+  const [woerterbuchAuf, setWoerterbuchAuf] = useState(false)
   const [fehler, setFehler] = useState('')
   const [antworten, setAntworten] = useState<Antworten>({})
   const [rest, setRest] = useState(0)
@@ -1992,10 +1997,18 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
           <Text fw={600} truncate style={{ flex: 1 }}>
             {t.titel}
           </Text>
+          {t.woerterbuecher?.length ? <WoerterbuchKnopf offen={woerterbuchAuf} umschalten={() => setWoerterbuchAuf((x) => !x)} /> : null}
           <Badge size="lg" color={rest < 60 ? 'red' : rest < 300 ? 'orange' : 'blue'} leftSection={<IconClock size={14} />}>
             {minuten}:{String(sekunden).padStart(2, '0')}
           </Badge>
         </Group>
+        {woerterbuchAuf && t.woerterbuecher?.length ? (
+          <WoerterbuchFenster
+            erlaubt={t.woerterbuecher}
+            pfad={(wb, q) => `/s/api/woerterbuch?id=${encodeURIComponent(t.id)}&geheim=${encodeURIComponent(t.geheim ?? '')}&wb=${wb}&q=${encodeURIComponent(q)}`}
+            schliessen={() => setWoerterbuchAuf(false)}
+          />
+        ) : null}
         {t.handschrift && (
           <SegmentedControl
             mt={6}

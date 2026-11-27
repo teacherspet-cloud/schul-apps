@@ -11,9 +11,10 @@
  * Zuordnung wie beim Sperren der Hilfen (`data-hilfe-fuer`, aufgabenVerweise.ts › hilfenZuordnung):
  * ein Kasten mit Aufgabennummer gehört zu dieser Aufgabe, einer ohne gilt fürs ganze Blatt.
  */
-import { ActionIcon, CloseButton, Group, Paper, Popover, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, CloseButton, Group, Paper, Stack, Text, Tooltip } from '@mantine/core'
 import { IconMessageDots } from '@tabler/icons-react'
 import { useState } from 'react'
+import { Schwebefenster } from '../../shared/Schwebefenster'
 
 export interface Formulierungshilfe {
   /** Kennung des Bausteins (data-hilfe-block) – ein über zwei Seiten geteilter Kasten erscheint einmal */
@@ -70,51 +71,43 @@ export function formulierungshilfenAus(doc: Document): { jeAufgabe: Map<number, 
   return { jeAufgabe, allgemein }
 }
 
-function Inhalt({ hilfen, schliessen }: { hilfen: Formulierungshilfe[]; schliessen: () => void }): React.JSX.Element {
+function Eintraege({ hilfen }: { hilfen: Formulierungshilfe[] }): React.JSX.Element {
   return (
-    <Stack gap={8}>
-      <Group justify="space-between" wrap="nowrap" gap={4}>
-        <Text fw={700} size="sm">
-          {hilfen.length === 1 ? hilfen[0].titel : 'Formulierungshilfen'}
-        </Text>
-        <CloseButton size="sm" onClick={schliessen} aria-label="Formulierungshilfen schließen" />
-      </Group>
-      <ScrollArea.Autosize mah="55vh" type="auto" offsetScrollbars>
-        <Stack gap={10}>
-          {hilfen.map((h) => (
-            <Stack key={h.id} gap={6}>
-              {hilfen.length > 1 && (
-                <Text fw={600} size="sm" c="dimmed">
-                  {h.titel}
+    <Stack gap={10}>
+      {hilfen.map((h) => (
+        <Stack key={h.id} gap={6}>
+          {hilfen.length > 1 && (
+            <Text fw={600} size="sm" c="dimmed">
+              {h.titel}
+            </Text>
+          )}
+          {h.gruppen.map((g, i) => (
+            <div key={i}>
+              {g.label && (
+                <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={2}>
+                  {g.label}
                 </Text>
               )}
-              {h.gruppen.map((g, i) => (
-                <div key={i}>
-                  {g.label && (
-                    <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={2}>
-                      {g.label}
-                    </Text>
-                  )}
-                  <Stack gap={3}>
-                    {g.eintraege.map((e, k) => (
-                      <Text key={k} size="sm" style={{ lineHeight: 1.35 }}>
-                        {e}
-                      </Text>
-                    ))}
-                  </Stack>
-                </div>
-              ))}
-            </Stack>
+              <Stack gap={3}>
+                {g.eintraege.map((e, k) => (
+                  <Text key={k} size="sm" style={{ lineHeight: 1.35 }}>
+                    {e}
+                  </Text>
+                ))}
+              </Stack>
+            </div>
           ))}
         </Stack>
-      </ScrollArea.Autosize>
+      ))}
     </Stack>
   )
 }
 
+const titelVon = (hilfen: Formulierungshilfe[]): string => (hilfen.length === 1 ? hilfen[0].titel : 'Formulierungshilfen')
+
 /**
- * Knopf am rechten Rand eines Schreibfelds; die Leiste öffnet sich rechts daneben (passt sie dort
- * nicht hin, rückt sie selbst an die nächste freie Seite) und bleibt beim Tippen offen.
+ * Knopf am Schreibfeld; die Hilfen öffnen sich in einem verschiebbaren Fenster (27.11.2026), anfangs rechts neben dem
+ * Knopf. Es bleibt beim Tippen und Rollen offen, bis es geschlossen wird.
  */
 export function FormulierungsKnopf({
   hilfen,
@@ -125,41 +118,33 @@ export function FormulierungsKnopf({
   stil: React.CSSProperties
   feldId: string
 }): React.JSX.Element {
-  const [offen, setOffen] = useState(false)
+  const [offen, setOffen] = useState<{ x: number; y: number } | null>(null)
   return (
-    <Popover
-      opened={offen}
-      onChange={setOffen}
-      position="right-start"
-      width={290}
-      shadow="md"
-      withArrow
-      closeOnClickOutside={false}
-      closeOnEscape
-      trapFocus={false}
-      returnFocus={false}
-      middlewares={{ flip: true, shift: { padding: 8 } }}
-    >
-      <Popover.Target>
-        <Tooltip label={offen ? 'Formulierungshilfen schließen' : 'Formulierungshilfen neben dem Text zeigen'} disabled={offen}>
-          <ActionIcon
-            variant={offen ? 'filled' : 'light'}
-            color="indigo"
-            radius="xl"
-            size="md"
-            style={{ ...stil, zIndex: 21, boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}
-            onClick={() => setOffen((o) => !o)}
-            aria-label="Formulierungshilfen"
-            data-phrasen-feld={feldId}
-          >
-            <IconMessageDots size={16} />
-          </ActionIcon>
-        </Tooltip>
-      </Popover.Target>
-      <Popover.Dropdown p="sm" data-phrasen-leiste={feldId}>
-        <Inhalt hilfen={hilfen} schliessen={() => setOffen(false)} />
-      </Popover.Dropdown>
-    </Popover>
+    <>
+      <Tooltip label={offen ? 'Formulierungshilfen schließen' : 'Formulierungshilfen zeigen'}>
+        <ActionIcon
+          variant={offen ? 'filled' : 'light'}
+          color="indigo"
+          radius="xl"
+          size="md"
+          style={{ ...stil, zIndex: 21, boxShadow: '0 1px 4px rgba(0,0,0,.15)' }}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            setOffen((o) => (o ? null : { x: r.right + 8, y: r.top }))
+          }}
+          aria-label="Formulierungshilfen"
+          aria-pressed={Boolean(offen)}
+          data-phrasen-feld={feldId}
+        >
+          <IconMessageDots size={16} />
+        </ActionIcon>
+      </Tooltip>
+      {offen && (
+        <Schwebefenster titel={titelVon(hilfen)} schliessen={() => setOffen(null)} start={offen} merken="phrasen" breite={300} kennung={{ 'data-phrasen-leiste': feldId }}>
+          <Eintraege hilfen={hilfen} />
+        </Schwebefenster>
+      )}
+    </>
   )
 }
 
@@ -167,7 +152,15 @@ export function FormulierungsKnopf({
 export function FormulierungsKasten({ hilfen, schliessen }: { hilfen: Formulierungshilfe[]; schliessen: () => void }): React.JSX.Element {
   return (
     <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-indigo-light)" data-phrasen-liste>
-      <Inhalt hilfen={hilfen} schliessen={schliessen} />
+      <Stack gap={8}>
+        <Group justify="space-between" wrap="nowrap" gap={4}>
+          <Text fw={700} size="sm">
+            {titelVon(hilfen)}
+          </Text>
+          <CloseButton size="sm" onClick={schliessen} aria-label="Formulierungshilfen schließen" />
+        </Group>
+        <Eintraege hilfen={hilfen} />
+      </Stack>
     </Paper>
   )
 }

@@ -7,6 +7,8 @@
  * Server – nur für die KI, nie an die Lernenden. Dazu die verknüpfte Rückmeldung (Aufgaben +
  * Lösungsblatt als Erwartungshorizont), in der alle Abgaben landen.
  */
+import { WoerterbuchWahl } from '../freigaben/WoerterbuchWahl'
+import type { WoerterbuchId } from '@shared/woerterbuecher'
 import { NurExperte } from '../../shared/components/NurExperte'
 import KalenderHinweis from '../../shared/components/KalenderHinweis'
 import { hilfenZuordnung } from './didactics/aufgabenVerweise'
@@ -216,6 +218,8 @@ export function BlattFreigabeDialog({
   const [aufgabenRunden, setAufgabenRunden] = useState(3)
   const [stift, setStift] = useState(true)
   const [grossKlein, setGrossKlein] = useState(true)
+  // Wörterbücher für die Lernenden (27.11.2026) – Vorgabe: keins, die Lehrkraft schaltet frei
+  const [woerterbuecher, setWoerterbuecher] = useState<WoerterbuchId[]>([])
   // Korrekturrand (05.10.2026): Vorgabe an – digital steht dort das KI-Feedback, gedruckt bleibt er leer
   const [korrekturrand, setKorrekturrand] = useState(true)
   // Lösungsblatt nach dem ersten Einreichen (03.10.2026, Idee aus LearningView)
@@ -304,6 +308,7 @@ export function BlattFreigabeDialog({
           ...(grossKlein ? {} : { grossKlein: false }),
           ...(schrittweise ? { schrittweise: true } : {}),
           ...(merkAmEnde ? { merkAmEnde: true } : {}),
+          ...(woerterbuecher.length ? { woerterbuecher } : {}),
           // „Für dich" im Fachordner (12.10.2026) – der Server setzt es nur bei Einzel-Freigabe
           ...(fuerDich && einzelne.length ? { fuerDich: true } : {}),
           ...(bis ? { bis: new Date(`${bis}T23:59:00`).getTime(), ...(fristHart ? { fristHart: true } : {}) } : {}),
@@ -431,6 +436,7 @@ export function BlattFreigabeDialog({
           onChange={(e) => setGrossKlein(e.currentTarget.checked)}
           data-blatt-grossklein
         />
+        <WoerterbuchWahl wert={woerterbuecher} setze={setWoerterbuecher} fachId={ws.meta.subjectId} />
         <TextInput
           type="date"
           label="Bearbeiten bis (optional)"

@@ -16,8 +16,20 @@ export interface Anmerkung {
   art: 'lob' | 'fehler' | 'hinweis'
   text: string
   zeichen?: string
+  /** Berichtigte Form der Stelle (sprachliche Fehler, 27.11.2026) */
+  verbesserung?: string
   /** Aus dem Feedback zu dieser Aufgabe – markiert nur in ihren Feldern (sonst irgendwo im Blatt) */
   aufgabe?: number
+}
+
+/** „→ people" hinter dem Randkommentar: die Verbesserung, grün und fett */
+function Verbesserung({ v }: { v?: string }): React.JSX.Element | null {
+  if (!v) return null
+  return (
+    <span data-rand-verbesserung>
+      {' '}→ <b style={{ color: '#2b8a3e' }}>{v}</b>
+    </span>
+  )
 }
 
 export const ANMERKUNG_FARBE: Record<Anmerkung['art'], string> = { fehler: '#e03131', hinweis: '#f08c00', lob: '#2f9e44' }
@@ -207,12 +219,13 @@ export function Rand(p: {
             <Text size="sm">
               {a.zeichen ? <b>{a.zeichen}: </b> : null}
               {a.text}
+              <Verbesserung v={a.verbesserung} />
             </Text>
           </Popover.Dropdown>
         </Popover>
       )
     const top = Math.max(y - 2, unten + 4)
-    const zeilen = Math.min(5, Math.ceil(((a.zeichen ? a.zeichen.length + 2 : 0) + a.text.length + 3) / Math.max(10, Math.floor(w / 6.2))))
+    const zeilen = Math.min(5, Math.ceil(((a.zeichen ? a.zeichen.length + 2 : 0) + a.text.length + (a.verbesserung ? a.verbesserung.length + 3 : 0) + 3) / Math.max(10, Math.floor(w / 6.2))))
     unten = top + 6 + zeilen * 14
     const an = p.aktiv === a.nr
     if (ende) {
@@ -271,12 +284,14 @@ export function Rand(p: {
           >
             <b style={{ color: farbe }}>{a.nr}</b> {a.zeichen ? <b style={{ color: farbe }}>{a.zeichen} </b> : null}
             {a.text}
+            <Verbesserung v={a.verbesserung} />
           </div>
         </Popover.Target>
         <Popover.Dropdown p="xs">
           <Text size="sm">
             {a.zeichen ? <b>{a.zeichen}: </b> : null}
             {a.text}
+            <Verbesserung v={a.verbesserung} />
           </Text>
         </Popover.Dropdown>
       </Popover>

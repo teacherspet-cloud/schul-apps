@@ -225,7 +225,8 @@ try {
   await p.waitForTimeout(1500)
   await mp.screenshot({ path: join(out, '6-mia-frage.png') })
   await p.screenshot({ path: join(out, '7-beamer-spiel.png') })
-  pruefe(/sfx-(schritt|seil)/.test(await klang()), `Klang: Schritt/Seil bei richtigen Antworten (${(await klang()).match(/sfx-[a-z]+/g)?.length ?? 0} Geräusche)`)
+  // Tauziehen (2 Teams) ohne Geräusche – Wunsch der Lehrkraft 27.11.2026; die Musik läuft weiter
+  pruefe(!/sfx-(schritt|seil)/.test(await klang()), `Klang: Tauziehen ohne Geräusche (${(await klang()).match(/sfx-[a-z]+/g)?.length ?? 0} Geräusche)`)
 
   // Pause
   await p.locator('[data-klassenspiel-pause]').click()

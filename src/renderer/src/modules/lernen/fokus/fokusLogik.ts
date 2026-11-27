@@ -27,8 +27,21 @@ export interface VollbildDokument {
   documentElement: VollbildElement
 }
 
-/** Kann diese Seite in den echten Vollbildmodus? (iPhone: nein) */
-export const vollbildMoeglich = (doc: VollbildDokument): boolean =>
+/**
+ * iPad (auch mit „Desktop-Website", dann meldet es sich als Mac mit Touch)? 27.11.2026, Befund der Lehrkraft: Auf dem
+ * iPad endete das Vollbild beim Rollen im Arbeitsblatt. Das ist ein bekannter Fehler von WebKit – Wisch- und
+ * Rollgesten gelten dort als „Vollbild schließen", und preventDefault verhindert es nicht (WebKit-Bugs 206855, 227387,
+ * 264215). Abgestimmt: auf dem iPad kein echtes Vollbild, nur die bildschirmfüllende Fokusansicht.
+ */
+export function istIpad(nav: { userAgent?: string; maxTouchPoints?: number } | undefined = typeof navigator === 'undefined' ? undefined : navigator): boolean {
+  if (!nav) return false
+  const ua = nav.userAgent ?? ''
+  return /iPad/.test(ua) || (/Macintosh/.test(ua) && (nav.maxTouchPoints ?? 0) > 1)
+}
+
+/** Kann diese Seite in den echten Vollbildmodus? (iPhone: nein; iPad: bewusst nein, siehe `istIpad`) */
+export const vollbildMoeglich = (doc: VollbildDokument, nav?: { userAgent?: string; maxTouchPoints?: number }): boolean =>
+  !istIpad(nav ?? (typeof navigator === 'undefined' ? undefined : navigator)) &&
   Boolean(
     (doc.fullscreenEnabled || doc.webkitFullscreenEnabled) &&
       (typeof doc.documentElement.requestFullscreen === 'function' || typeof doc.documentElement.webkitRequestFullscreen === 'function')

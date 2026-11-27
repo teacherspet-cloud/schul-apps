@@ -13,6 +13,7 @@
 import { alternativenAnfrage, alternativenEinarbeiten } from './lueckenAlternativen'
 import { PAGE_FORMAT_FIELD } from '../../arbeitsblatt/generation/schemas'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
+import { spanischeZeichenRegel } from '@shared/feedbackRegeln'
 import type { AiCall } from '../../../shared/imageChoice'
 import { createRng, newId } from '../../vokabeltest/model/random'
 import { chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf, teilformenAuftrag } from '../../arbeitsblatt/didactics/grammar'
@@ -121,6 +122,7 @@ export function testPrompt(test: GrammarTest): string {
     ),
     `Umfang: ${m.minutes} Minuten, insgesamt ${m.points} Punkte.`,
     LUECKEN_REGELN_DE,
+    spanischeZeichenRegel(m.subjectId),
     '',
     'ART DER AUFGABEN:',
     '- Es wird GEPRÜFT, nicht erarbeitet: kein Merkkasten, keine Regelherleitung, keine Hilfekarten, keine Tippkästen.',

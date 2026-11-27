@@ -16,11 +16,12 @@ describe('Klänge aus dem Stand der Klassenspiele', () => {
     expect(arten(berg(1, 0.2), berg(1, 0.2, 'Sturm'))).toEqual(['gebremst'])
     expect(arten(berg(1, 0.2, 'Sturm'), berg(1, 0.2, 'Sturm'))).toEqual([])
   })
-  it('Rennen: Schritt, Führungswechsel, Ziel; Tauziehen: Seil', () => {
+  it('Rennen: Schritt, Führungswechsel, Ziel; Tauziehen: still (27.11.2026)', () => {
     expect(arten(bahnen([2, 3]), bahnen([3, 3]))).toEqual(['schritt'])
     expect(arten(bahnen([3, 2]), bahnen([3, 4]))).toEqual(['schritt', 'fuehrung'])
     expect(arten(bahnen([9, 2]), bahnen([10, 2]))).toEqual(['schritt', 'rekord'])
-    expect(arten(bahnen([2, 3], true), bahnen([3, 3], true))).toEqual(['seil'])
+    expect(arten(bahnen([2, 3], true), bahnen([3, 3], true))).toEqual([])
+    expect(arten(bahnen([3, 2], true), bahnen([3, 4], true))).toEqual([])
   })
   it('Gebiet: erobert und gestohlen', () => {
     expect(arten(karte([null, 0]), karte([1, 0]))).toEqual(['erobert'])

@@ -187,6 +187,8 @@ export const BROWSER_SPEICHER: LokalerSpeicher[] = [
       'src/renderer/src/shared/loesungen.ts',
       'src/renderer/src/shared/reiheZuordnung.tsx',
       'src/renderer/src/shared/restzeit.ts',
+      // Lage der verschiebbaren Fenster (Hilfe, Formulierungshilfen, Wörterbuch) – nur Koordinaten, 27.11.2026
+      'src/renderer/src/shared/Schwebefenster.tsx',
       'src/renderer/src/shared/sitzung.ts',
       'src/renderer/src/shared/touch/zoom.tsx',
       'src/renderer/src/shell/SettingsPage.tsx',

@@ -9,6 +9,8 @@ import { IconAdjustments } from '@tabler/icons-react'
 import { useState } from 'react'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
+import { WoerterbuchWahl } from './WoerterbuchWahl'
+import type { WoerterbuchId } from '@shared/woerterbuecher'
 
 interface Einstellungen {
   feedback: boolean
@@ -21,6 +23,7 @@ interface Einstellungen {
   merkAmEnde?: boolean
   bis?: number
   fristHart?: boolean
+  woerterbuecher?: WoerterbuchId[]
 }
 
 const tagText = (ms?: number): string => (ms ? new Date(ms).toLocaleDateString('sv-SE') : '')
@@ -42,7 +45,7 @@ export function FreigabeEinstellungenKnopf({ id, klein = false, geaendert }: { i
     if (!e) return
     setLaeuft(true)
     try {
-      await senden(`/server/blaetter/${id}/einstellungen`, { ...e, grossKlein: e.grossKlein !== false, bis: e.bis ?? null })
+      await senden(`/server/blaetter/${id}/einstellungen`, { ...e, grossKlein: e.grossKlein !== false, bis: e.bis ?? null, woerterbuecher: e.woerterbuecher ?? [] })
       notifySuccess('Einstellungen gespeichert – sie gelten sofort für alle Lernenden.')
       setOffen(false)
       geaendert?.()
@@ -103,6 +106,7 @@ export function FreigabeEinstellungenKnopf({ id, klein = false, geaendert }: { i
             <Switch label="Merkkästen erst am Ende zeigen" checked={Boolean(e.merkAmEnde)} onChange={(x) => setze({ merkAmEnde: x.currentTarget.checked })} />
             <Switch label="Stift erlaubt" checked={e.stift} onChange={(x) => setze({ stift: x.currentTarget.checked })} />
             <Switch label="Satzanfänge automatisch großschreiben" checked={e.grossKlein !== false} onChange={(x) => setze({ grossKlein: x.currentTarget.checked })} />
+            <WoerterbuchWahl wert={e.woerterbuecher ?? []} setze={(w) => setze({ woerterbuecher: w })} />
             <Group align="end" gap="sm">
               <TextInput
                 type="date"

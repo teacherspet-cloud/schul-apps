@@ -28,6 +28,8 @@
  * Server – ein verstelltes Gerät ändert nichts. Abgeben geht auch per sendBeacon (beim Verlassen
  * der Seite): Statt der Kopfzeile schützt dort das Geheimnis der Teilnahme (nur dieses Gerät kennt es).
  */
+import { istWoerterbuch, woerterbuecherAus, type WoerterbuchId } from '../shared/woerterbuecher'
+import { nachschlagen } from './woerterbuch'
 import { randomBytes } from 'node:crypto'
 import { tagesBeginn } from './ohneUhrzeit'
 import { codeErgebnis } from './codeBremse'
@@ -376,6 +378,8 @@ export interface Einstellungen {
    */
   termin?: string
   terminVerborgen?: boolean
+  /** Freigeschaltete Wörterbücher (27.11.2026) – im Test nur exakte Suche ohne „Meinten Sie" */
+  woerterbuecher?: WoerterbuchId[]
 }
 
 interface TestZeile {
@@ -505,6 +509,7 @@ export function testErstellen(
     terminVerborgen?: boolean
     /** Druckfassungen ohne Lösungen je Fassung (02.11.2026) */
     blaetter?: unknown
+    woerterbuecher?: unknown
   }
 ): Test {
   if (!e.test?.variants?.length && !e.blatt?.fassungen?.length) throw new Error('Der Test hat keine Variante.')
@@ -531,6 +536,7 @@ export function testErstellen(
     ...(figuren.length ? { figur: true } : {}),
     handschrift: e.handschrift !== false,
     gaeste: e.gaeste !== false,
+    ...(woerterbuecherAus(e.woerterbuecher).length ? { woerterbuecher: woerterbuecherAus(e.woerterbuecher) } : {}),
     ...(terminBereinigt(e.termin) ? { termin: terminBereinigt(e.termin)!, ...(e.terminVerborgen ? { terminVerborgen: true } : {}) } : {}),
     ...(e.test ? { blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize } } : {})
   }
@@ -1445,6 +1451,21 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       }
       return (json(res, 200, { frei: true, abgegeben: true, ...ergebnisFuer(test, t) }), true)
     }
+    // Wörterbuch im Test (27.11.2026): nur freigeschaltete, nur während der Test läuft, ohne ähnliche Wörter
+    if (req.method === 'GET' && was === 'woerterbuch') {
+      const t = teilnahme(String(url.searchParams.get('id') ?? ''))
+      if (!t || t.schueler_id !== ich.id || t.geheim !== String(url.searchParams.get('geheim') ?? '')) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
+      const test = testNachId(t.test_id)!
+      const wb = url.searchParams.get('wb')
+      if (!istWoerterbuch(wb) || !test.einstellungen.woerterbuecher?.includes(wb)) return (json(res, 403, { fehler: 'Dieses Wörterbuch ist im Test nicht erlaubt.' }), true)
+      if (t.abgabe || t.beginn === 0 || Date.now() > t.ende + NACHFRIST_MS) return (json(res, 409, { fehler: 'Der Test läuft nicht.' }), true)
+      try {
+        return (json(res, 200, nachschlagen(wb, String(url.searchParams.get('q') ?? ''), true)), true)
+      } catch {
+        return (json(res, 503, { fehler: 'Das Wörterbuch ist auf dem Server noch nicht eingerichtet.' }), true)
+      }
+    }
+
     if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
 
     if (was === 'beitreten') {
@@ -1495,6 +1516,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
           abgegeben: Boolean(t.abgabe),
           figur: test.einstellungen.figur ? figurPosen(test.id) : [],
           handschrift: Boolean(test.einstellungen.handschrift),
+          ...(test.einstellungen.woerterbuecher?.length && !t.abgabe && !wartet ? { woerterbuecher: test.einstellungen.woerterbuecher } : {}),
           // NUR die Schülerfassung – die Lösungen bleiben hier (bis zum Ergebnis)
           aufgaben: t.abgabe || wartet ? [] : fassung.aufgaben,
           ...(fassung.stil && !(t.abgabe || wartet) ? { stil: fassung.stil } : {}),

@@ -18,6 +18,7 @@
  * dazu das ganze Blatt (die Materialien M1, M2 …, auf die sich Aufgaben beziehen) und die
  * Materialien der Lehrkraft. Der vorige Stand bleibt als Fassung abrufbar (`addVersion`).
  */
+import { spanischeZeichenRegel } from '@shared/feedbackRegeln'
 import { arr, obj, str } from '../../../shared/aiSchema'
 import { plainText } from '../../../shared/richtext/parse'
 import type { Answer, Sheet, TaskBlock, Worksheet } from '../model/types'
@@ -113,8 +114,13 @@ export async function generateSolution(block: TaskBlock, sheet: Sheet, ws: Works
       `Du bist eine erfahrene Lehrkraft für das Fach ${meta.subjectLabel} und schreibst den Lösungsteil zu einer FERTIGEN Aufgabe eines Arbeitsblatts.`,
       'Die Aufgabe bleibt unverändert. Du lieferst nur den Erwartungshorizont und – wo die Lernenden frei schreiben oder rechnen – eine Musterlösung in Schülerform.',
       'Bezieht sich die Aufgabe auf Materialien (M1, M2 …), stützt sich die Lösung auf GENAU diese Materialien, so wie sie auf dem Blatt stehen.',
-      'Der Erwartungshorizont steht in der Unterrichtssprache des Fachs. Die Musterlösung steht in der Sprache, in der die Lernenden antworten, und auf deren Niveau.'
-    ].join('\n'),
+      'Der Erwartungshorizont steht in der Unterrichtssprache des Fachs. Die Musterlösung steht in der Sprache, in der die Lernenden antworten, und auf deren Niveau.',
+      // Transfer/Beurteilung (27.11.2026): Materialbelege nur für Aussagen über das Material, Weltwissen ist zulässig
+      'Verlangt die Aufgabe Vergleich, Übertragung auf andere Orte oder das eigene Umfeld, Beurteilung oder Stellungnahme, sagt der Erwartungshorizont ausdrücklich, dass dafür plausibles Allgemeinwissen und begründete Vermutungen zulässig sind; Materialbelege werden nur für Aussagen über das Material verlangt.',
+      spanischeZeichenRegel(meta.subjectId)
+    ]
+      .filter(Boolean)
+      .join('\n'),
     user: [
       `Gesamtes Arbeitsblatt (Zusammenhang, Materialien):\n${describeSheet(sheet)}`,
       [

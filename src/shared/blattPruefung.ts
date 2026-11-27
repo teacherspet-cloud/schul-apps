@@ -12,6 +12,7 @@
  *
  * Reine Rechnungen ohne Datenbank (Tests: tests/blattPruefung.test.ts).
  */
+import { EIGENWISSEN_REGEL } from './feedbackRegeln'
 import type { StructuredRequest } from './types'
 import type { BlattAufgabe, BlattFeld } from './blattFreigabe'
 import { abgrenzen, datenRegel, neueMarke } from './kiSchutz'
@@ -468,8 +469,10 @@ export function abgabeAufgabenAnfrage(
       '- INHALT VOR FORM: Prüfe, ob der Operator erfüllt ist („nenne" = Stichpunkte genügen). Bemängle die Form nur, wenn die Aufgabe sie verlangt.',
       '- Verrate die Lösung NICHT – weder wörtlich noch umschrieben. Keine Note, keine Punkte.',
       '- Gib für JEDE Aufgabe genau einen Eintrag mit ihrer Nummer zurück.',
+      EIGENWISSEN_REGEL,
       opts.sprache && opts.sprache !== 'de' ? `- Schreibe auf Deutsch; Zitate aus den Antworten bleiben in der Originalsprache (${opts.sprache}).` : '',
       bilder.length ? '- Mit dem Stift Eingetragenes steht auf den beigefügten Seitenbildern; beziehe es bei der passenden Aufgabe ein.' : '',
+      bilder.length ? '- HANDSCHRIFT: Was in den Schreiblinien oder Feldern dieser Aufgabe mit dem Stift geschrieben steht, IST die Antwort (auch zusätzlich zu Getipptem). Lies es auf dem Seitenbild Wort für Wort ab und bewerte es genau wie getippten Text – nie als „leer“ oder „nichts eingetragen“. Ist eine Stelle unleserlich, sag das freundlich und bitte um deutlichere Schrift. Zitate in Markierungen nur, wenn sie wörtlich getippt sind.' : '',
       opts.material ? `MATERIAL DES BLATTS MIT ZEILENNUMMERN (nur zum Prüfen von Belegen, nicht Teil der Antworten):\n${opts.material}` : '',
       ...eintraege.map((e) =>
         [
@@ -481,7 +484,7 @@ export function abgabeAufgabenAnfrage(
             ? `BEWERTUNG ZU AUFGABE ${e.aufgabe.nr}: Jede Lücke ist richtig, wenn sie den Satz inhaltlich passend zum Text ergänzt – wörtlich aus dem Text übernommen oder in eigenen Worten; ein anderer Wortlaut als die Musterlösung ist kein Fehler. Abschreiben und Sprachfehler senken die Einschätzung nicht.`
             : '',
           `ANTWORT ZU AUFGABE ${e.aufgabe.nr} (zwischen [ANFANG ${marke}] und [ENDE ${marke}]):`,
-          abgrenzen(e.antwort.trim() || '(nur auf dem Blatt eingezeichnet, siehe Bild)', marke)
+          abgrenzen(e.antwort.trim() || '(nur handschriftlich bzw. auf dem Blatt eingezeichnet – siehe Seitenbild)', marke)
         ]
           .filter(Boolean)
           .join('\n')

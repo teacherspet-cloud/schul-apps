@@ -16,6 +16,7 @@ import type { AbschriftBefund } from './abschrift'
 import type { AufgabenSchluessel } from './blattPruefung'
 import { abgrenzen, datenRegel, neueMarke } from './kiSchutz'
 import { KRISEN_FELD, KRISEN_REGEL } from './krise'
+import { EIGENWISSEN_REGEL, SPANISCH_ZEICHEN_KORREKTUR } from './feedbackRegeln'
 import { ohneTrenner } from './blattKiSchutz'
 
 export interface BlattAufgabe {
@@ -89,7 +90,7 @@ export interface AufgabenFeedback {
   fehlt?: string
   schritt?: string
   /** Markierungen in der Antwort: wörtliches Zitat, Art, Kommentar */
-  markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string; zeichen?: string }[]
+  markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string; zeichen?: string; verbesserung?: string }[]
   /** Krisenhinweis (22.10.2026): Die App zeigt dem Kind den festen Hilfetext (shared/krise.ts) – nie eine Sanktion */
   krise?: boolean
 }
@@ -164,11 +165,13 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       '- INHALT VOR FORM: Prüfe, ob der Operator erfüllt ist („nenne" = Stichpunkte genügen; „erkläre", „beschreibe", „beurteile" = Zusammenhänge). Bemängle die Form (Fließtext, Stichpunkte) NUR, wenn die Aufgabe sie ausdrücklich verlangt.',
       '- Keine Allgemeinplätze („Schau noch einmal in die Quelle", „Achte auf Genauigkeit") ohne zu sagen, WORAUF genau.',
       '- markierungen: Stellen der Antwort mit wörtlichem Zitat (1–8 Wörter, genau wie geschrieben): art „lob" für Gelungenes, „fehler" für Falsches, „hinweis" für Unvollständiges; text = kurzer Randkommentar ohne die Lösung. Inhaltlich 1–6 Stellen.',
-      sinn ? '' : '- SPRACHE WIE IN EINER KORRIGIERTEN ARBEIT: Markiere JEDEN sprachlichen Fehler einzeln (Rechtschreibung, Zeichensetzung, Grammatik, Satzbau, Ausdruck …) als eigene Markierung mit art „fehler", dem Korrekturzeichen im Feld „zeichen" und als Zitat genau das fehlerhafte Wort bzw. die kurze Wortgruppe; text = kurz, was falsch ist (z. B. „das/dass", „Komma vor dem Nebensatz"), ohne die ganze Verbesserung vorzuschreiben. Höchstens 15 Sprachmarkierungen. Inhaltliche Markierungen: „zeichen" leer oder „Inh".',
+      sinn ? '' : '- SPRACHE WIE IN EINER KORRIGIERTEN ARBEIT: Markiere JEDEN sprachlichen Fehler einzeln (Rechtschreibung, Zeichensetzung, Grammatik, Satzbau, Ausdruck …) als eigene Markierung mit art „fehler", dem Korrekturzeichen im Feld „zeichen" und als Zitat genau das fehlerhafte Wort bzw. die kurze Wortgruppe; text = kurz, was falsch ist (z. B. „das/dass", „Komma vor dem Nebensatz", „falsche Präposition"); verbesserung = genau das Zitat in berichtigter Form (Rechtschreibung, Zeichensetzung, Grammatik, Präposition; bei Ausdruck/Wortwahl ein passender Vorschlag), nur diese Stelle, keine weiteren Inhalte. Höchstens 15 Sprachmarkierungen. Inhaltliche Markierungen: „zeichen" leer oder „Inh", verbesserung leer.',
       zeichen.length ? `- Korrekturzeichen (nur diese verwenden): ${zeichen.map((z) => `${z.zeichen} = ${z.bedeutung}`).join('; ')}.` : '',
       sinn
         ? '- VERSTEHENSAUFGABE MIT LÜCKEN: Bewertet wird NUR, ob jede Ergänzung den Satz inhaltlich passend zum Text vervollständigt. Wörtlich aus dem Text übernommene Wörter sind genauso richtig wie eigene Formulierungen – Abschreiben ist hier KEIN Mangel und senkt die Einschätzung nicht, auch wenn die Anweisung eigene Worte empfiehlt (dann höchstens ein freundlicher Tipp im schritt). Ein anderer Wortlaut als die Musterlösung ist kein Fehler, wenn der Inhalt stimmt. Rechtschreibung und Grammatik zählen nicht: keine Sprachmarkierungen mit art „fehler" (höchstens „hinweis"). Markiere eine Ergänzung nur dann als „fehler", wenn sie inhaltlich nicht stimmt. Gleiche Antwort = gleiches Urteil.'
         : '',
+      sinn ? '' : EIGENWISSEN_REGEL,
+      sprache === 'es' ? SPANISCH_ZEICHEN_KORREKTUR : '',
       sinn
         ? ''
         : '- EIGENE LEISTUNG: Wörtlich aus dem Material Übernommenes ist KEINE Bearbeitung von Operatoren wie „fasse zusammen", „beschreibe", „erkläre", „ordne ein", „beurteile". Lobe Abgeschriebenes nicht als gelungen; benenne es unter „fehlt" und zeige im nächsten Schritt, wie man in eigenen Worten verdichtet.',
@@ -184,8 +187,9 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       bilder.length
         ? '- Mit dem Stift Eingetragenes, Textkästchen und Linien stehen auf den beigefügten Seitenbildern; beziehe nur ein, was zu dieser Aufgabe gehört.'
         : '',
+      bilder.length ? '- HANDSCHRIFT: Was in den Schreiblinien oder Feldern dieser Aufgabe mit dem Stift geschrieben steht, IST die Antwort (auch zusätzlich zu Getipptem). Lies es auf dem Seitenbild Wort für Wort ab und bewerte es genau wie getippten Text – nie als „leer“ oder „nichts eingetragen“. Ist eine Stelle unleserlich, sag das freundlich und bitte um deutlichere Schrift. Zitate in Markierungen nur, wenn sie wörtlich getippt sind.' : '',
       zusatz.material
-        ? `${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; eine um eine Zeile abweichende Zeilenangabe (Zeilenumbruch, Zählweise) gilt als richtig; ein sinngemäßer Beleg ohne wörtliches Zitat gilt, wenn die genannte Stelle den Gedanken trägt; nicht Teil der Antwort):'}\n${zusatz.material}`
+        ? `${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; eigenes Wissen über das Material hinaus ist erlaubt (siehe Regel EIGENES WISSEN); eine um eine Zeile abweichende Zeilenangabe (Zeilenumbruch, Zählweise) gilt als richtig; ein sinngemäßer Beleg ohne wörtliches Zitat gilt, wenn die genannte Stelle den Gedanken trägt; nicht Teil der Antwort):'}\n${zusatz.material}`
         : '',
       // Befund mit Zitaten aus der Antwort: ohne Trennzeichen, damit er keinen Block vortäuschen kann
       zusatz.schreibform ? ohneTrenner(zusatz.schreibform, marke) : '',
@@ -229,9 +233,10 @@ ${ohneTrenner(zusatz.auto, marke)}`
               zitat: { type: 'string' },
               art: { type: 'string', enum: ['lob', 'fehler', 'hinweis'] },
               text: { type: 'string' },
-              zeichen: { type: 'string' }
+              zeichen: { type: 'string' },
+              verbesserung: { type: 'string' }
             },
-            required: ['zitat', 'art', 'text', 'zeichen'],
+            required: ['zitat', 'art', 'text', 'zeichen', 'verbesserung'],
             additionalProperties: false
           }
         },
@@ -259,10 +264,16 @@ export function aufgabenFeedbackAus(roh: unknown): AufgabenFeedback {
       zitat: t(m.zitat, 120),
       art: (['lob', 'fehler', 'hinweis'].includes(String(m.art)) ? m.art : 'hinweis') as 'lob' | 'fehler' | 'hinweis',
       text: t(m.text, 240),
-      zeichen: t(m.zeichen, 6)
+      zeichen: t(m.zeichen, 6),
+      verbesserung: t(m.verbesserung, 160)
     }))
     .filter((m) => m.zitat && m.text)
-    .map(({ zeichen, ...m }) => (zeichen && zeichen !== '-' ? { ...m, zeichen } : m))
+    .map(({ zeichen, verbesserung, ...m }) => ({
+      ...m,
+      ...(zeichen && zeichen !== '-' ? { zeichen } : {}),
+      // Verbesserung nur bei sprachlichen Fehlern (27.11.2026) – nie bei Inhalt, Lob oder Hinweis
+      ...(verbesserung && m.art === 'fehler' && !/^inh/i.test(zeichen) && verbesserung !== m.zitat ? { verbesserung } : {})
+    }))
     .slice(0, 24)
   // Ältere Antworten (nur „text") bleiben lesbar
   const text =

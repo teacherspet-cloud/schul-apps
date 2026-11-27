@@ -50,10 +50,10 @@ function leerlaufStarten(): void {
   leerlauf.unref?.()
 }
 
-async function mitSeite<T>(html: string, fn: (seite: import('playwright-core').Page) => Promise<T>, skripte = true): Promise<T> {
+async function mitSeite<T>(html: string, fn: (seite: import('playwright-core').Page) => Promise<T>, skripte = true, schaerfe = 1): Promise<T> {
   return nacheinander(async () => {
     const b = await holeBrowser()
-    const kontext = await b.newContext({ javaScriptEnabled: skripte })
+    const kontext = await b.newContext({ javaScriptEnabled: skripte, deviceScaleFactor: schaerfe })
     try {
       const seite = await kontext.newPage()
       // Kein Zugriff aus dem Druck heraus ins Netz – alles Nötige steckt im HTML (data:-Adressen)
@@ -260,9 +260,10 @@ export async function seitenMitTinte(
     for (const n of seiten) {
       const el = s.locator('.ws-page').nth(n)
       if (!(await el.count())) continue
-      const jpg = await el.screenshot({ type: 'jpeg', quality: 70 })
+      const jpg = await el.screenshot({ type: 'jpeg', quality: 80 })
       bilder.push(`data:image/jpeg;base64,${Buffer.from(jpg).toString('base64')}`)
     }
     return bilder
-  })
+    // Schärfer (27.11.2026): Handschrift in den Schreiblinien muss für die KI lesbar sein (vorher 900 px, Qualität 70)
+  }, true, 1.6)
 }

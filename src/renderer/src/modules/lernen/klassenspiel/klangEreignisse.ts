@@ -36,19 +36,20 @@ export function klangAusBloecken(vorher: BBlock[], jetzt: BBlock[]): KlangAnstos
     if (b1.hinweis && !b0.hinweis) aus.push({ art: 'gebremst', ducken: true })
   }
 
-  // Rennen/Tauziehen/Puzzle/Turnier-Bahnen
+  // Rennen/Puzzle/Turnier-Bahnen. Tauziehen (Seil) bleibt ohne Geräusche – Wunsch der Lehrkraft 27.11.2026,
+  // nur die Musik läuft dort weiter.
   const n0 = finde(vorher, 'bahnen')
   const n1 = finde(jetzt, 'bahnen')
-  if (n0 && n1 && n0.teams.length === n1.teams.length) {
+  if (n0 && n1 && !n1.seil && n0.teams.length === n1.teams.length) {
     const w0 = n0.teams.map((t) => t.wert)
     const w1 = n1.teams.map((t) => t.wert)
     const plus = w1.reduce((s, w, i) => s + Math.max(0, w - w0[i]), 0)
-    if (plus > 0) aus.push({ art: n1.seil ? 'seil' : 'schritt', staerke: n1.seil ? 0.85 : 0.6 })
+    if (plus > 0) aus.push({ art: 'schritt', staerke: 0.6 })
     const f0 = fuehrend(w0)
     const f1 = fuehrend(w1)
     if (f1 !== null && f0 !== null && f1 !== f0) aus.push({ art: 'fuehrung', ducken: true })
     const imZiel = (ts: typeof n1.teams): number => ts.filter((t) => t.ziel > 0 && t.wert >= t.ziel).length
-    if (!n1.seil && imZiel(n1.teams) > imZiel(n0.teams)) aus.push({ art: 'rekord', ducken: true })
+    if (imZiel(n1.teams) > imZiel(n0.teams)) aus.push({ art: 'rekord', ducken: true })
   }
 
   // Gebiet: Feld erobert (vorher frei) oder gestohlen (vorher anderes Team)

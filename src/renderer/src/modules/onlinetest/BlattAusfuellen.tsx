@@ -12,7 +12,10 @@
 import { amSatzanfang, grossAmSatzanfang } from '@shared/grossKlein'
 import { materialMitZeilen } from './materialZeilen'
 import type { Stil } from './objektOptionen'
-import { HilfeModal, hilfekartenAus, oeffneHilfeFenster, type Hilfekarten } from './hilfeFenster'
+import { HilfeFenster, hilfekartenAus, type Hilfekarten } from './hilfeFenster'
+import { Mitlauf, SichtKontext, useSichtStore } from './mitlauf'
+import { WoerterbuchFenster, WoerterbuchKnopf } from './WoerterbuchFenster'
+import type { WoerterbuchId } from '@shared/woerterbuecher'
 import { FormulierungsKasten, FormulierungsKnopf, formulierungshilfenAus, type Formulierungshilfe } from './formulierungsLeiste'
 import {
   ActionIcon,
@@ -148,6 +151,8 @@ export interface BlattDaten {
     schrittweise?: boolean
     /** Merkkästen erst nach vollständiger Bearbeitung */
     merkAmEnde?: boolean
+    /** Freigeschaltete Wörterbücher (27.11.2026) */
+    woerterbuecher?: WoerterbuchId[]
   }
   /** Von der Lehrkraft freigeschaltete Aufgaben (zählen wie „teilweise") */
   freigeschaltet?: number[]
@@ -640,9 +645,9 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
   const [fassungen, setFassungen] = useState(d.fassungen)
   const [genutzt, setGenutzt] = useState(d.genutzt)
   const [aufgabenFb, setAufgabenFb] = useState(d.aufgabenFeedback)
-  // Geöffnete Hilfekarten je Aufgabe (06.10.2026) – Fenster bzw. Pop-up als Rückfall
+  // Geöffnete Hilfekarten je Aufgabe (06.10.2026); offene Hilfefenster (27.11.2026: verschiebbar in der Seite, mehrere zugleich)
   const [hilfen, setHilfen] = useState<Record<string, number>>(d.hilfen ?? {})
-  const [hilfeModal, setHilfeModal] = useState<Hilfekarten | null>(null)
+  const [hilfeOffen, setHilfeOffen] = useState<{ h: Hilfekarten; start?: { x: number; y: number } }[]>([])
   const hilfeGezeigt = useCallback(
     (nr: number, karten: number): void => {
       setHilfen((h) => ({ ...h, [String(nr)]: Math.max(h[String(nr)] ?? 0, karten) }))
@@ -651,10 +656,11 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
     },
     [d.id, lehrkraft]
   )
-  const hilfeOeffnen = (a: AufgabeInfo): void => {
-    if (!a.hilfe) return
-    const offen = hilfen[String(a.nr)] ?? 0
-    if (!oeffneHilfeFenster(a.hilfe, offen, (k) => hilfeGezeigt(a.nr, k))) setHilfeModal(a.hilfe)
+  const hilfeOeffnen = (a: AufgabeInfo, start?: { x: number; y: number }): void => {
+    const h = a.hilfe
+    if (!h) return
+    // Ein zweiter Druck auf dasselbe ? schließt sein Fenster wieder
+    setHilfeOffen((l) => (l.some((x) => x.h.nr === h.nr) ? l.filter((x) => x.h.nr !== h.nr) : [...l, { h, start }]))
   }
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
@@ -717,7 +723,16 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
     ]
     return roh.map((a, i) => {
       const zeichen = 'zeichen' in a ? String(a.zeichen ?? '') : ''
-      return { nr: i + 1, zitat: a.zitat, art: a.art, text: a.text, ...(zeichen ? { zeichen } : {}), ...(a.aufgabe ? { aufgabe: a.aufgabe } : {}) }
+      const verbesserung = 'verbesserung' in a && a.verbesserung ? String(a.verbesserung) : ''
+      return {
+        nr: i + 1,
+        zitat: a.zitat,
+        art: a.art,
+        text: a.text,
+        ...(zeichen ? { zeichen } : {}),
+        ...(verbesserung ? { verbesserung } : {}),
+        ...(a.aufgabe ? { aufgabe: a.aufgabe } : {})
+      }
     })
   }, [letzteFassung, aufgabenFb])
   // Randkommentare stehen im Korrekturrand der Seite (blattDigital.ts) – keine Spalte daneben
@@ -761,6 +776,12 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
     if (zoomInhalt.current) zoomInhalt.current.style.transform = ''
   }, [zoom])
   const eff = massstab * zoom
+  // Obere Sichtkante in Blattkoordinaten – für die mitlaufenden Knöpfe (? und Formulierungshilfen, 27.11.2026)
+  const sicht = useSichtStore(zoomInhalt, eff)
+  // Wörterbuch (27.11.2026): Buch-Knopf in der Werkzeugleiste, nur wenn die Lehrkraft eines freigeschaltet hat
+  const [woerterbuchAuf, setWoerterbuchAuf] = useState(false)
+  const woerterbuecher = d.einstellungen.woerterbuecher ?? []
+  const woerterbuchKnopf = woerterbuecher.length && !lehrkraft ? <WoerterbuchKnopf offen={woerterbuchAuf} umschalten={() => setWoerterbuchAuf((x) => !x)} /> : null
   const notizrandSchalter = (
     <Tooltip label={notizrandAn ? 'Notizrand ausblenden' : 'Notizrand neben dem Blatt einblenden'}>
       <ActionIcon
@@ -1269,6 +1290,7 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
           setVorgabe={setVorgabe}
           rechts={
             <Group gap={4} wrap="nowrap" className="zoom-in-leiste">
+              {woerterbuchKnopf}
               {notizrandSchalter}
               {zoomKnoepfe}
             </Group>
@@ -1278,6 +1300,7 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
       {/* Ohne Werkzeugleiste (eingereicht/gesperrt, nur Ansehen): die Zoom-Knöpfe in einer eigenen, mitlaufenden Zeile */}
       {ansicht === 'blatt' && !(schreibbar && werkzeugeDa) && (
         <Group justify="flex-end" className="zoom-in-leiste" style={{ position: 'sticky', top: 8, zIndex: 30 }}>
+          {woerterbuchKnopf}
           {(schreibbar || randNotizenDa) && notizrandSchalter}
           {zoomKnoepfe}
         </Group>
@@ -1327,6 +1350,7 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
               style={{ width: dokBreite, height: 1123, border: 0, display: 'block', pointerEvents: 'none', background: '#fff' }}
             />
             {gemessen && (
+              <SichtKontext.Provider value={sicht}>
               <Ebene
                 grossKlein={grossKlein}
                 breite={dokBreite}
@@ -1366,6 +1390,7 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
                 bildOeffnen={setBildOffen}
                 bildMarkiert={(b, i) => Boolean(tinte[bildTinteSchluessel(b.id)]) || objekte.some((o) => o.s === BILD_SEITE + i)}
               />
+              </SichtKontext.Provider>
             )}
             {gemessen &&
               gemessen.seiten.map((s, i) =>
@@ -1424,14 +1449,23 @@ function AusfuellenInnen({ d, lehrkraft, probe }: { d: BlattDaten; lehrkraft?: {
                 schliessen={() => setBildOffen(null)}
               />
             )}
-            {hilfeModal && (
-              <HilfeModal
-                h={hilfeModal}
-                offen={hilfen[String(hilfeModal.nr)] ?? 0}
-                gezeigt={(k) => hilfeGezeigt(hilfeModal.nr, k)}
-                schliessen={() => setHilfeModal(null)}
+            {woerterbuchAuf && woerterbuecher.length > 0 && (
+              <WoerterbuchFenster
+                erlaubt={woerterbuecher}
+                pfad={(wb, q) => `/s/api/blatt/woerterbuch?id=${encodeURIComponent(d.id)}&wb=${wb}&q=${encodeURIComponent(q)}`}
+                schliessen={() => setWoerterbuchAuf(false)}
               />
             )}
+            {hilfeOffen.map(({ h, start }) => (
+              <HilfeFenster
+                key={h.nr}
+                h={h}
+                start={start}
+                offen={hilfen[String(h.nr)] ?? 0}
+                gezeigt={(k) => hilfeGezeigt(h.nr, k)}
+                schliessen={() => setHilfeOffen((l) => l.filter((x) => x.h.nr !== h.nr))}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -1613,6 +1647,17 @@ function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.El
   )
 }
 
+/**
+ * Unteres Ende einer Aufgabe in Blattkoordinaten (für das mitlaufende ?): ihr unterstes Feld, sonst der Kopf der
+ * nächsten Aufgabe auf derselben Seite, sonst das Seitenende.
+ */
+function aufgabeEnde(a: AufgabeInfo, aufgaben: AufgabeInfo[], felder: Feld[], s: Seite): number {
+  const feldEnde = Math.max(-Infinity, ...felder.filter((f) => f.nr === a.nr).map((f) => f.y + f.h))
+  if (Number.isFinite(feldEnde)) return Math.max(feldEnde, a.y + 40)
+  const naechste = aufgaben.filter((x) => x.seite === a.seite && x.y > a.y).map((x) => x.y)
+  return naechste.length ? Math.min(...naechste) - 8 : s.y + s.h - 16
+}
+
 /** Eingabefelder und Stift-Ebene über dem Blatt */
 function Ebene(p: {
   /** Breite des Dokuments (mit Querseiten 1123 px) */
@@ -1657,7 +1702,7 @@ function Ebene(p: {
   form?: FormArt
   /** Geöffnete Hilfekarten je Aufgabe und Öffnen des Hilfefensters (06.10.2026) */
   hilfen?: Record<string, number>
-  hilfeOeffnen?: (a: AufgabeInfo) => void
+  hilfeOeffnen?: (a: AufgabeInfo, start?: { x: number; y: number }) => void
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   // Feedback-Knopf an der Aufgabe: zum Prüfen lassen oder um vorhandenes Feedback zu lesen
@@ -1908,7 +1953,11 @@ function Ebene(p: {
         if (f.art !== 'zeilen' || (f.zeilen ?? 1) < 2) return null
         const hilfen = p.aufgaben.find((a) => a.nr === f.nr)?.phrasen
         if (!hilfen?.length) return null
-        return <FormulierungsKnopf key={`phr-${f.id}`} hilfen={hilfen} feldId={f.id} stil={{ position: 'absolute', left: f.x + f.w + 6, top: f.y - 2 }} />
+        return (
+          <Mitlauf key={`phr-${f.id}`} x={f.x + f.w + 6} von={f.y - 2} bis={f.y + f.h} hoehe={30} z={21}>
+            <FormulierungsKnopf hilfen={hilfen} feldId={f.id} stil={{}} />
+          </Mitlauf>
+        )
       })}
       {/* Hilfekarten rechts neben der Aufgabe (06.10.2026): eigenes kleines Fenster, Karten schrittweise */}
       {p.hilfeOeffnen &&
@@ -1919,23 +1968,25 @@ function Ebene(p: {
             if (!s) return null
             const genutzt = p.hilfen?.[String(a.nr)] ?? 0
             return (
-              <Tooltip
-                key={`hilfe-${a.nr}`}
-                label={`Hilfekarten zu Aufgabe ${a.nr} (${genutzt ? `${genutzt} von ${a.hilfe!.karten.length} geöffnet` : `${a.hilfe!.karten.length} Karten`})`}
-              >
-                <ActionIcon
-                  variant="filled"
-                  color="yellow"
-                  radius="xl"
-                  size="lg"
-                  style={{ position: 'absolute', left: s.x + s.w - 46, top: a.y - 4, zIndex: 20, boxShadow: '0 1px 4px rgba(0,0,0,.18)' }}
-                  onClick={() => p.hilfeOeffnen!(a)}
-                  aria-label={`Hilfe zu Aufgabe ${a.nr}`}
-                  data-hilfe-nr={a.nr}
-                >
-                  <IconHelp size={20} />
-                </ActionIcon>
-              </Tooltip>
+              <Mitlauf key={`hilfe-${a.nr}`} x={s.x + s.w - 46} von={a.y - 4} bis={aufgabeEnde(a, p.aufgaben, p.felder, s)} hoehe={38}>
+                <Tooltip label={`Hilfekarten zu Aufgabe ${a.nr} (${genutzt ? `${genutzt} von ${a.hilfe!.karten.length} geöffnet` : `${a.hilfe!.karten.length} Karten`})`}>
+                  <ActionIcon
+                    variant="filled"
+                    color="yellow"
+                    radius="xl"
+                    size="lg"
+                    style={{ boxShadow: '0 1px 4px rgba(0,0,0,.18)' }}
+                    onClick={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect()
+                      p.hilfeOeffnen!(a, { x: r.left - 370, y: r.top })
+                    }}
+                    aria-label={`Hilfe zu Aufgabe ${a.nr}`}
+                    data-hilfe-nr={a.nr}
+                  >
+                    <IconHelp size={20} />
+                  </ActionIcon>
+                </Tooltip>
+              </Mitlauf>
             )
           })}
       {/* Bild vergrößern und markieren (25.10.2026): Lupe unten rechts am Bild, grün sobald es Markierungen trägt */}
@@ -2037,7 +2088,7 @@ function Liste(p: {
   loesungenAuf?: boolean
   zumBlatt: (a: AufgabeInfo) => void
   /** Hilfekarten öffnen (06.10.2026) */
-  hilfeOeffnen?: (a: AufgabeInfo) => void
+  hilfeOeffnen?: (a: AufgabeInfo, start?: { x: number; y: number }) => void
 }): React.JSX.Element {
   const gruppen = useMemo(() => {
     // Auch Aufgaben ohne Felder, die auf dem Blatt gezeichnet werden (Diagramm, Zeitleiste …)

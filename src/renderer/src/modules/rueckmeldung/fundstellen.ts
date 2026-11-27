@@ -72,6 +72,8 @@ export function fundstellenRegel(g: Pick<Grundlage, 'aufgaben' | 'fundstellen'>,
       '- MATERIALBEZUG: Jeder Erwartungspunkt nennt konkret, WAS aus dem Material erwartet wird – die einzelne Information, das Argument, das Beispiel, den Beleg –, nicht allgemein „wichtige Aspekte des Textes“ oder „Argumente nennen“.',
       `- ${stelle}.`,
       '- Wo die Lernenden frei schreiben, folgt eine kurze Musterlösung, die genau diese Inhalte aus dem Material verarbeitet.',
+      // Eigenwissen (27.11.2026, Befund „Cars in the Lion City"): Transfer/Beurteilung braucht Weltwissen – der Horizont sagt das ausdrücklich
+      '- ÜBER DAS MATERIAL HINAUS: Verlangt die Aufgabe Vergleich, Übertragung (z. B. auf Deutschland oder das eigene Umfeld), Beurteilung oder Stellungnahme, sagt der Erwartungshorizont ausdrücklich, dass dort plausibles Allgemeinwissen, eigene Erfahrungen und begründete Vermutungen erwartet und zulässig sind (mit 1–2 Beispielen), und verlangt Materialbelege nur für Aussagen über das Material.',
       KEINE_WORTZAHL
     ].join('\n')
   if (fuer === 'tabelle')
